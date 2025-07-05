@@ -2,95 +2,91 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <title>Member Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Member Dashboard – Baccarat Fund Club</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white min-h-screen p-6">
-  <div class="max-w-2xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold">👤 Member Dashboard</h1>
-      <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
-    </div>
+<body class="bg-gray-900 text-white p-6">
+  <h1 class="text-3xl font-bold mb-6 text-center">🎴 Member Dashboard</h1>
 
-    <div id="memberInfo" class="bg-gray-800 p-6 rounded-lg shadow-lg space-y-4">
-      <!-- Member details inserted here -->
+  <!-- Profile Info as Read-Only Inputs -->
+  <div class="bg-gray-800 p-6 rounded-lg mb-8 space-y-4">
+    <div>
+      <label class="block mb-1 text-gray-300">Name</label>
+      <input id="memberName" type="text" readonly class="w-full p-2 rounded bg-gray-700 text-white" />
     </div>
-
-    <div class="mt-8 bg-gray-800 p-6 rounded-lg shadow-lg">
-      <h2 class="text-xl font-semibold mb-4">💳 Request a Transaction</h2>
-      <form id="txForm" class="space-y-4">
-        <select id="type" class="w-full p-2 bg-gray-700 rounded">
-          <option value="deposit">Deposit</option>
-          <option value="withdraw">Withdraw</option>
-        </select>
-        <input type="number" id="amount" placeholder="Amount in ₱" class="w-full p-2 bg-gray-700 rounded" required />
-        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded">Submit Request</button>
-        <p id="txMessage" class="text-green-400 text-center mt-2"></p>
-      </form>
+    <div>
+      <label class="block mb-1 text-gray-300">Email</label>
+      <input id="memberEmail" type="email" readonly class="w-full p-2 rounded bg-gray-700 text-white" />
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block mb-1 text-gray-300">Shares</label>
+        <input id="memberShares" type="number" readonly class="w-full p-2 rounded bg-gray-700 text-white" />
+      </div>
+      <div>
+        <label class="block mb-1 text-gray-300">Balance (₱)</label>
+        <input id="memberBalance" type="number" readonly class="w-full p-2 rounded bg-gray-700 text-white" />
+      </div>
     </div>
   </div>
 
+  <!-- Withdrawal Request Section -->
+  <section class="bg-gray-800 p-6 rounded-lg mb-8">
+    <h2 class="text-2xl font-semibold mb-4">💸 Request Withdrawal</h2>
+    <form id="withdrawForm" class="space-y-4">
+      <div>
+        <label for="amount" class="block mb-1 text-gray-300">Amount (₱)</label>
+        <input type="number" id="amount" min="1" required class="w-full p-2 rounded bg-gray-700 text-white" />
+      </div>
+      <div>
+        <label for="note" class="block mb-1 text-gray-300">Note (optional)</label>
+        <textarea id="note" rows="2" class="w-full p-2 rounded bg-gray-700 text-white"></textarea>
+      </div>
+      <button type="submit" class="w-full bg-green-600 hover:bg-green-700 p-2 rounded">Submit Request</button>
+      <p id="withdrawMessage" class="mt-2 text-sm text-green-400 hidden">✅ Request submitted!</p>
+    </form>
+  </section>
+
   <script>
-    async function fetchMembers() {
-      try {
-        const r = await fetch("members.json");
-        const defaultMembers = await r.json();
-        const newMembers = JSON.parse(localStorage.getItem("newMembers") || "[]");
-        return [...defaultMembers, ...newMembers];
-      } catch {
-        return JSON.parse(localStorage.getItem("newMembers") || "[]");
-      }
-    }
-
-    function showMember(member) {
-      const div = document.getElementById("memberInfo");
-      if (!member) {
-        div.innerHTML = '<p class="text-red-500">Member not found.</p>';
-        return;
-      }
-      div.innerHTML = `
-        <p><strong>Name:</strong> ${member.name}</p>
-        <p><strong>Email:</strong> ${member.email}</p>
-        <p><strong>Phone:</strong> ${member.phone}</p>
-        <p><strong>Shares:</strong> ${member.shares}</p>
-        <p><strong>Balance:</strong> ₱${member.balance.toFixed(2)}</p>
-        <p><strong>Deposits:</strong> ${member.deposits}</p>
-        <p><strong>Withdrawals:</strong> ${member.withdrawals}</p>
-        <p><strong>Joined:</strong> ${member.joinDate}</p>
-      `;
-    }
-
-    document.getElementById("logoutBtn").addEventListener("click", () => {
-      localStorage.removeItem("role");
-      localStorage.removeItem("memberEmail");
-      window.location.href = "index.html";
-    });
-
-    document.getElementById("txForm").addEventListener("submit", (e) => {
-      e.preventDefault();
-      const amount = parseFloat(document.getElementById("amount").value);
-      const type = document.getElementById("type").value;
-      const txMessage = document.getElementById("txMessage");
-
-      if (!amount || amount <= 0) {
-        txMessage.textContent = "Invalid amount.";
-        txMessage.className = "text-red-400 text-center";
+    window.addEventListener('DOMContentLoaded', () => {
+      const user = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+      if (!user.email || !user.name) {
+        // Not logged in or bad data → back to login
+        window.location.href = 'index.html';
         return;
       }
 
-      txMessage.textContent = `✅ ${type === "deposit" ? "Deposit" : "Withdrawal"} request for ₱${amount} submitted!`;
-      txMessage.className = "text-green-400 text-center";
+      // Populate the read-only inputs
+      document.getElementById('memberName').value = user.name;
+      document.getElementById('memberEmail').value = user.email;
+      document.getElementById('memberShares').value = user.shares || 0;
+      document.getElementById('memberBalance').value = user.balance?.toFixed(2) || '0.00';
 
-      document.getElementById("amount").value = "";
+      // Handle withdrawal form
+      document.getElementById('withdrawForm').addEventListener('submit', e => {
+        e.preventDefault();
+        const amount = parseFloat(document.getElementById('amount').value);
+        const note = document.getElementById('note').value.trim();
+
+        if (isNaN(amount) || amount <= 0) {
+          alert('🔴 Enter a valid positive amount.');
+          return;
+        }
+
+        const requests = JSON.parse(localStorage.getItem('withdrawRequests') || '[]');
+        requests.push({
+          email: user.email,
+          amount,
+          note,
+          date: new Date().toISOString()
+        });
+        localStorage.setItem('withdrawRequests', JSON.stringify(requests));
+
+        e.target.reset();
+        document.getElementById('withdrawMessage').classList.remove('hidden');
+      });
     });
-
-    (async () => {
-      const email = localStorage.getItem("memberEmail") || "";
-      const members = await fetchMembers();
-      const member = members.find(m => m.email.toLowerCase() === email.toLowerCase());
-      showMember(member);
-    })();
   </script>
 </body>
 </html>
