@@ -69,21 +69,25 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { 
-      getFirestore, collection, getDocs, doc, updateDoc, addDoc, 
+      getFirestore, collection, getDocs, doc, updateDoc, addDoc, getDoc,
       query, orderBy, onSnapshot 
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
       authDomain: "bfc-tracker.firebaseapp.com",
+      databaseURL: "https://bfc-tracker-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "bfc-tracker",
-      storageBucket: "bfc-tracker.appspot.com",
+      storageBucket: "bfc-tracker.firebasestorage.app",
       messagingSenderId: "127052459580",
-      appId: "1:127052459580:web:c3d5caa9302238c11cdd39"
+      appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
+      measurementId: "G-PNYRCFJHYM"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const analytics = getAnalytics(app);
 
     const totalMembers = document.getElementById("totalMembers");
     const totalShares = document.getElementById("totalShares");
@@ -148,8 +152,8 @@
           <p><strong>Name:</strong> ${m.name}</p>
           <p><strong>Email:</strong> ${m.email}</p>
           <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${m.status === 'approved' ? 'bg-green-600' : m.status === 'pending' ? 'bg-yellow-600' : 'bg-red-600'}">${m.status}</span></p>
-          <p><strong>Shares:</strong> ${m.shares}</p>
-          <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
+          <p><strong>Shares:</strong> ${m.shares || 0}</p>
+          <p><strong>Balance:</strong> ₱${formatCurrency(m.balance || 0)}</p>
         `;
         membersList.appendChild(div);
       });
@@ -162,18 +166,19 @@
     function updateTopShareholders() {
       const top = [...allMembers]
         .filter(m => m.status === 'approved')
-        .sort((a, b) => b.shares - a.shares)
+        .sort((a, b) => (b.shares || 0) - (a.shares || 0))
         .slice(0, 5);
 
       topShareholders.innerHTML = "";
       top.forEach((m, i) => {
         const li = document.createElement("li");
-        li.textContent = `${m.name} — ${m.shares} shares`;
+        li.textContent = `${m.name} — ${m.shares || 0} shares`;
         topShareholders.appendChild(li);
       });
     }
 
-    search webinarsInput.addEventListener("input", () => {
+    // Fix search input event listener (correcting typo from 'search webinarsInput')
+    searchInput.addEventListener("input", () => {
       const query = searchInput.value.toLowerCase();
       const filtered = allMembers.filter(m =>
         m.name.toLowerCase().includes(query) ||
@@ -196,6 +201,7 @@
               <p><strong>Member:</strong> ${data.memberName}</p>
               <p><strong>Type:</strong> ${data.type}</p>
               <p><strong>Amount:</strong> ₱${formatCurrency(data.amount)}</p>
+              <p><strong>Shares:</strong> ${data.shares || 0}</p>
               <p><strong>Date:</strong> ${data.timestamp?.toDate().toLocaleString() || "N/A"}</p>
               <button class="approve-btn bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded mt-2" data-id="${docSnap.id}" data-member-id="${data.memberId}">Approve</button>
               <button class="reject-btn bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded mt-2" data-id="${docSnap.id}">Reject</button>
@@ -226,19 +232,20 @@
               const memberSnap = await getDoc(memberRef);
               const memberData = memberSnap.data();
               const newShares = (memberData.shares || 0) + (transactionData.shares || 0);
-              const newBalance = (memberData.balance || 0) + transactionData.amount;
+              const newBalance = (memberData.balance || 0) + (transactionData.amount || 0);
 
               await updateDoc(memberRef, {
                 shares: newShares,
                 balance: newBalance
               });
             }
-            await updateDoc(transactionRef, { status: isApprove ? "approved" : "rejected" });
+            await updateDoc(transactionRef, { status: "approved" });
           } else {
             await updateDoc(transactionRef, { status: "rejected" });
           }
         } catch (error) {
           console.error("Error processing transaction:", error);
+          alert("Failed to process transaction. Please try again.");
         }
       }
     });
@@ -259,7 +266,7 @@
         // Add transaction to Firestore
         await addDoc(collection(db, "transactions"), {
           memberId,
-          memberName: allMembers.find(m => m.id === memberId).name,
+          memberName: allMembers.find(m => m.id === memberId)?.name || "Unknown",
           type: "deposit",
           amount,
           shares,
@@ -312,8 +319,8 @@
       snapshot.forEach(docSnap => {
         const data = docSnap.data();
         if (data.status === "approved") {
-          runningBalance += data.amount;
-          labels.push(data.timestamp.toDate().toLocaleString('default', { month: 'short' }));
+          runningBalance += data.amount || 0;
+          labels.push(data.timestamp?.toDate().toLocaleString('default', { month: 'short', year: 'numeric' }) || 'Unknown');
           balances.push(runningBalance);
         }
       });
