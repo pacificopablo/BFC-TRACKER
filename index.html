@@ -6,21 +6,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-900 text-white flex items-center justify-center h-screen">
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
   <div class="bg-gray-800 p-8 rounded shadow-md w-full max-w-sm">
-    <h1 class="text-2xl font-bold mb-4 text-center">🔐 Login</h1>
+    <h1 class="text-2xl font-bold mb-6 text-center">🔐 Baccarat Fund Club Login</h1>
     <form id="loginForm" class="space-y-4">
       <div>
-        <label for="email" class="block mb-1">Email:</label>
+        <label for="email" class="block mb-1">Email</label>
         <input type="email" id="email" required class="w-full px-3 py-2 rounded text-black">
       </div>
       <div>
-        <label for="password" class="block mb-1">Password:</label>
+        <label for="password" class="block mb-1">Password</label>
         <input type="password" id="password" required class="w-full px-3 py-2 rounded text-black">
       </div>
       <button type="submit" class="w-full bg-green-600 py-2 rounded hover:bg-green-700">Login</button>
       <p id="loginMessage" class="mt-2 text-sm text-red-400 hidden">Invalid email or password.</p>
     </form>
+
+    <div class="mt-6 text-sm text-center space-y-2">
+      <a href="register.html" class="block text-blue-400 hover:underline">📋 Register as New Member</a>
+      <button onclick="forgotPassword()" class="text-blue-300 hover:underline">🔑 Forgot Password?</button>
+    </div>
   </div>
 
   <script>
@@ -28,17 +33,31 @@
       e.preventDefault();
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value.trim();
-      const users = JSON.parse(localStorage.getItem('approvedMembers') || '[]');
 
+      // Admin login
+      if (email === 'admin@bfc.com' && password === 'admin123') {
+        localStorage.setItem('isAdmin', 'true');
+        window.location.href = 'admin.html';
+        return;
+      }
+
+      // Member login
+      const users = JSON.parse(localStorage.getItem('approvedMembers') || '[]');
       const matchedUser = users.find(user => user.email === email && user.password === password);
 
       if (matchedUser) {
+        localStorage.setItem('isAdmin', 'false');
         localStorage.setItem('loggedInUser', JSON.stringify(matchedUser));
         window.location.href = 'member-dashboard.html';
       } else {
         document.getElementById('loginMessage').classList.remove('hidden');
       }
     });
+
+    function forgotPassword() {
+      alert("Please contact the admin at admin@bfc.com to reset your password.");
+      // Optional: Redirect to a separate forgot-password.html in the future
+    }
   </script>
 </body>
 </html>
