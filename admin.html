@@ -1,7 +1,8 @@
-<!DOCTYPE html><html lang="en"><head>
+<!DOCTYPE html><html lang="en">
+<head>
   <meta charset="UTF-8" />
-  <title>Baccarat Fund Admin Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Baccarat Fund Admin Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
@@ -26,28 +27,11 @@
     <h2 class="text-xl font-bold mb-2">🏆 Top 5 Shareholders</h2>
     <ul id="topShareholders" class="list-disc list-inside text-sm"></ul>
   </div>  <!-- Transaction Requests -->  <h2 class="text-2xl font-bold mt-10 mb-4">💰 Deposit & Cash Out Requests</h2>
-  <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>  <!-- Edit Modal -->  <div id="editModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-50">
-    <div class="bg-white text-black p-6 rounded-lg w-full max-w-md">
-      <h2 class="text-xl font-bold mb-4">Edit Member</h2>
-      <input id="editName" class="mb-2 w-full p-2 border rounded" placeholder="Name" />
-      <input id="editEmail" class="mb-2 w-full p-2 border rounded" placeholder="Email" />
-      <input id="editShares" type="number" class="mb-2 w-full p-2 border rounded" placeholder="Shares" />
-      <input id="editBalance" type="number" class="mb-2 w-full p-2 border rounded" placeholder="Balance" />
-      <select id="editStatus" class="mb-4 w-full p-2 border rounded">
-        <option value="pending">Pending</option>
-        <option value="approved">Approved</option>
-        <option value="rejected">Rejected</option>
-      </select>
-      <div class="flex justify-end space-x-2">
-        <button id="closeEditModal" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
-        <button id="saveEdit" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
-      </div>
-    </div>
-  </div>  <script type="module">
+  <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>  <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import {
-      getFirestore, collection, getDocs, doc, updateDoc, deleteDoc,
-      query, orderBy, onSnapshot
+      getFirestore, collection, getDocs, doc, updateDoc,
+      query, orderBy, onSnapshot, getDoc
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -59,9 +43,11 @@
       appId: "1:127052459580:web:c3d5caa9302238c11cdd39"
     };
 
+    // Initialize Firebase & Firestore
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // DOM Elements
     const totalMembers = document.getElementById("totalMembers");
     const totalShares = document.getElementById("totalShares");
     const totalBalance = document.getElementById("totalBalance");
@@ -70,28 +56,18 @@
     const searchInput = document.getElementById("searchInput");
     const requestsList = document.getElementById("requestsList");
 
-    const editModal = document.getElementById("editModal");
-    const editName = document.getElementById("editName");
-    const editEmail = document.getElementById("editEmail");
-    const editShares = document.getElementById("editShares");
-    const editBalance = document.getElementById("editBalance");
-    const editStatus = document.getElementById("editStatus");
-    const closeEditModal = document.getElementById("closeEditModal");
-    const saveEdit = document.getElementById("saveEdit");
-
     let allMembers = [];
-    let currentEditId = null;
 
     function formatCurrency(value) {
       return parseFloat(value).toLocaleString("en-PH", { minimumFractionDigits: 2 });
     }
 
+    // Load and display members
     async function loadMembers() {
       const snapshot = await getDocs(collection(db, "users"));
       allMembers = [];
       snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        allMembers.push({ id: docSnap.id, ...data });
+        allMembers.push({ id: docSnap.id, ...docSnap.data() });
       });
       displayMembers(allMembers);
       updateTopShareholders();
@@ -114,10 +90,6 @@
           <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${m.status === 'approved' ? 'bg-green-600' : m.status === 'pending' ? 'bg-yellow-600' : 'bg-red-600'}">${m.status}</span></p>
           <p><strong>Shares:</strong> ${m.shares}</p>
           <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
-          <div class="flex gap-2 mt-3">
-            <button class="bg-blue-600 px-3 py-1 rounded" onclick="editMember('${m.id}', '${m.name}', '${m.email}', ${m.shares}, ${m.balance}, '${m.status}')">Edit</button>
-            <button class="bg-red-600 px-3 py-1 rounded" onclick="deleteMember('${m.id}')">Delete</button>
-          </div>
         `;
         membersList.appendChild(div);
       });
@@ -127,42 +99,12 @@
       totalBalance.textContent = formatCurrency(balanceTotal);
     }
 
-    window.editMember = (id, name, email, shares, balance, status) => {
-      currentEditId = id;
-      editName.value = name;
-      editEmail.value = email;
-      editShares.value = shares;
-      editBalance.value = balance;
-      editStatus.value = status;
-      editModal.classList.remove("hidden");
-    };
-
-    saveEdit.onclick = async () => {
-      if (!currentEditId) return;
-      await updateDoc(doc(db, "users", currentEditId), {
-        name: editName.value.trim(),
-        email: editEmail.value.trim(),
-        shares: Number(editShares.value),
-        balance: Number(editBalance.value),
-        status: editStatus.value
-      });
-      editModal.classList.add("hidden");
-      loadMembers();
-    };
-
-    closeEditModal.onclick = () => {
-      editModal.classList.add("hidden");
-    };
-
-    window.deleteMember = async (id) => {
-      if (confirm("Are you sure you want to delete this member?")) {
-        await deleteDoc(doc(db, "users", id));
-        loadMembers();
-      }
-    };
-
     function updateTopShareholders() {
-      const top = [...allMembers].filter(m => m.status === 'approved').sort((a, b) => b.shares - a.shares).slice(0, 5);
+      const top = [...allMembers]
+        .filter(m => m.status === 'approved')
+        .sort((a, b) => b.shares - a.shares)
+        .slice(0, 5);
+
       topShareholders.innerHTML = "";
       top.forEach(m => {
         const li = document.createElement("li");
@@ -171,43 +113,89 @@
       });
     }
 
+    // Search filter
     searchInput.addEventListener("input", () => {
-      const query = searchInput.value.toLowerCase();
+      const queryText = searchInput.value.toLowerCase();
       const filtered = allMembers.filter(m =>
-        m.name.toLowerCase().includes(query) ||
-        m.email.toLowerCase().includes(query) ||
-        m.status.toLowerCase().includes(query)
+        m.name.toLowerCase().includes(queryText) ||
+        m.email.toLowerCase().includes(queryText) ||
+        m.status.toLowerCase().includes(queryText)
       );
       displayMembers(filtered);
     });
 
+    // Listen for and calculate approved "buy" share transactions
+    function listenForShareTransactions() {
+      const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
+      onSnapshot(q, snapshot => {
+        let totalSh = 0, totalVal = 0;
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          if (data.status === "approved" && data.type === "buy") {
+            totalSh += data.shares || 0;
+            totalVal += (data.shares || 0) * 10;
+          }
+        });
+        totalShares.textContent = totalSh;
+        totalBalance.textContent = formatCurrency(totalVal);
+      });
+    }
+
+    // Admin request listener with Approve button
     function listenForRequests() {
       const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
-      onSnapshot(q, (snapshot) => {
+      onSnapshot(q, snapshot => {
         requestsList.innerHTML = "";
         snapshot.forEach(docSnap => {
           const data = docSnap.data();
-          if (data.status === "pending") {
+          const id = docSnap.id;
+          if (data.status === "pending" && data.type === "buy") {
             const div = document.createElement("div");
             div.className = "bg-gray-700 p-4 rounded";
             div.innerHTML = `
               <p><strong>Member:</strong> ${data.memberName}</p>
               <p><strong>Type:</strong> ${data.type}</p>
+              <p><strong>Shares:</strong> ${data.shares}</p>
               <p><strong>Amount:</strong> ₱${formatCurrency(data.amount)}</p>
               <p><strong>Date:</strong> ${data.timestamp?.toDate().toLocaleString() || "N/A"}</p>
+              <button class="mt-2 px-3 py-1 bg-green-600 rounded text-sm" onclick="approveTransaction('${id}', '${data.userId}', ${data.shares})">✅ Approve</button>
             `;
             requestsList.appendChild(div);
           }
         });
-        if (requestsList.innerHTML === "") {
+        if (!requestsList.innerHTML) {
           requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
         }
       });
     }
 
+    // Approve transaction: update user and transaction
+    window.approveTransaction = async (txId, userId, shares) => {
+      const userRef = doc(db, "users", userId);
+      const txRef = doc(db, "transactions", txId);
+      try {
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) throw new Error("User not found");
+        const userData = userSnap.data();
+        const newShares = (userData.shares || 0) + shares;
+        const newBalance = (userData.balance || 0) + (shares * 10);
+        await updateDoc(userRef, { shares: newShares, balance: newBalance });
+        await updateDoc(txRef, { status: "approved", applied: true });
+        alert("✅ Transaction approved and user updated!");
+        loadMembers();
+        listenForShareTransactions();
+      } catch (error) {
+        console.error("❌ Approval error:", error);
+        alert("❌ Failed to approve transaction. Check console.");
+      }
+    };
+
+    // Initialize everything
     loadMembers();
     listenForRequests();
+    listenForShareTransactions();
 
+    // Example static chart (replace with real data if needed)
     const ctx = document.getElementById('fundChart').getContext('2d');
     new Chart(ctx, {
       type: 'line',
@@ -225,9 +213,7 @@
       },
       options: {
         responsive: true,
-        plugins: {
-          legend: { labels: { color: 'white' } },
-        },
+        plugins: { legend: { labels: { color: 'white' } } },
         scales: {
           x: { ticks: { color: 'white' } },
           y: { ticks: { color: 'white' }, beginAtZero: true }
