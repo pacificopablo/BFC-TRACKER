@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Baccarat Fund Club Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-gray-900 text-white font-sans p-4">
+  <div class="max-w-6xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6 text-center">Baccarat Fund Club Tracker</h1>
+
+    <!-- Add Member -->
+    <div class="bg-gray-800 p-4 rounded-xl mb-6">
+      <h2 class="text-xl font-semibold mb-2">Add Member</h2>
+      <div class="grid grid-cols-2 gap-4">
+        <input id="memberName" class="p-2 rounded bg-gray-700" placeholder="Member Name" />
+        <input id="memberShares" class="p-2 rounded bg-gray-700" placeholder="Shares (e.g., 100)" type="number" />
+      </div>
+      <button onclick="addMember()" class="mt-4 bg-green-600 hover:bg-green-700 px-4 py-2 rounded">Add Member</button>
+    </div>
+
+    <!-- Members Table -->
+    <div class="bg-gray-800 p-4 rounded-xl mb-6">
+      <h2 class="text-xl font-semibold mb-4">Members</h2>
+      <table class="w-full text-left">
+        <thead>
+          <tr class="text-green-400">
+            <th>Name</th>
+            <th>Shares</th>
+            <th>Investment ($)</th>
+          </tr>
+        </thead>
+        <tbody id="membersTable"></tbody>
+      </table>
+    </div>
+
+    <!-- Log Shoe Session -->
+    <div class="bg-gray-800 p-4 rounded-xl mb-6">
+      <h2 class="text-xl font-semibold mb-2">Log Session</h2>
+      <div class="grid grid-cols-2 gap-4">
+        <input id="sessionDate" class="p-2 rounded bg-gray-700" placeholder="Date (YYYY-MM-DD)" type="date" />
+        <select id="strategy" class="p-2 rounded bg-gray-700">
+          <option>Banker Only</option>
+          <option>OTB4L</option>
+          <option>Dragon Slayer</option>
+          <option>Zigzag Breaker</option>
+        </select>
+        <input id="result" class="p-2 rounded bg-gray-700" placeholder="W or L" />
+        <input id="units" class="p-2 rounded bg-gray-700" placeholder="Units Won/Lost" type="number" />
+      </div>
+      <button onclick="logSession()" class="mt-4 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">Log Session</button>
+    </div>
+
+    <!-- Session History -->
+    <div class="bg-gray-800 p-4 rounded-xl mb-6">
+      <h2 class="text-xl font-semibold mb-4">Session History</h2>
+      <table class="w-full text-left">
+        <thead>
+          <tr class="text-blue-400">
+            <th>Date</th>
+            <th>Strategy</th>
+            <th>Result</th>
+            <th>Units</th>
+          </tr>
+        </thead>
+        <tbody id="sessionTable"></tbody>
+      </table>
+    </div>
+
+    <!-- Bankroll Dashboard -->
+    <div class="bg-gray-800 p-4 rounded-xl">
+      <h2 class="text-xl font-semibold mb-4">Bankroll Over Time</h2>
+      <canvas id="bankrollChart" height="100"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const members = [];
+    const sessions = [];
+    let bankroll = 0;
+
+    function addMember() {
+      const name = document.getElementById('memberName').value;
+      const shares = parseInt(document.getElementById('memberShares').value);
+      const investment = shares * 10; // $10 per share
+      if (name && shares > 0) {
+        members.push({ name, shares, investment });
+        updateMemberTable();
+        document.getElementById('memberName').value = '';
+        document.getElementById('memberShares').value = '';
+      }
+    }
+
+    function updateMemberTable() {
+      const table = document.getElementById('membersTable');
+      table.innerHTML = '';
+      members.forEach(m => {
+        table.innerHTML += `<tr><td>${m.name}</td><td>${m.shares}</td><td>$${m.investment}</td></tr>`;
+      });
+    }
+
+    function logSession() {
+      const date = document.getElementById('sessionDate').value;
+      const strategy = document.getElementById('strategy').value;
+      const result = document.getElementById('result').value.toUpperCase();
+      const units = parseInt(document.getElementById('units').value);
+      if (date && strategy && (result === 'W' || result === 'L') && !isNaN(units)) {
+        const actualUnits = result === 'W' ? units : -Math.abs(units);
+        sessions.push({ date, strategy, result, units: actualUnits });
+        bankroll += actualUnits;
+        updateSessionTable();
+        updateChart();
+        document.getElementById('sessionDate').value = '';
+        document.getElementById('result').value = '';
+        document.getElementById('units').value = '';
+      }
+    }
+
+    function updateSessionTable() {
+      const table = document.getElementById('sessionTable');
+      table.innerHTML = '';
+      sessions.forEach(s => {
+        table.innerHTML += `<tr><td>${s.date}</td><td>${s.strategy}</td><td>${s.result}</td><td>${s.units}</td></tr>`;
+      });
+    }
+
+    function updateChart() {
+      const ctx = document.getElementById('bankrollChart').getContext('2d');
+      const labels = sessions.map(s => s.date);
+      const data = sessions.reduce((acc, s) => {
+        if (acc.length === 0) acc.push(s.units);
+        else acc.push(acc[acc.length - 1] + s.units);
+        return acc;
+      }, []);
+
+      if (window.chart) window.chart.destroy();
+      window.chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Running Bankroll',
+            data,
+            borderColor: '#34D399',
+            backgroundColor: 'transparent',
+            tension: 0.3
+          }]
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+
+</html>
