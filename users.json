@@ -1,39 +1,29 @@
-{
-  "admin": {
-    "email": "smoakshadow@gmail.com",
-    "password": "admin123"
-  },
-  "members": [
-    {
-      "id": "1",
-      "name": "John Doe",
-      "email": "john@example.com",
-      "phone": "09171234567",
-      "shares": 10,
-      "balance": 100,
-      "password": "pass123",
-      "joinDate": "2025-01-01"
-    },
-    {
-      "id": "2",
-      "name": "Jane Smith",
-      "email": "jane@example.com",
-      "phone": "09179876543",
-      "shares": 5,
-      "balance": 50,
-      "password": "pass456",
-      "joinDate": "2025-02-15"
-    }
+[
   {
-    "id": "1751710614214",
-    "name": "Regina Lopez",
-    "email": "regielizalopez@gmail.com",
-    "phone": "09558478333",
-    "shares": 500,
-    "balance": 5000,
-    "password": "1630Regina",
-    "joinDate": "2025-07-05"
+    "name": "Admin User",
+    "email":"smoakshadow@gmail.com" ,
+    "password": "admin123",
+    "shares": 0,
+    "balance": 0,
+    "role": "admin",
+    "status": "approved"
+  },
+  {
+    "name": "Juan Dela Cruz",
+    "email": "juan@example.com",
+    "password": "password123",
+    "shares": 150,
+    "balance": 1500,
+    "role": "member",
+    "status": "approved"
+  },
+  {
+    "name": "Maria Santos",
+    "email": "maria@example.com",
+    "password": "mypassword",
+    "shares": 100,
+    "balance": 1000,
+    "role": "member",
+    "status": "pending"
   }
 ]
-  ]
-}
