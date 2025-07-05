@@ -2,70 +2,39 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Member Dashboard - Baccarat Fund Club</title>
+  <title>Member Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white p-6">
-  <h1 class="text-3xl font-bold mb-4">👤 Member Dashboard</h1>
-
-  <div class="mb-4">
-    <p><strong>Email:</strong> <span id="userEmail"></span></p>
-    <p><strong>Balance:</strong> ₱<span id="userBalance">0</span></p>
-  </div>
-
-  <h2 class="text-xl font-bold mb-2 mt-6">💸 Request Withdrawal</h2>
-  <form id="withdrawForm" class="space-y-4 max-w-sm">
-    <input type="number" id="withdrawAmount" placeholder="Enter amount to withdraw" required class="w-full p-2 text-black rounded" />
-    <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 py-2 rounded">Request Withdrawal</button>
-  </form>
-  <p id="withdrawStatus" class="text-green-400 mt-2 hidden">✅ Request submitted!</p>
+<body class="bg-gray-900 text-white p-4">
+  <h1 class="text-3xl font-bold mb-4">🎉 Welcome, <span id="userName">Member</span></h1>
+  <p class="mb-2">Email: <span id="userEmail">user@example.com</span></p>
+  <p class="mb-2">Shares: <span id="userShares">0</span></p>
+  <p class="mb-2">Balance: ₱<span id="userBalance">0.00</span></p>
 
   <script type="module">
     import { auth, db } from './firebase-config.js';
-    import {
-      onAuthStateChanged
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import {
-      addDoc,
-      collection,
-      getDoc,
-      doc,
-      serverTimestamp
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    const userEmail = document.getElementById("userEmail");
-    const userBalance = document.getElementById("userBalance");
-    const form = document.getElementById("withdrawForm");
-    const statusMsg = document.getElementById("withdrawStatus");
+    const nameField = document.getElementById("userName");
+    const emailField = document.getElementById("userEmail");
+    const sharesField = document.getElementById("userShares");
+    const balanceField = document.getElementById("userBalance");
 
     onAuthStateChanged(auth, async (user) => {
       if (user) {
-        userEmail.textContent = user.email;
-
-        const userRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          userBalance.textContent = userSnap.data().balance || 0;
+        const uid = user.uid;
+        const docSnap = await getDoc(doc(db, "users", uid));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          nameField.textContent = data.name;
+          emailField.textContent = data.email;
+          sharesField.textContent = data.shares;
+          balanceField.textContent = data.balance.toFixed(2);
         }
-
-        form.addEventListener("submit", async (e) => {
-          e.preventDefault();
-          const amount = parseFloat(document.getElementById("withdrawAmount").value);
-          try {
-            await addDoc(collection(db, "withdrawals"), {
-              userId: user.uid,
-              userEmail: user.email,
-              amount,
-              status: "pending",
-              timestamp: serverTimestamp()
-            });
-            statusMsg.classList.remove("hidden");
-            form.reset();
-          } catch (err) {
-            alert("❌ Failed to request withdrawal: " + err.message);
-          }
-        });
+      } else {
+        window.location.href = "index.html";
       }
     });
   </script>
