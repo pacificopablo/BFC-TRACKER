@@ -8,12 +8,15 @@
 </head>
 <body class="bg-gray-900 text-white p-4">
   <h1 class="text-3xl font-bold mb-6">👑 Admin Dashboard</h1>
-  <div id="summary" class="mb-6">
+
+  <div id="summary" class="mb-6 space-y-1">
     <p>Total Members: <span id="totalMembers">0</span></p>
     <p>Total Shares: <span id="totalShares">0</span></p>
     <p>Total Balance: ₱<span id="totalBalance">0</span></p>
   </div>
-  <div id="membersList" class="space-y-4"></div>
+
+  <p id="loadingText" class="text-gray-400 mb-4">Loading members...</p>
+  <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
 
   <script type="module">
     import { db } from './firebase-config.js';
@@ -29,8 +32,32 @@
     const totalMembers = document.getElementById("totalMembers");
     const totalShares = document.getElementById("totalShares");
     const totalBalance = document.getElementById("totalBalance");
+    const loadingText = document.getElementById("loadingText");
+
+    function createMemberCard(data, id) {
+      const div = document.createElement("div");
+      div.className = "bg-gray-800 p-4 rounded shadow";
+
+      const statusColor = data.status === "approved" ? "bg-green-500" : "bg-yellow-500";
+
+      div.innerHTML = `
+        <p><strong>Name:</strong> ${data.name}</p>
+        <p><strong>Email:</strong> ${data.email}</p>
+        <p><strong>Status:</strong> 
+          <span class="px-2 py-1 text-xs font-semibold rounded ${statusColor}">
+            ${data.status}
+          </span>
+        </p>
+        <p><strong>Shares:</strong> ${data.shares}</p>
+        <p><strong>Balance:</strong> ₱${data.balance}</p>
+        ${data.status !== "approved" ? `<button class="bg-green-600 px-2 py-1 mt-2 rounded" onclick="approveUser('${id}')">Approve</button>` : ""}
+        <button class="bg-red-600 px-2 py-1 mt-2 ml-2 rounded" onclick="deleteUser('${id}')">Delete</button>
+      `;
+      return div;
+    }
 
     async function loadMembers() {
+      loadingText.style.display = "block";
       const querySnapshot = await getDocs(collection(db, "users"));
       let memberCount = 0, shareTotal = 0, balanceTotal = 0;
       membersList.innerHTML = "";
@@ -42,23 +69,13 @@
         shareTotal += data.shares;
         balanceTotal += data.balance;
 
-        const div = document.createElement("div");
-        div.className = "bg-gray-800 p-4 rounded";
-        div.innerHTML = \`
-          <p><strong>Name:</strong> \${data.name}</p>
-          <p><strong>Email:</strong> \${data.email}</p>
-          <p><strong>Status:</strong> \${data.status}</p>
-          <p><strong>Shares:</strong> \${data.shares}</p>
-          <p><strong>Balance:</strong> ₱\${data.balance}</p>
-          <button class="bg-green-600 px-2 py-1 mt-2 rounded" onclick="approveUser('\${id}')">Approve</button>
-          <button class="bg-red-600 px-2 py-1 mt-2 ml-2 rounded" onclick="deleteUser('\${id}')">Delete</button>
-        \`;
-        membersList.appendChild(div);
+        membersList.appendChild(createMemberCard(data, id));
       });
 
       totalMembers.textContent = memberCount;
       totalShares.textContent = shareTotal;
       totalBalance.textContent = balanceTotal.toFixed(2);
+      loadingText.style.display = "none";
     }
 
     window.approveUser = async (id) => {
@@ -67,8 +84,11 @@
     };
 
     window.deleteUser = async (id) => {
-      await deleteDoc(doc(db, "users", id));
-      loadMembers();
+      const confirmDelete = confirm("Are you sure you want to delete this user?");
+      if (confirmDelete) {
+        await deleteDoc(doc(db, "users", id));
+        loadMembers();
+      }
     };
 
     loadMembers();
