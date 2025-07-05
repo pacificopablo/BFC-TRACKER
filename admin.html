@@ -44,6 +44,12 @@
     </form>
   </div>
 
+  <!-- Distribute Profit Button -->
+  <div class="bg-gray-800 p-4 rounded shadow mb-6">
+    <h2 class="text-xl font-bold mb-2">💸 Distribute Profit</h2>
+    <button id="distributeProfit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Distribute 10% Profit to Members</button>
+  </div>
+
   <!-- Financial Chart -->
   <div class="bg-gray-800 p-4 rounded shadow mb-6">
     <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
@@ -76,7 +82,7 @@
           <label for="memberName" class="block text-sm">Name</label>
           <input type="text" id="memberName" class="p-2 w-full rounded bg-gray-700 text-white" required />
         </div>
-        <div>
+        <hinge>
           <label for="memberEmail" class="block text-sm">Email</label>
           <input type="email" id="memberEmail" class="p-2 w-full rounded bg-gray-700 text-white" required />
         </div>
@@ -139,6 +145,7 @@
     const memberModal = document.getElementById("memberModal");
     const memberDetailsForm = document.getElementById("memberDetailsForm");
     const cancelModal = document.getElementById("cancelModal");
+    const distributeProfit = document.getElementById("distributeProfit");
 
     let allMembers = [];
     let fundChartInstance;
@@ -354,7 +361,6 @@
       const shares = parseInt(document.getElementById("memberShares").value);
       const balance = parseFloat(document.getElementById("memberBalance").value);
 
-      // Basic validation
       if (!name || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || shares < 0 || balance < 0) {
         alert("Please enter valid details (name, valid email, non-negative shares and balance).");
         return;
@@ -369,7 +375,6 @@
           shares,
           balance
         });
-        // Optionally log as a transaction for audit
         await addDoc(collection(db, "transactions"), {
           memberId,
           memberName: name,
@@ -386,6 +391,46 @@
       } catch (error) {
         console.error("Error updating member details:", error);
         alert("Failed to update member details. Please try again.");
+      }
+    });
+
+    // Handle profit distribution
+    distributeProfit.addEventListener("click", async () => {
+      if (!confirm("Are you sure you want to distribute a 10% profit to all approved members?")) {
+        return;
+      }
+
+      try {
+        const approvedMembers = allMembers.filter(m => m.status === "approved");
+        if (approvedMembers.length === 0) {
+          alert("No approved members to distribute profit to.");
+          return;
+        }
+
+        for (const member of approvedMembers) {
+          const profit = (member.shares || 0) * 10 * 0.1; // 10% of share value (1 share = 10 pesos)
+          const newBalance = (member.balance || 0) + profit;
+
+          await updateDoc(doc(db, "users", member.id), {
+            balance: newBalance
+          });
+
+          await addDoc(collection(db, "transactions"), {
+            memberId: member.id,
+            memberName: member.name,
+            type: "profit",
+            amount: profit,
+            shares: 0,
+            status: "approved",
+            timestamp: new Date(),
+            description: "10% profit distribution"
+          });
+        }
+
+        alert(`Successfully distributed 10% profit to ${approvedMembers.length} members.`);
+      } catch (error) {
+        console.error("Error distributing profit:", error);
+        alert("Failed to distribute profit. Please try again.");
       }
     });
 
@@ -426,7 +471,7 @@
 
       snapshot.forEach(docSnap => {
         const data = docSnap.data();
-        if (data.status === "approved" && (data.type === "deposit" || data.type === "update")) {
+        if (data.status === "approved" && (data.type === "deposit" || data.type === "update" || data.type === "profit")) {
           runningBalance += data.amount || 0;
           labels.push(data.timestamp?.toDate().toLocaleString('default', { month: 'short', year: 'numeric' }) || 'Unknown');
           balances.push(runningBalance);
