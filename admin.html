@@ -20,6 +20,9 @@
 
   <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
 
+  <h2 class="text-2xl font-bold mt-8 mb-4">💰 Deposit & Cash Out Requests</h2>
+  <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>
+
   <!-- Edit Member Modal -->
   <div id="editModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-50">
     <div class="bg-white text-black p-6 rounded-lg w-full max-w-md">
@@ -40,10 +43,24 @@
     </div>
   </div>
 
+  <!-- Transaction Modal -->
+  <div id="transactionModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-50">
+    <div class="bg-white text-black p-6 rounded-lg w-full max-w-md">
+      <h2 class="text-xl font-bold mb-4" id="transactionTitle">Transaction</h2>
+      <p id="transactionMemberName" class="mb-2 text-sm text-gray-600"></p>
+      <input id="transactionAmount" type="number" min="1" class="mb-4 w-full p-2 border rounded" placeholder="Enter amount" />
+      <div class="flex justify-end space-x-2">
+        <button id="cancelTransaction" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
+        <button id="confirmTransaction" class="bg-green-600 text-white px-4 py-2 rounded">Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import {
-      getFirestore, collection, getDocs, doc, updateDoc
+      getFirestore, collection, getDocs, doc, updateDoc, addDoc, serverTimestamp,
+      query, orderBy, onSnapshot, getDoc
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -63,10 +80,12 @@
     const totalShares = document.getElementById("totalShares");
     const totalBalance = document.getElementById("totalBalance");
     const searchInput = document.getElementById("searchInput");
+    const requestsList = document.getElementById("requestsList");
 
     let allMembers = [];
     let currentEditId = null;
 
+    // Edit Modal elements
     const modal = document.getElementById("editModal");
     const editName = document.getElementById("editName");
     const editEmail = document.getElementById("editEmail");
@@ -76,9 +95,29 @@
     const closeModal = document.getElementById("closeModal");
     const saveEdit = document.getElementById("saveEdit");
 
+    // Transaction Modal elements
+    const transactionModal = document.getElementById("transactionModal");
+    const transactionTitle = document.getElementById("transactionTitle");
+    const transactionAmount = document.getElementById("transactionAmount");
+    const transactionMemberName = document.getElementById("transactionMemberName");
+    const cancelTransaction = document.getElementById("cancelTransaction");
+    const confirmTransaction = document.getElementById("confirmTransaction");
+
+    let currentTransaction = {
+      memberId: null,
+      name: "",
+      type: ""
+    };
+
+    // Reset and close modals
     closeModal.onclick = () => {
       modal.classList.add("hidden");
       resetModal();
+    };
+    cancelTransaction.onclick = () => {
+      transactionModal.classList.add("hidden");
+      transactionAmount.value = "";
+      currentTransaction = {};
     };
 
     function resetModal() {
@@ -94,6 +133,7 @@
       return parseFloat(value).toLocaleString("en-PH", { minimumFractionDigits: 2 });
     }
 
+    // Load all members from Firestore
     async function loadMembers() {
       const querySnapshot = await getDocs(collection(db, "users"));
       allMembers = [];
@@ -104,6 +144,7 @@
       displayMembers(allMembers);
     }
 
+    // Display members filtered or full list
     function displayMembers(members) {
       let memberCount = 0, shareTotal = 0, balanceTotal = 0;
       membersList.innerHTML = "";
@@ -121,7 +162,11 @@
           <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${data.status === 'approved' ? 'bg-green-600' : data.status === 'pending' ? 'bg-yellow-600' : 'bg-red-600'}">${data.status}</span></p>
           <p><strong>Shares:</strong> ${data.shares}</p>
           <p><strong>Balance:</strong> ₱${formatCurrency(data.balance)}</p>
-          <button class="bg-blue-600 px-2 py-1 mt-2 rounded" onclick="editMember('${data.id}', '${data.name}', '${data.email}', ${data.shares}, ${data.balance}, '${data.status}')">Edit</button>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <button class="bg-blue-600 px-2 py-1 rounded" onclick="editMember('${data.id}', '${data.name}', '${data.email}', ${data.shares}, ${data.balance}, '${data.status}')">Edit</button>
+            <button class="bg-green-600 px-2 py-1 rounded" onclick="openTransaction('${data.id}', '${data.name}', 'deposit')">Deposit</button>
+            <button class="bg-red-600 px-2 py-1 rounded" onclick="openTransaction('${data.id}', '${data.name}', 'withdrawal')">Cash Out</button>
+          </div>
         `;
         membersList.appendChild(div);
       });
@@ -131,6 +176,7 @@
       totalBalance.textContent = formatCurrency(balanceTotal);
     }
 
+    // Edit member popup
     window.editMember = (id, name, email, shares, balance, status) => {
       currentEditId = id;
       editName.value = name;
@@ -160,6 +206,7 @@
       loadMembers();
     };
 
+    // Search filter
     searchInput.addEventListener("input", () => {
       const query = searchInput.value.toLowerCase();
       const filtered = allMembers.filter(m =>
@@ -170,7 +217,124 @@
       displayMembers(filtered);
     });
 
+    // Transaction modal open
+    window.openTransaction = (memberId, name, type) => {
+      currentTransaction = { memberId, name, type };
+      transactionTitle.textContent = type === "deposit" ? "Deposit Request" : "Cash Out Request";
+      transactionMemberName.textContent = `Member: ${name}`;
+      transactionAmount.value = "";
+      transactionModal.classList.remove("hidden");
+    };
+
+    confirmTransaction.onclick = async () => {
+      const amount = parseFloat(transactionAmount.value);
+      if (!amount || amount <= 0) {
+        alert("Please enter a valid amount.");
+        return;
+      }
+      await addDoc(collection(db, "transactions"), {
+        memberId: currentTransaction.memberId,
+        memberName: currentTransaction.name,
+        type: currentTransaction.type,
+        amount,
+        status: "pending",
+        timestamp: serverTimestamp()
+      });
+      transactionModal.classList.add("hidden");
+      transactionAmount.value = "";
+      alert("Transaction request submitted.");
+    };
+
+    // Listen and display pending requests
+    function listenForRequests() {
+      const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
+      onSnapshot(q, (snapshot) => {
+        requestsList.innerHTML = "";
+        if (snapshot.empty) {
+          requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
+          return;
+        }
+
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          const id = docSnap.id;
+          if(data.status === "pending") {
+            const div = document.createElement("div");
+            div.className = "bg-gray-700 p-4 rounded flex justify-between items-center";
+            div.innerHTML = `
+              <div>
+                <p><strong>Member:</strong> ${data.memberName}</p>
+                <p><strong>Type:</strong> ${data.type === "deposit" ? "Deposit" : "Cash Out"}</p>
+                <p><strong>Amount:</strong> ₱${parseFloat(data.amount).toLocaleString('en-PH', {minimumFractionDigits: 2})}</p>
+                <p><strong>Requested at:</strong> ${data.timestamp?.toDate().toLocaleString() || "N/A"}</p>
+              </div>
+              <div class="space-x-2">
+                <button class="bg-green-600 px-3 py-1 rounded approve-btn">Approve</button>
+                <button class="bg-red-600 px-3 py-1 rounded reject-btn">Reject</button>
+              </div>
+            `;
+
+            div.querySelector(".approve-btn").onclick = async () => {
+              await approveRequest(id, data);
+            };
+            div.querySelector(".reject-btn").onclick = async () => {
+              await rejectRequest(id);
+            };
+
+            requestsList.appendChild(div);
+          }
+        });
+
+        if(requestsList.children.length === 0) {
+          requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
+        }
+      });
+    }
+
+    async function approveRequest(requestId, data) {
+      try {
+        // Mark transaction approved
+        await updateDoc(doc(db, "transactions", requestId), { status: "approved" });
+
+        // Update member balance
+        const userRef = doc(db, "users", data.memberId);
+        const userDocSnap = await getDoc(userRef);
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          let newBalance = userData.balance || 0;
+          let newShares = userData.shares || 0;
+          const amt = Number(data.amount);
+
+          if (data.type === "deposit") {
+            newBalance += amt;
+          } else if (data.type === "withdrawal") {
+            newBalance -= amt;
+            if (newBalance < 0) newBalance = 0;
+          }
+
+          await updateDoc(userRef, { balance: newBalance, shares: newShares });
+          alert(`Request approved and balance updated for ${data.memberName}`);
+          loadMembers();
+        } else {
+          alert("User not found.");
+        }
+      } catch (error) {
+        alert("Error approving request: " + error.message);
+      }
+    }
+
+    async function rejectRequest(requestId) {
+      try {
+        await updateDoc(doc(db, "transactions", requestId), { status: "rejected" });
+        alert("Request rejected.");
+      } catch (error) {
+        alert("Error rejecting request: " + error.message);
+      }
+    }
+
+    // Initial load
     loadMembers();
+    listenForRequests();
   </script>
 </body>
 </html>
