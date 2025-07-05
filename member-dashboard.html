@@ -3,93 +3,71 @@
 <head>
   <meta charset="UTF-8" />
   <title>Member Dashboard - Baccarat Fund Club</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 text-white p-6">
+  <h1 class="text-3xl font-bold mb-4">👤 Member Dashboard</h1>
 
-  <div class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold">👤 Member Dashboard</h1>
-    <button onclick="logout()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">🚪 Logout</button>
+  <div class="mb-4">
+    <p><strong>Email:</strong> <span id="userEmail"></span></p>
+    <p><strong>Balance:</strong> ₱<span id="userBalance">0</span></p>
   </div>
 
-  <div id="welcomeMessage" class="text-xl mb-6"></div>
-
-  <section class="bg-gray-800 p-6 rounded-lg mb-6">
-    <h2 class="text-2xl font-semibold mb-4">💼 Fund Summary</h2>
-    <div><strong>Shares:</strong> <span id="memberShares"></span></div>
-    <div><strong>Balance:</strong> ₱<span id="memberBalance"></span></div>
-  </section>
-
-  <section class="bg-gray-800 p-6 rounded-lg mb-6">
-    <h2 class="text-2xl font-semibold mb-4">💰 Request Withdrawal</h2>
-    <form id="withdrawForm" class="space-y-4">
-      <div>
-        <input type="number" id="withdrawAmount" placeholder="Amount (₱)" class="w-full p-2 rounded text-black" required />
-      </div>
-      <div>
-        <input type="text" id="withdrawNote" placeholder="Note (optional)" class="w-full p-2 rounded text-black" />
-      </div>
-      <button type="submit" class="bg-yellow-500 px-4 py-2 rounded hover:bg-yellow-600">📤 Submit Request</button>
-    </form>
-    <p id="withdrawStatus" class="mt-4 text-green-400 hidden">✅ Request submitted!</p>
-  </section>
+  <h2 class="text-xl font-bold mb-2 mt-6">💸 Request Withdrawal</h2>
+  <form id="withdrawForm" class="space-y-4 max-w-sm">
+    <input type="number" id="withdrawAmount" placeholder="Enter amount to withdraw" required class="w-full p-2 text-black rounded" />
+    <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 py-2 rounded">Request Withdrawal</button>
+  </form>
+  <p id="withdrawStatus" class="text-green-400 mt-2 hidden">✅ Request submitted!</p>
 
   <script type="module">
     import { auth, db } from './firebase-config.js';
     import {
-      onAuthStateChanged, signOut
+      onAuthStateChanged
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import {
-      doc, getDoc, addDoc, collection, serverTimestamp
+      addDoc,
+      collection,
+      getDoc,
+      doc,
+      serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    let currentUserData = null;
+    const userEmail = document.getElementById("userEmail");
+    const userBalance = document.getElementById("userBalance");
+    const form = document.getElementById("withdrawForm");
+    const statusMsg = document.getElementById("withdrawStatus");
 
     onAuthStateChanged(auth, async (user) => {
-      if (!user) return window.location.href = "index.html";
+      if (user) {
+        userEmail.textContent = user.email;
 
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (!userDoc.exists() || userDoc.data().status !== "approved") {
-        alert("❌ Access denied. You are not approved.");
-        return window.location.href = "index.html";
-      }
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          userBalance.textContent = userSnap.data().balance || 0;
+        }
 
-      currentUserData = userDoc.data();
-      document.getElementById('welcomeMessage').textContent = `Welcome, ${currentUserData.name}`;
-      document.getElementById('memberShares').textContent = currentUserData.shares;
-      document.getElementById('memberBalance').textContent = currentUserData.balance.toFixed(2);
-    });
-
-    const form = document.getElementById("withdrawForm");
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const amount = parseFloat(document.getElementById("withdrawAmount").value);
-      const note = document.getElementById("withdrawNote").value;
-
-      try {
-        await addDoc(collection(db, "withdrawals"), {
-          email: auth.currentUser.email,
-          name: currentUserData.name,
-          amount,
-          note,
-          status: "pending",
-          createdAt: serverTimestamp()
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const amount = parseFloat(document.getElementById("withdrawAmount").value);
+          try {
+            await addDoc(collection(db, "withdrawals"), {
+              userId: user.uid,
+              userEmail: user.email,
+              amount,
+              status: "pending",
+              timestamp: serverTimestamp()
+            });
+            statusMsg.classList.remove("hidden");
+            form.reset();
+          } catch (err) {
+            alert("❌ Failed to request withdrawal: " + err.message);
+          }
         });
-
-        form.reset();
-        document.getElementById("withdrawStatus").classList.remove("hidden");
-        setTimeout(() => document.getElementById("withdrawStatus").classList.add("hidden"), 3000);
-      } catch (err) {
-        alert("❌ Error submitting request");
-        console.error(err);
       }
     });
-
-    function logout() {
-      signOut(auth).then(() => window.location.href = "index.html");
-    }
   </script>
-
 </body>
 </html>
