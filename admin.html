@@ -44,10 +44,23 @@
     </form>
   </div>
 
-  <!-- Distribute Profit Button -->
+  <!-- Distribute Profit Form -->
   <div class="bg-gray-800 p-4 rounded shadow mb-6">
     <h2 class="text-xl font-bold mb-2">💸 Distribute Profit</h2>
-    <button id="distributeProfit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Distribute 10% Profit to Members</button>
+    <form id="distributeProfitForm" class="space-y-4">
+      <div>
+        <label for="distributionType" class="block text-sm">Distribution Type</label>
+        <select id="distributionType" class="p-2 w-full rounded bg-gray-700 text-white" required>
+          <option value="percent">Percentage</option>
+          <option value="amount">Fixed Amount</option>
+        </select>
+      </div>
+      <div>
+        <label for="distributionValue" class="block text-sm">Value</label>
+        <input type="number" id="distributionValue" min="0" step="0.01" class="p-2 w-full rounded bg-gray-700 text-white" placeholder="Enter percentage or amount" required />
+      </div>
+      <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Distribute Profit</button>
+    </form>
   </div>
 
   <!-- Financial Chart -->
@@ -82,7 +95,7 @@
           <label for="memberName" class="block text-sm">Name</label>
           <input type="text" id="memberName" class="p-2 w-full rounded bg-gray-700 text-white" required />
         </div>
-        <hinge>
+        <div>
           <label for="memberEmail" class="block text-sm">Email</label>
           <input type="email" id="memberEmail" class="p-2 w-full rounded bg-gray-700 text-white" required />
         </div>
@@ -145,7 +158,6 @@
     const memberModal = document.getElementById("memberModal");
     const memberDetailsForm = document.getElementById("memberDetailsForm");
     const cancelModal = document.getElementById("cancelModal");
-    const distributeProfit = document.getElementById("distributeProfit");
 
     let allMembers = [];
     let fundChartInstance;
@@ -395,8 +407,21 @@
     });
 
     // Handle profit distribution
-    distributeProfit.addEventListener("click", async () => {
-      if (!confirm("Are you sure you want to distribute a 10% profit to all approved members?")) {
+    document.getElementById("distributeProfitForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const distributionType = document.getElementById("distributionType").value;
+      const distributionValue = parseFloat(document.getElementById("distributionValue").value);
+
+      if (isNaN(distributionValue) || distributionValue <= 0) {
+        alert("Please enter a valid positive value for distribution.");
+        return;
+      }
+
+      let confirmMessage = distributionType === "percent"
+        ? `Are you sure you want to distribute a ${distributionValue}% profit to all approved members?`
+        : `Are you sure you want to distribute ₱${formatCurrency(distributionValue)} to all approved members?`;
+
+      if (!confirm(confirmMessage)) {
         return;
       }
 
@@ -408,7 +433,14 @@
         }
 
         for (const member of approvedMembers) {
-          const profit = (member.shares || 0) * 10 * 0.1; // 10% of share value (1 share = 10 pesos)
+          let profit;
+          if (distributionType === "percent") {
+            // Calculate profit as a percentage of share value (1 share = 10 pesos)
+            profit = (member.shares || 0) * 10 * (distributionValue / 100);
+          } else {
+            // Distribute fixed amount equally among approved members
+            profit = distributionValue;
+          }
           const newBalance = (member.balance || 0) + profit;
 
           await updateDoc(doc(db, "users", member.id), {
@@ -423,11 +455,14 @@
             shares: 0,
             status: "approved",
             timestamp: new Date(),
-            description: "10% profit distribution"
+            description: distributionType === "percent" 
+              ? `${distributionValue}% profit distribution`
+              : `Fixed amount profit distribution of ₱${formatCurrency(distributionValue)}`
           });
         }
 
-        alert(`Successfully distributed 10% profit to ${approvedMembers.length} members.`);
+        alert(`Successfully distributed ${distributionType === "percent" ? distributionValue + "%" : "₱" + formatCurrency(distributionValue)} profit to ${approvedMembers.length} members.`);
+        document.getElementById("distributeProfitForm").reset();
       } catch (error) {
         console.error("Error distributing profit:", error);
         alert("Failed to distribute profit. Please try again.");
