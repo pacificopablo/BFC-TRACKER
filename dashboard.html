@@ -7,17 +7,31 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 text-white p-6 min-h-screen">
-  
-    <div class="max-w-6xl mx-auto">
-      <div class="mb-4 space-x-2 text-center">
-        <button onclick="showTab('all')" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">All</button>
-        <button onclick="showTab('approved')" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">Approved Only</button>
-        <button onclick="showTab('pending')" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded">Pending Only</button>
-      </div>
-    
+  <div class="max-w-6xl mx-auto">
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-3xl font-bold">👑 Admin Dashboard</h1>
       <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
+    </div>
+
+    <!-- Add New Member Form -->
+    <div class="bg-gray-800 p-6 rounded mb-8">
+      <h2 class="text-xl font-bold mb-4">➕ Add New Member</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input id="addName" placeholder="Full Name" class="p-3 rounded bg-gray-700" />
+        <input id="addEmail" placeholder="Email" class="p-3 rounded bg-gray-700" />
+        <input id="addPhone" placeholder="Phone Number" class="p-3 rounded bg-gray-700" />
+        <input id="addShares" type="number" placeholder="Shares" class="p-3 rounded bg-gray-700" />
+        <input id="addBalance" type="number" placeholder="Initial Balance (₱)" class="p-3 rounded bg-gray-700" />
+      </div>
+      <button onclick="addMember()" class="mt-4 bg-blue-600 px-4 py-2 rounded hover:bg-blue-700">Add Member</button>
+      <p id="addMsg" class="mt-2"></p>
+    </div>
+
+    <!-- Tab Filters -->
+    <div class="mb-4 space-x-2 text-center">
+      <button onclick="showTab('all')" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">All</button>
+      <button onclick="showTab('approved')" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">Approved Only</button>
+      <button onclick="showTab('pending')" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded">Pending Only</button>
     </div>
 
     <h2 class="text-xl font-bold mb-2" id="approvedTitle">📋 Approved Members</h2>
@@ -34,8 +48,8 @@
     }
 
     function getMembers() {
-      let approved = JSON.parse(localStorage.getItem("newMembers") || "[]");
-      let pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
+      const approved = JSON.parse(localStorage.getItem("newMembers") || "[]");
+      const pending  = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
       return { approved, pending };
     }
 
@@ -44,6 +58,44 @@
       localStorage.setItem("pendingMembers", JSON.stringify(pending));
     }
 
+    // Add member manually (approved immediately)
+    function addMember() {
+      const name    = document.getElementById("addName").value.trim();
+      const email   = document.getElementById("addEmail").value.trim().toLowerCase();
+      const phone   = document.getElementById("addPhone").value.trim();
+      const shares  = parseInt(document.getElementById("addShares").value);
+      const balance = parseFloat(document.getElementById("addBalance").value);
+      const msg     = document.getElementById("addMsg");
+
+      if (!name || !email || !phone || !shares || isNaN(balance)) {
+        msg.textContent = "❌ Please fill all fields correctly.";
+        msg.className = "text-red-500";
+        return;
+      }
+
+      let { approved, pending } = getMembers();
+      if (approved.some(m => m.email === email) || pending.some(m => m.email === email)) {
+        msg.textContent = "❌ Email already exists.";
+        msg.className = "text-red-500";
+        return;
+      }
+
+      const newMember = {
+        id: Date.now().toString(),
+        name, email, phone, shares, balance,
+        deposits: 1, withdrawals: 0,
+        joinDate: new Date().toISOString().split("T")[0]
+      };
+
+      approved.push(newMember);
+      saveMembers(approved, pending);
+
+      msg.textContent = "✅ Member added and approved.";
+      msg.className = "text-green-500";
+      renderApproved(approved);
+    }
+
+    // Render functions
     function renderApproved(members) {
       const container = document.getElementById("approvedList");
       container.innerHTML = "";
@@ -56,11 +108,11 @@
         const div = document.createElement("div");
         div.className = "bg-gray-800 p-4 rounded shadow space-y-2";
         div.innerHTML = `
-          <p><strong>Name:</strong> <input value="${m.name}" onchange="updateField(${i}, 'name', this.value)" class="bg-gray-700 p-1 rounded w-full" /></p>
+          <p><strong>Name:</strong> <input value="${m.name}" onchange="updateField('approved', ${i}, 'name', this.value)" class="bg-gray-700 p-1 rounded w-full" /></p>
           <p><strong>Email:</strong> ${m.email}</p>
-          <p><strong>Phone:</strong> <input value="${m.phone}" onchange="updateField(${i}, 'phone', this.value)" class="bg-gray-700 p-1 rounded w-full" /></p>
-          <p><strong>Shares:</strong> <input type="number" value="${m.shares}" onchange="updateField(${i}, 'shares', this.value)" class="bg-gray-700 p-1 rounded w-full" /></p>
-          <p><strong>Balance:</strong> ₱<input type="number" value="${m.balance}" onchange="updateField(${i}, 'balance', this.value)" class="bg-gray-700 p-1 rounded w-full" /></p>
+          <p><strong>Phone:</strong> <input value="${m.phone}" onchange="updateField('approved', ${i}, 'phone', this.value)" class="bg-gray-700 p-1 rounded w-full" /></p>
+          <p><strong>Shares:</strong> <input type="number" value="${m.shares}" onchange="updateField('approved', ${i}, 'shares', this.value)" class="bg-gray-700 p-1 rounded w-full" /></p>
+          <p><strong>Balance:</strong> ₱<input type="number" value="${m.balance}" onchange="updateField('approved', ${i}, 'balance', this.value)" class="bg-gray-700 p-1 rounded w-full" /></p>
           <p><strong>Joined:</strong> ${m.joinDate}</p>
           <button onclick="removeMember(${i})" class="bg-red-600 mt-2 px-3 py-1 rounded hover:bg-red-700">Delete</button>
         `;
@@ -73,10 +125,10 @@
       container.appendChild(summary);
     }
 
-    function renderPending(pending) {
+    function renderPending(members) {
       const container = document.getElementById("pendingList");
       container.innerHTML = "";
-      pending.forEach((m, i) => {
+      members.forEach((m, i) => {
         const div = document.createElement("div");
         div.className = "bg-gray-800 p-4 rounded shadow space-y-2";
         div.innerHTML = `
@@ -95,74 +147,63 @@
       });
     }
 
-    function updateField(index, field, value) {
-      const members = JSON.parse(localStorage.getItem("newMembers") || "[]");
-      if (field === 'shares' || field === 'balance') {
-        value = parseFloat(value);
-      }
-      members[index][field] = value;
-      localStorage.setItem("newMembers", JSON.stringify(members));
-      renderApproved(members);
+    function updateField(list, idx, field, value) {
+      let { approved, pending } = getMembers();
+      const target = list === 'approved' ? approved : pending;
+      if (field==="shares"||field==="balance") value = parseFloat(value);
+      target[idx][field] = value;
+      saveMembers(approved, pending);
+      renderApproved(approved);
+      renderPending(pending);
     }
 
-    function removeMember(index) {
-      const members = JSON.parse(localStorage.getItem("newMembers") || "[]");
-      if (confirm("Are you sure you want to delete this member?")) {
-        members.splice(index, 1);
-        localStorage.setItem("newMembers", JSON.stringify(members));
-        renderApproved(members);
+    function removeMember(i) {
+      let { approved, pending } = getMembers();
+      if (confirm("Delete this member?")) {
+        approved.splice(i,1);
+        saveMembers(approved, pending);
+        renderApproved(approved);
       }
     }
 
     function approve(i) {
-      let pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
-      let approved = JSON.parse(localStorage.getItem("newMembers") || "[]");
-      approved.push(pending[i]);
-      pending.splice(i, 1);
+      let { approved, pending } = getMembers();
+      approved.push(pending.splice(i,1)[0]);
       saveMembers(approved, pending);
       renderApproved(approved);
       renderPending(pending);
     }
 
     function reject(i) {
-      let pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
-      if (confirm("Reject this pending registration?")) {
-        pending.splice(i, 1);
-        localStorage.setItem("pendingMembers", JSON.stringify(pending));
+      let { approved, pending } = getMembers();
+      if (confirm("Reject this registration?")) {
+        pending.splice(i,1);
+        saveMembers(approved, pending);
         renderPending(pending);
       }
     }
 
+    function showTab(tab) {
+      const aList = document.getElementById("approvedList"),
+            pList = document.getElementById("pendingList"),
+            aTitle= document.getElementById("approvedTitle"),
+            pTitle= document.getElementById("pendingTitle");
+      if(tab==="approved"){
+        aList.style.display="grid"; aTitle.style.display="block";
+        pList.style.display="none"; pTitle.style.display="none";
+      } else if(tab==="pending"){
+        aList.style.display="none"; aTitle.style.display="none";
+        pList.style.display="grid"; pTitle.style.display="block";
+      } else {
+        aList.style.display="grid"; aTitle.style.display="block";
+        pList.style.display="grid"; pTitle.style.display="block";
+      }
+    }
+
+    // Initial render
     const { approved, pending } = getMembers();
     renderApproved(approved);
     renderPending(pending);
   </script>
-
-    <script>
-      function showTab(tab) {
-        const approvedSec = document.getElementById("approvedList");
-        const pendingSec = document.getElementById("pendingList");
-        const approvedTitle = document.getElementById("approvedTitle");
-        const pendingTitle = document.getElementById("pendingTitle");
-
-        if (tab === "approved") {
-          approvedSec.style.display = "grid";
-          approvedTitle.style.display = "block";
-          pendingSec.style.display = "none";
-          pendingTitle.style.display = "none";
-        } else if (tab === "pending") {
-          approvedSec.style.display = "none";
-          approvedTitle.style.display = "none";
-          pendingSec.style.display = "grid";
-          pendingTitle.style.display = "block";
-        } else {
-          approvedSec.style.display = "grid";
-          approvedTitle.style.display = "block";
-          pendingSec.style.display = "grid";
-          pendingTitle.style.display = "block";
-        }
-      }
-    </script>
-    </body>
-    
+</body>
 </html>
