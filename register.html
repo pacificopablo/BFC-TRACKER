@@ -37,14 +37,16 @@
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const uid = userCredential.user.uid;
+
         await setDoc(doc(db, "users", uid), {
-          name,
-          email,
+          name: name,
+          email: email,
           role: "member",
           shares: 0,
           balance: 0,
           status: "pending"
         });
+
         form.reset();
         statusMsg.classList.remove('hidden');
       } catch (error) {
