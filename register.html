@@ -3,81 +3,64 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Baccarat Fund Club Register</title>
+  <title>Register Member - Baccarat Fund Club</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
-  <div class="bg-gray-800 p-8 rounded-xl w-full max-w-md shadow-lg">
+  <div class="bg-gray-800 p-8 rounded-lg max-w-md w-full shadow-lg">
     <h1 class="text-2xl font-bold mb-6 text-center">Register New Member</h1>
-    <form id="registerForm" class="space-y-4">
-      <input id="email" type="email" placeholder="Email" required class="w-full p-3 rounded bg-gray-700" />
-      <input id="password" type="password" placeholder="Password (min 6 chars)" required class="w-full p-3 rounded bg-gray-700" />
-      <input id="name" type="text" placeholder="Full Name" required class="w-full p-3 rounded bg-gray-700" />
-      <input id="phone" type="text" placeholder="Phone Number" required class="w-full p-3 rounded bg-gray-700" />
-      <input id="shares" type="number" placeholder="Number of Shares (min 1)" min="1" required class="w-full p-3 rounded bg-gray-700" />
-      <button type="submit" class="w-full bg-green-600 hover:bg-green-700 py-3 rounded font-semibold transition">Register</button>
-      <p id="message" class="mt-2 text-center"></p>
+    <form id="regForm" class="space-y-4">
+      <input type="text" id="name" placeholder="Full Name" required class="w-full p-3 rounded bg-gray-700" />
+      <input type="email" id="email" placeholder="Email" required class="w-full p-3 rounded bg-gray-700" />
+      <input type="text" id="phone" placeholder="Phone Number" required class="w-full p-3 rounded bg-gray-700" />
+      <input type="number" id="shares" placeholder="Shares" required class="w-full p-3 rounded bg-gray-700" />
+      <input type="number" id="balance" placeholder="Initial Balance (₱)" required class="w-full p-3 rounded bg-gray-700" />
+      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded font-semibold transition">Register</button>
+      <p id="message" class="text-center mt-3"></p>
     </form>
-    <p class="text-center mt-4">
-      <a href="index.html" class="text-blue-400 hover:underline">Back to Login</a>
-    </p>
+    <div class="text-center mt-4">
+      <a href="index.html" class="text-green-400 hover:underline">Back to Login</a>
+    </div>
   </div>
 
-  <script type="module">
-    import { auth, db } from './firebase-config.js';
-    import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-auth.js";
-    import { doc, setDoc } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-firestore.js";
-
-    const registerForm = document.getElementById('registerForm');
-    const message = document.getElementById('message');
-
-    registerForm.addEventListener('submit', async e => {
+  <script>
+    document.getElementById("regForm").addEventListener("submit", function (e) {
       e.preventDefault();
-      message.textContent = '';
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim().toLowerCase();
+      const phone = document.getElementById("phone").value.trim();
+      const shares = parseInt(document.getElementById("shares").value);
+      const balance = parseFloat(document.getElementById("balance").value);
+      const message = document.getElementById("message");
 
-      const email = registerForm.email.value.trim();
-      const password = registerForm.password.value.trim();
-      const name = registerForm.name.value.trim();
-      const phone = registerForm.phone.value.trim();
-      const shares = parseInt(registerForm.shares.value);
+      const newMember = {
+        id: Date.now().toString(),
+        name,
+        email,
+        phone,
+        shares,
+        balance,
+        deposits: 1,
+        withdrawals: 0,
+        joinDate: new Date().toISOString().split("T")[0]
+      };
 
-      if (password.length < 6) {
-        message.textContent = "❌ Password must be at least 6 characters.";
-        message.className = "text-red-500 mt-2 text-center";
+      const saved = JSON.parse(localStorage.getItem("newMembers") || "[]");
+      const duplicate = saved.find(m => m.email === email);
+      if (duplicate) {
+        message.textContent = "❌ Email already registered.";
+        message.className = "text-red-500";
         return;
       }
-      if (shares < 1) {
-        message.textContent = "❌ You must buy at least 1 share.";
-        message.className = "text-red-500 mt-2 text-center";
-        return;
-      }
 
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const uid = userCredential.user.uid;
-        const joinDate = new Date().toISOString().split('T')[0];
-        await setDoc(doc(db, "members", uid), {
-          name,
-          phone,
-          shares,
-          joinDate,
-          deposits: 0,
-          withdrawals: 0,
-          balance: shares * 10
-        });
+      saved.push(newMember);
+      localStorage.setItem("newMembers", JSON.stringify(saved));
+      message.textContent = "✅ Registration successful!";
+      message.className = "text-green-500";
 
-        message.textContent = "✅ Success! Redirecting to login...";
-        message.className = "text-green-400 mt-2 text-center";
-
-        registerForm.reset();
-
-        setTimeout(() => {
-          window.location.href = "index.html";
-        }, 2000);
-      } catch (error) {
-        message.textContent = "❌ " + error.message;
-        message.className = "text-red-500 mt-2 text-center";
-      }
+      setTimeout(() => {
+        window.location.href = "index.html";
+      }, 1500);
     });
   </script>
 </body>
