@@ -9,7 +9,6 @@
 <body class="bg-gray-900 text-white p-6">
   <h1 class="text-3xl font-bold mb-6 text-center">🎴 Member Dashboard</h1>
 
-  <!-- Profile Info as Read-Only Inputs -->
   <div class="bg-gray-800 p-6 rounded-lg mb-8 space-y-4">
     <div>
       <label class="block mb-1 text-gray-300">Name</label>
@@ -31,7 +30,6 @@
     </div>
   </div>
 
-  <!-- Withdrawal Request Section -->
   <section class="bg-gray-800 p-6 rounded-lg mb-8">
     <h2 class="text-2xl font-semibold mb-4">💸 Request Withdrawal</h2>
     <form id="withdrawForm" class="space-y-4">
@@ -52,37 +50,25 @@
     window.addEventListener('DOMContentLoaded', () => {
       const user = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
       if (!user.email || !user.name) {
-        // Not logged in or bad data → back to login
         window.location.href = 'index.html';
         return;
       }
-
-      // Populate the read-only inputs
       document.getElementById('memberName').value = user.name;
       document.getElementById('memberEmail').value = user.email;
       document.getElementById('memberShares').value = user.shares || 0;
       document.getElementById('memberBalance').value = user.balance?.toFixed(2) || '0.00';
 
-      // Handle withdrawal form
       document.getElementById('withdrawForm').addEventListener('submit', e => {
         e.preventDefault();
         const amount = parseFloat(document.getElementById('amount').value);
         const note = document.getElementById('note').value.trim();
-
         if (isNaN(amount) || amount <= 0) {
-          alert('🔴 Enter a valid positive amount.');
+          alert('🔴 Enter a valid amount.');
           return;
         }
-
         const requests = JSON.parse(localStorage.getItem('withdrawRequests') || '[]');
-        requests.push({
-          email: user.email,
-          amount,
-          note,
-          date: new Date().toISOString()
-        });
+        requests.push({ email: user.email, amount, note, date: new Date().toISOString() });
         localStorage.setItem('withdrawRequests', JSON.stringify(requests));
-
         e.target.reset();
         document.getElementById('withdrawMessage').classList.remove('hidden');
       });
