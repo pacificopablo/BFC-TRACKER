@@ -1,55 +1,64 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Register - Baccarat Fund</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register - Baccarat Fund Club</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-900 text-white flex items-center justify-center h-screen">
-  <div class="w-full max-w-sm">
-    <h1 class="text-2xl font-bold mb-4 text-center">📝 Register</h1>
-    <input id="name" placeholder="Full Name" class="mb-2 w-full p-2 rounded bg-gray-700" />
-    <input id="email" placeholder="Email" class="mb-2 w-full p-2 rounded bg-gray-700" />
-    <input id="phone" placeholder="Phone Number" class="mb-2 w-full p-2 rounded bg-gray-700" />
-    <input id="shares" type="number" placeholder="Shares" class="mb-2 w-full p-2 rounded bg-gray-700" />
-    <input id="balance" type="number" placeholder="Initial Balance (₱)" class="mb-2 w-full p-2 rounded bg-gray-700" />
-    <button onclick="register()" class="w-full bg-green-600 hover:bg-green-700 p-2 rounded">Submit</button>
-    <p id="msg" class="mt-2 text-center"></p>
-  </div>
-  <script>
-    function register() {
-      const name = document.getElementById("name").value.trim();
-      const email = document.getElementById("email").value.trim().toLowerCase();
-      const phone = document.getElementById("phone").value.trim();
-      const shares = parseInt(document.getElementById("shares").value);
-      const balance = parseFloat(document.getElementById("balance").value);
-      const msg = document.getElementById("msg");
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
+  <div class="bg-gray-800 p-8 rounded shadow-lg w-full max-w-md">
+    <h1 class="text-2xl font-bold mb-4 text-center">📝 Member Registration</h1>
+    <input id="regName" type="text" placeholder="Full Name" class="w-full mb-3 p-2 rounded bg-gray-700" />
+    <input id="regEmail" type="email" placeholder="Email" class="w-full mb-3 p-2 rounded bg-gray-700" />
+    <input id="regPhone" type="text" placeholder="Phone Number" class="w-full mb-3 p-2 rounded bg-gray-700" />
+    <input id="regShares" type="number" placeholder="Number of Shares" class="w-full mb-3 p-2 rounded bg-gray-700" oninput="autoComputeBalance()" />
+    <input id="regBalance" type="number" placeholder="Initial Balance (₱)" class="w-full mb-3 p-2 rounded bg-gray-700" readonly />
+    <input id="regPassword" type="password" placeholder="Create Password" class="w-full mb-4 p-2 rounded bg-gray-700" />
+    <button onclick="registerMember()" class="w-full bg-blue-600 hover:bg-blue-700 p-2 rounded">Register</button>
+    <p id="regMsg" class="mt-3 text-center text-sm"></p>
+    <p class="text-center mt-4"><a href="index.html" class="text-blue-400">⬅️ Back to Login</a></p>
+  </div>  <script>
+    function autoComputeBalance() {
+      const shares = parseInt(document.getElementById("regShares").value);
+      document.getElementById("regBalance").value = isNaN(shares) ? "" : shares * 10;
+    }
 
-      if (!name || !email || !phone || !shares || isNaN(balance)) {
+    function registerMember() {
+      const name = document.getElementById("regName").value.trim();
+      const email = document.getElementById("regEmail").value.trim().toLowerCase();
+      const phone = document.getElementById("regPhone").value.trim();
+      const shares = parseInt(document.getElementById("regShares").value);
+      const balance = parseFloat(document.getElementById("regBalance").value);
+      const password = document.getElementById("regPassword").value.trim();
+      const msg = document.getElementById("regMsg");
+
+      if (!name || !email || !phone || !shares || isNaN(balance) || !password) {
         msg.textContent = "❌ Please complete all fields.";
         msg.className = "text-red-500";
         return;
       }
 
       const pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
-      if (pending.some(m => m.email === email)) {
-        msg.textContent = "❌ You already registered.";
-        msg.className = "text-red-500";
+      const approved = JSON.parse(localStorage.getItem("newMembers") || "[]");
+
+      if ([...pending, ...approved].some(m => m.email === email)) {
+        msg.textContent = "⚠️ Email already exists.";
+        msg.className = "text-yellow-400";
         return;
       }
 
-      const newMember = {
+      const member = {
         id: Date.now().toString(),
         name, email, phone, shares, balance,
+        password,
         joinDate: new Date().toISOString().split("T")[0]
       };
 
-      pending.push(newMember);
+      pending.push(member);
       localStorage.setItem("pendingMembers", JSON.stringify(pending));
-      msg.textContent = "✅ Registered! Waiting for admin approval.";
+      msg.textContent = "✅ Registration submitted. Wait for admin approval.";
       msg.className = "text-green-500";
+      document.querySelectorAll("input").forEach(input => input.value = "");
     }
-  </script>
-</body>
+  </script></body>
 </html>
