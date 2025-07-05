@@ -16,8 +16,8 @@
     <input id="newName" placeholder="Full Name" class="p-2 rounded bg-gray-700" />
     <input id="newEmail" placeholder="Email" class="p-2 rounded bg-gray-700" />
     <input id="newPhone" placeholder="Phone" class="p-2 rounded bg-gray-700" />
-    <input id="newShares" type="number" placeholder="Shares" class="p-2 rounded bg-gray-700" />
-    <input id="newBalance" type="number" placeholder="Balance" class="p-2 rounded bg-gray-700" />
+    <input id="newShares" type="number" placeholder="Shares" class="p-2 rounded bg-gray-700" oninput="autoComputeBalance()" />
+    <input id="newBalance" type="number" placeholder="Balance (₱)" class="p-2 rounded bg-gray-700" readonly />
     <button onclick="addMember()" class="col-span-2 bg-blue-600 hover:bg-blue-700 p-2 rounded">Add Member</button>
   </div>
 </div>
@@ -58,7 +58,12 @@
       approvedList.innerHTML = approved.map(m => `
         <li class="bg-gray-800 p-3 rounded">
           <p><strong>${m.name}</strong> (${m.email})</p>
-          <p>📞 ${m.phone} | 💼 Shares: ${m.shares} | 💰 ₱${m.balance.toFixed(2)}</p>
+          <p>📞 <input value="${m.phone}" onchange="editField('${m.id}', 'phone', this.value)" class="bg-gray-700 rounded p-1" /></p>
+          <p>💼 Shares: <input type="number" value="${m.shares}" onchange="editShares('${m.id}', this.value)" class="bg-gray-700 rounded p-1" /></p>
+          <p>💰 Balance: ₱${m.balance.toFixed(2)}</p>
+          <div class="mt-2">
+            <button onclick="deleteMember('${m.id}')" class="bg-red-600 px-2 py-1 rounded">Delete</button>
+          </div>
         </li>
       `).join("");
     }
@@ -75,6 +80,33 @@
     function reject(id) {
       pending = pending.filter(m => m.id !== id);
       save();
+    }
+
+    function deleteMember(id) {
+      approved = approved.filter(m => m.id !== id);
+      save();
+    }
+
+    function editField(id, field, value) {
+      const member = approved.find(m => m.id === id);
+      if (member) {
+        member[field] = value;
+        save();
+      }
+    }
+
+    function editShares(id, value) {
+      const member = approved.find(m => m.id === id);
+      if (member) {
+        member.shares = parseInt(value);
+        member.balance = member.shares * 10;
+        save();
+      }
+    }
+
+    function autoComputeBalance() {
+      const shares = parseInt(document.getElementById("newShares").value);
+      document.getElementById("newBalance").value = isNaN(shares) ? "" : shares * 10;
     }
 
     function addMember() {
