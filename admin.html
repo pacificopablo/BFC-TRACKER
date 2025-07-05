@@ -1,147 +1,114 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin Dashboard - Baccarat Fund</title>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Dashboard - Baccarat Fund Club</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 text-white p-6">
-  <div class="max-w-5xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold">🛡️ Admin Dashboard</h1>
-      <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded">Logout</button>
-    </div><div class="bg-gray-800 p-4 rounded mb-6">
-  <h2 class="text-xl font-bold mb-2">➕ Add New Member</h2>
-  <div class="grid grid-cols-2 gap-4">
-    <input id="newName" placeholder="Full Name" class="p-2 rounded bg-gray-700" />
-    <input id="newEmail" placeholder="Email" class="p-2 rounded bg-gray-700" />
-    <input id="newPhone" placeholder="Phone" class="p-2 rounded bg-gray-700" />
-    <input id="newShares" type="number" placeholder="Shares" class="p-2 rounded bg-gray-700" oninput="autoComputeBalance()" />
-    <input id="newBalance" type="number" placeholder="Balance (₱)" class="p-2 rounded bg-gray-700" readonly />
-    <button onclick="addMember()" class="col-span-2 bg-blue-600 hover:bg-blue-700 p-2 rounded">Add Member</button>
-  </div>
-</div>
+  <div class="max-w-6xl mx-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-3xl font-bold">🛠️ Admin Dashboard</h1>
+      <button onclick="logout()" class="bg-red-600 px-3 py-1 rounded">Logout</button>
+    </div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-  <div>
-    <h2 class="text-xl font-bold mb-2">🕓 Pending Members</h2>
-    <ul id="pendingList" class="space-y-2"></ul>
-  </div>
-  <div>
-    <h2 class="text-xl font-bold mb-2">✅ Approved Members</h2>
-    <ul id="approvedList" class="space-y-2"></ul>
-  </div>
-</div>
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">📥 Pending Members</h2>
+      <ul id="pendingList" class="space-y-2"></ul>
+    </div>
 
-  </div>  <script>
-    if (!localStorage.getItem("admin")) {
+    <div>
+      <h2 class="text-xl font-semibold mb-2">✅ Approved Members</h2>
+      <ul id="approvedList" class="space-y-2"></ul>
+    </div>
+  </div>
+
+  <script>
+    if (!(localStorage.getItem("admin") || sessionStorage.getItem("admin"))) {
       window.location.href = "index.html";
     }
 
-    const pendingList = document.getElementById("pendingList");
-    const approvedList = document.getElementById("approvedList");
-
-    let pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
-    let approved = JSON.parse(localStorage.getItem("newMembers") || "[]");
-
-    function render() {
-      pendingList.innerHTML = pending.map(m => `
-        <li class="bg-gray-800 p-3 rounded">
-          <p><strong>${m.name}</strong> (${m.email})</p>
-          <div class="mt-2">
-            <button onclick="approve('${m.id}')" class="bg-green-600 px-2 py-1 rounded mr-2">Approve</button>
-            <button onclick="reject('${m.id}')" class="bg-red-600 px-2 py-1 rounded">Reject</button>
-          </div>
-        </li>
-      `).join("");
-
-      approvedList.innerHTML = approved.map(m => `
-        <li class="bg-gray-800 p-3 rounded">
-          <p><strong>${m.name}</strong> (${m.email})</p>
-          <p>📞 <input value="${m.phone}" onchange="editField('${m.id}', 'phone', this.value)" class="bg-gray-700 rounded p-1" /></p>
-          <p>💼 Shares: <input type="number" value="${m.shares}" onchange="editShares('${m.id}', this.value)" class="bg-gray-700 rounded p-1" /></p>
-          <p>💰 Balance: ₱${m.balance.toFixed(2)}</p>
-          <div class="mt-2">
-            <button onclick="deleteMember('${m.id}')" class="bg-red-600 px-2 py-1 rounded">Delete</button>
-          </div>
-        </li>
-      `).join("");
-    }
-
-    function approve(id) {
-      const member = pending.find(m => m.id === id);
-      if (member) {
-        approved.push(member);
-        pending = pending.filter(m => m.id !== id);
-        save();
-      }
-    }
-
-    function reject(id) {
-      pending = pending.filter(m => m.id !== id);
-      save();
-    }
-
-    function deleteMember(id) {
-      approved = approved.filter(m => m.id !== id);
-      save();
-    }
-
-    function editField(id, field, value) {
-      const member = approved.find(m => m.id === id);
-      if (member) {
-        member[field] = value;
-        save();
-      }
-    }
-
-    function editShares(id, value) {
-      const member = approved.find(m => m.id === id);
-      if (member) {
-        member.shares = parseInt(value);
-        member.balance = member.shares * 10;
-        save();
-      }
-    }
-
-    function autoComputeBalance() {
-      const shares = parseInt(document.getElementById("newShares").value);
-      document.getElementById("newBalance").value = isNaN(shares) ? "" : shares * 10;
-    }
-
-    function addMember() {
-      const name = document.getElementById("newName").value.trim();
-      const email = document.getElementById("newEmail").value.trim().toLowerCase();
-      const phone = document.getElementById("newPhone").value.trim();
-      const shares = parseInt(document.getElementById("newShares").value);
-      const balance = parseFloat(document.getElementById("newBalance").value);
-
-      if (!name || !email || !phone || !shares || isNaN(balance)) {
-        alert("❌ Complete all fields to add member.");
-        return;
+    async function loadMembers() {
+      let data;
+      try {
+        const res = await fetch('users.json');
+        data = await res.json();
+      } catch {
+        data = { members: [], admin: null };
       }
 
-      const newMember = {
-        id: Date.now().toString(),
-        name, email, phone, shares, balance,
-        joinDate: new Date().toISOString().split("T")[0]
-      };
+      const pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
+      const approvedLocal = JSON.parse(localStorage.getItem("approvedMembers") || "[]");
 
-      approved.push(newMember);
-      save();
+      // Combine JSON approved and local approved
+      const approved = data.members.concat(approvedLocal);
+
+      // Display pending
+      const pendingList = document.getElementById("pendingList");
+      if (pending.length === 0) pendingList.innerHTML = "<li>No pending members</li>";
+      else
+        pendingList.innerHTML = pending
+          .map(
+            (m, i) => `
+          <li class="bg-gray-800 p-3 rounded">
+            <p><strong>${m.name}</strong> (${m.email})</p>
+            <p>Shares: ${m.shares} | Balance: ₱${m.balance}</p>
+            <button onclick="approve(${i})" class="bg-green-600 mt-2 px-2 py-1 rounded">Approve</button>
+            <button onclick="reject(${i})" class="bg-red-600 mt-2 px-2 py-1 rounded ml-2">Reject</button>
+          </li>
+        `
+          )
+          .join("");
+
+      // Display approved
+      const approvedList = document.getElementById("approvedList");
+      if (approved.length === 0) approvedList.innerHTML = "<li>No approved members</li>";
+      else
+        approvedList.innerHTML = approved
+          .map(
+            (m, i) => `
+          <li class="bg-gray-800 p-3 rounded">
+            <p><strong>${m.name}</strong> (${m.email})</p>
+            <p>Shares: ${m.shares} | Balance: ₱${m.balance}</p>
+            <button onclick="deleteMember(${i})" class="bg-red-600 mt-2 px-2 py-1 rounded">Delete</button>
+          </li>
+        `
+          )
+          .join("");
     }
 
-    function save() {
+    function approve(index) {
+      let pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
+      let approvedLocal = JSON.parse(localStorage.getItem("approvedMembers") || "[]");
+      const member = pending.splice(index, 1)[0];
+      approvedLocal.push(member);
       localStorage.setItem("pendingMembers", JSON.stringify(pending));
-      localStorage.setItem("newMembers", JSON.stringify(approved));
-      render();
+      localStorage.setItem("approvedMembers", JSON.stringify(approvedLocal));
+      loadMembers();
+    }
+
+    function reject(index) {
+      let pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
+      pending.splice(index, 1);
+      localStorage.setItem("pendingMembers", JSON.stringify(pending));
+      loadMembers();
+    }
+
+    function deleteMember(index) {
+      // We cannot delete JSON-based members; only localStorage approved
+      let approvedLocal = JSON.parse(localStorage.getItem("approvedMembers") || "[]");
+      approvedLocal.splice(index - JSON.parse(localStorage.getItem("approvedMembers") || "[]").length, 1);
+      localStorage.setItem("approvedMembers", JSON.stringify(approvedLocal));
+      loadMembers();
     }
 
     function logout() {
       localStorage.removeItem("admin");
+      sessionStorage.removeItem("admin");
       window.location.href = "index.html";
     }
 
-    render();
-  </script></body>
+    loadMembers();
+  </script>
+</body>
 </html>
