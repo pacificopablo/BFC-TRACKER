@@ -2,284 +2,39 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin Dashboard – Baccarat Fund Club</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard - Member</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-gray-900 text-white p-6 min-h-screen">
-  <div class="max-w-6xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold">👑 Admin Dashboard</h1>
-      <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
+<body class="bg-gray-900 text-white p-6">
+  <div class="max-w-xl mx-auto">
+    <div class="flex justify-between mb-4">
+      <h1 class="text-2xl font-bold">👤 Member Dashboard</h1>
+      <button onclick="logout()" class="bg-red-600 px-3 py-1 rounded">Logout</button>
     </div>
-
-    <!-- Add Member -->
-    <div class="bg-gray-800 p-6 rounded mb-8">
-      <h2 class="text-xl font-bold mb-4">➕ Add New Member</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <input id="addName" placeholder="Full Name" class="p-3 rounded bg-gray-700" />
-        <input id="addEmail" placeholder="Email" class="p-3 rounded bg-gray-700" />
-        <input id="addPhone" placeholder="Phone Number" class="p-3 rounded bg-gray-700" />
-        <input id="addShares" type="number" placeholder="Shares" class="p-3 rounded bg-gray-700" />
-        <input id="addBalance" type="number" placeholder="Initial Balance (₱)" class="p-3 rounded bg-gray-700" />
-      </div>
-      <button onclick="addMember()" class="mt-4 bg-blue-600 px-4 py-2 rounded hover:bg-blue-700">Add Member</button>
-      <p id="addMsg" class="mt-2"></p>
-    </div>
-
-    <!-- Tabs -->
-    <div class="mb-4 space-x-2 text-center">
-      <button onclick="showTab('all')" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">All</button>
-      <button onclick="showTab('approved')" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">Approved</button>
-      <button onclick="showTab('pending')" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded">Pending</button>
-    </div>
-
-    <h2 class="text-xl font-bold mb-2" id="approvedTitle">📋 Approved Members</h2>
-    <div id="approvedList" class="grid md:grid-cols-2 gap-4 mb-10"></div>
-
-    <h2 class="text-xl font-bold mb-2" id="pendingTitle">🕓 Pending Registrations</h2>
-    <div id="pendingList" class="grid md:grid-cols-2 gap-4"></div>
-
-    <!-- Chart -->
-    <div class="bg-gray-800 p-6 rounded mt-10">
-      <h2 class="text-xl font-bold mb-4">📈 Fund Distribution</h2>
-      <canvas id="fundChart" height="120"></canvas>
-    </div>
-
-    <!-- Profit Sharing -->
-    <div class="bg-gray-800 p-6 rounded mt-10">
-      <h2 class="text-xl font-bold mb-4">💰 Profit Sharing Calculator</h2>
-      <input id="totalProfit" type="number" placeholder="Enter total profit (₱)" class="p-3 rounded bg-gray-700 w-full mb-4">
-      <button onclick="calculateProfits()" class="bg-indigo-600 px-4 py-2 rounded hover:bg-indigo-700">Calculate</button>
-      <div id="profitResults" class="mt-4 space-y-2"></div>
-    </div>
-
-    <!-- Export -->
-    <div class="mt-6">
-      <button onclick="exportCSV()" class="bg-yellow-600 px-4 py-2 rounded hover:bg-yellow-700">Export CSV</button>
-      <button onclick="window.print()" class="bg-purple-600 px-4 py-2 rounded hover:bg-purple-700 ml-2">Print PDF</button>
-    </div>
+    <div id="info" class="bg-gray-800 p-4 rounded"></div>
   </div>
-
   <script>
+    const member = JSON.parse(localStorage.getItem("currentMember"));
+    const info = document.getElementById("info");
+
+    if (!member) {
+      window.location.href = "index.html";
+    } else {
+      info.innerHTML = `
+        <p><strong>Name:</strong> ${member.name}</p>
+        <p><strong>Email:</strong> ${member.email}</p>
+        <p><strong>Phone:</strong> ${member.phone}</p>
+        <p><strong>Shares:</strong> ${member.shares}</p>
+        <p><strong>Balance:</strong> ₱${member.balance.toFixed(2)}</p>
+        <p><strong>Joined:</strong> ${member.joinDate}</p>
+      `;
+    }
+
     function logout() {
-      localStorage.removeItem('admin');
-      window.location.href = 'index.html';
+      localStorage.removeItem("currentMember");
+      window.location.href = "index.html";
     }
-
-    function getMembers() {
-      const approved = JSON.parse(localStorage.getItem(\"newMembers\") || \"[]\");
-      const pending  = JSON.parse(localStorage.getItem(\"pendingMembers\") || \"[]\");
-      return { approved, pending };
-    }
-
-    function saveMembers(approved, pending) {
-      localStorage.setItem(\"newMembers\", JSON.stringify(approved));
-      localStorage.setItem(\"pendingMembers\", JSON.stringify(pending));
-    }
-
-    function addMember() {
-      const name = document.getElementById(\"addName\").value.trim();
-      const email = document.getElementById(\"addEmail\").value.trim().toLowerCase();
-      const phone = document.getElementById(\"addPhone\").value.trim();
-      const shares = parseInt(document.getElementById(\"addShares\").value);
-      const balance = parseFloat(document.getElementById(\"addBalance\").value);
-      const msg = document.getElementById(\"addMsg\");
-
-      if (!name || !email || !phone || !shares || isNaN(balance)) {
-        msg.textContent = \"❌ Please fill all fields correctly.\";
-        msg.className = \"text-red-500\";
-        return;
-      }
-
-      let { approved, pending } = getMembers();
-      if (approved.some(m => m.email === email) || pending.some(m => m.email === email)) {
-        msg.textContent = \"❌ Email already exists.\";
-        msg.className = \"text-red-500\";
-        return;
-      }
-
-      const newMember = {
-        id: Date.now().toString(),
-        name, email, phone, shares, balance,
-        deposits: 1, withdrawals: 0,
-        joinDate: new Date().toISOString().split(\"T\")[0]
-      };
-
-      approved.push(newMember);
-      saveMembers(approved, pending);
-      msg.textContent = \"✅ Member added.\";
-      msg.className = \"text-green-500\";
-      renderApproved(approved);
-      renderChart(approved);
-    }
-
-    function renderApproved(members) {
-      const container = document.getElementById(\"approvedList\");
-      container.innerHTML = \"\";
-      let totalShares = 0, totalBalance = 0;
-
-      members.forEach((m, i) => {
-        totalShares += m.shares;
-        totalBalance += m.balance;
-
-        const div = document.createElement(\"div\");
-        div.className = \"bg-gray-800 p-4 rounded shadow space-y-2\";
-        div.innerHTML = `
-          <p><strong>Name:</strong> <input value=\"${m.name}\" onchange=\"updateField('approved', ${i}, 'name', this.value)\" class=\"bg-gray-700 p-1 rounded w-full\" /></p>
-          <p><strong>Email:</strong> ${m.email}</p>
-          <p><strong>Phone:</strong> <input value=\"${m.phone}\" onchange=\"updateField('approved', ${i}, 'phone', this.value)\" class=\"bg-gray-700 p-1 rounded w-full\" /></p>
-          <p><strong>Shares:</strong> <input type=\"number\" value=\"${m.shares}\" onchange=\"updateField('approved', ${i}, 'shares', this.value)\" class=\"bg-gray-700 p-1 rounded w-full\" /></p>
-          <p><strong>Balance:</strong> ₱<input type=\"number\" value=\"${m.balance}\" onchange=\"updateField('approved', ${i}, 'balance', this.value)\" class=\"bg-gray-700 p-1 rounded w-full\" /></p>
-          <p><strong>Joined:</strong> ${m.joinDate}</p>
-          <button onclick=\"removeMember(${i})\" class=\"bg-red-600 mt-2 px-3 py-1 rounded hover:bg-red-700\">Delete</button>
-        `;
-        container.appendChild(div);
-      });
-
-      const summary = document.createElement(\"div\");
-      summary.className = \"col-span-2 bg-green-700 p-4 rounded mt-4\";
-      summary.innerHTML = `<strong>📊 Total Shares:</strong> ${totalShares} | <strong>Total Balance:</strong> ₱${totalBalance.toFixed(2)}`;
-      container.appendChild(summary);
-    }
-
-    function renderPending(members) {
-      const container = document.getElementById(\"pendingList\");
-      container.innerHTML = \"\";
-      members.forEach((m, i) => {
-        const div = document.createElement(\"div\");
-        div.className = \"bg-gray-800 p-4 rounded shadow space-y-2\";
-        div.innerHTML = `
-          <p><strong>Name:</strong> ${m.name}</p>
-          <p><strong>Email:</strong> ${m.email}</p>
-          <p><strong>Phone:</strong> ${m.phone}</p>
-          <p><strong>Shares:</strong> ${m.shares}</p>
-          <p><strong>Balance:</strong> ₱${m.balance}</p>
-          <p><strong>Joined:</strong> ${m.joinDate}</p>
-          <div class=\"flex gap-4\">
-            <button onclick=\"approve(${i})\" class=\"bg-green-600 px-3 py-1 rounded hover:bg-green-700\">Approve</button>
-            <button onclick=\"reject(${i})\" class=\"bg-red-600 px-3 py-1 rounded hover:bg-red-700\">Reject</button>
-          </div>
-        `;
-        container.appendChild(div);
-      });
-    }
-
-    function updateField(list, idx, field, value) {
-      let { approved, pending } = getMembers();
-      const target = list === 'approved' ? approved : pending;
-      if (field===\"shares\"||field===\"balance\") value = parseFloat(value);
-      target[idx][field] = value;
-      saveMembers(approved, pending);
-      renderApproved(approved);
-      renderPending(pending);
-      renderChart(approved);
-    }
-
-    function removeMember(i) {
-      let { approved, pending } = getMembers();
-      if (confirm(\"Delete this member?\")) {
-        approved.splice(i,1);
-        saveMembers(approved, pending);
-        renderApproved(approved);
-        renderChart(approved);
-      }
-    }
-
-    function approve(i) {
-      let { approved, pending } = getMembers();
-      approved.push(pending.splice(i,1)[0]);
-      saveMembers(approved, pending);
-      renderApproved(approved);
-      renderPending(pending);
-      renderChart(approved);
-    }
-
-    function reject(i) {
-      let { approved, pending } = getMembers();
-      if (confirm(\"Reject this registration?\")) {
-        pending.splice(i,1);
-        saveMembers(approved, pending);
-        renderPending(pending);
-      }
-    }
-
-    function showTab(tab) {
-      const aList = document.getElementById(\"approvedList\"),
-            pList = document.getElementById(\"pendingList\"),
-            aTitle= document.getElementById(\"approvedTitle\"),
-            pTitle= document.getElementById(\"pendingTitle\");
-      if(tab===\"approved\"){
-        aList.style.display=\"grid\"; aTitle.style.display=\"block\";
-        pList.style.display=\"none\"; pTitle.style.display=\"none\";
-      } else if(tab===\"pending\"){
-        aList.style.display=\"none\"; aTitle.style.display=\"none\";
-        pList.style.display=\"grid\"; pTitle.style.display=\"block\";
-      } else {
-        aList.style.display=\"grid\"; aTitle.style.display=\"block\";
-        pList.style.display=\"grid\"; pTitle.style.display=\"block\";
-      }
-    }
-
-    function renderChart(data) {
-      const ctx = document.getElementById('fundChart').getContext('2d');
-      const labels = data.map(m => m.name);
-      const balances = data.map(m => m.balance);
-      if (window.fundChart) fundChart.destroy();
-      fundChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Fund (₱)',
-            data: balances,
-            backgroundColor: 'rgba(54, 162, 235, 0.7)'
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { display: false },
-            title: { display: true, text: 'Fund Contribution' }
-          }
-        }
-      });
-    }
-
-    function calculateProfits() {
-      const profit = parseFloat(document.getElementById('totalProfit').value);
-      const approved = JSON.parse(localStorage.getItem(\"newMembers\") || \"[]\");
-      const resultDiv = document.getElementById('profitResults');
-      resultDiv.innerHTML = '';
-      let totalShares = approved.reduce((sum, m) => sum + m.shares, 0);
-      approved.forEach(m => {
-        const memberProfit = ((m.shares / totalShares) * profit).toFixed(2);
-        const p = document.createElement('p');
-        p.innerHTML = `<strong>${m.name}</strong>: ₱${memberProfit}`;
-        resultDiv.appendChild(p);
-      });
-    }
-
-    function exportCSV() {
-      const approved = JSON.parse(localStorage.getItem(\"newMembers\") || \"[]\");
-      const csvRows = [\"Name,Email,Phone,Shares,Balance\"];
-      approved.forEach(m => {
-        csvRows.push(`${m.name},${m.email},${m.phone},${m.shares},${m.balance}`);
-      });
-      const csv = csvRows.join(\"\\n\");
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.setAttribute('href', url);
-      a.setAttribute('download', 'members.csv');
-      a.click();
-    }
-
-    const { approved, pending } = getMembers();
-    renderApproved(approved);
-    renderPending(pending);
-    renderChart(approved);
   </script>
 </body>
 </html>
