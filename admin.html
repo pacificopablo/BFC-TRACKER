@@ -4,10 +4,11 @@
   <meta charset="UTF-8" />
   <title>Admin Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 text-white p-4">
-  <h1 class="text-3xl font-bold mb-6">👑 Admin Dashboard</h1>
+  <h1 class="text-3xl font-bold mb-4">👑 Admin Dashboard</h1>
 
   <div id="summary" class="mb-6 space-y-1">
     <p>Total Members: <span id="totalMembers">0</span></p>
@@ -15,8 +16,21 @@
     <p>Total Balance: ₱<span id="totalBalance">0</span></p>
   </div>
 
+  <!-- Controls -->
+  <input type="text" id="searchInput" placeholder="Search by name, email, or status..." class="mb-4 p-2 w-full rounded bg-gray-700 text-white" />
+  <button onclick="exportCSV()" class="bg-blue-600 px-4 py-2 rounded mb-4">⬇️ Export to CSV</button>
+
+  <!-- Chart -->
+  <div class="mb-6">
+    <canvas id="statusChart" class="bg-white rounded p-2"></canvas>
+  </div>
+
   <p id="loadingText" class="text-gray-400 mb-4">Loading members...</p>
   <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+  <!-- Withdrawals -->
+  <h2 class="text-2xl font-bold mt-8 mb-4">💸 Withdrawal Requests</h2>
+  <div id="withdrawalsList" class="space-y-4"></div>
 
   <script type="module">
     import { db } from './firebase-config.js';
@@ -29,17 +43,19 @@
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const membersList = document.getElementById("membersList");
+    const withdrawalsList = document.getElementById("withdrawalsList");
     const totalMembers = document.getElementById("totalMembers");
     const totalShares = document.getElementById("totalShares");
     const totalBalance = document.getElementById("totalBalance");
     const loadingText = document.getElementById("loadingText");
+    const searchInput = document.getElementById("searchInput");
+
+    let memberData = [];
 
     function createMemberCard(data, id) {
       const div = document.createElement("div");
       div.className = "bg-gray-800 p-4 rounded shadow";
-
       const statusColor = data.status === "approved" ? "bg-green-500" : "bg-yellow-500";
-
       div.innerHTML = `
         <p><strong>Name:</strong> ${data.name}</p>
         <p><strong>Email:</strong> ${data.email}</p>
@@ -60,22 +76,57 @@
       loadingText.style.display = "block";
       const querySnapshot = await getDocs(collection(db, "users"));
       let memberCount = 0, shareTotal = 0, balanceTotal = 0;
+      let approvedCount = 0, pendingCount = 0;
+
+      memberData = [];
       membersList.innerHTML = "";
 
-      querySnapshot.forEach((docSnap) => {
+      const now = new Date();
+
+      for (const docSnap of querySnapshot.docs) {
         const data = docSnap.data();
         const id = docSnap.id;
+
+        // Auto-delete pending > 7 days
+        if (data.status === "pending" && data.createdAt?.toDate) {
+          const ageInDays = (now - data.createdAt.toDate()) / (1000 * 60 * 60 * 24);
+          if (ageInDays > 7) {
+            await deleteDoc(doc(db, "users", id));
+            continue;
+          }
+        }
+
         memberCount++;
         shareTotal += data.shares;
         balanceTotal += data.balance;
+        if (data.status === "approved") approvedCount++;
+        if (data.status === "pending") pendingCount++;
 
+        memberData.push({ id, ...data });
         membersList.appendChild(createMemberCard(data, id));
-      });
+      }
 
       totalMembers.textContent = memberCount;
       totalShares.textContent = shareTotal;
       totalBalance.textContent = balanceTotal.toFixed(2);
       loadingText.style.display = "none";
+
+      drawChart(approvedCount, pendingCount);
+    }
+
+    function drawChart(approved, pending) {
+      const ctx = document.getElementById('statusChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: ['Approved', 'Pending'],
+          datasets: [{
+            label: 'Member Status',
+            data: [approved, pending],
+            backgroundColor: ['#10B981', '#F59E0B'],
+          }]
+        }
+      });
     }
 
     window.approveUser = async (id) => {
@@ -91,7 +142,49 @@
       }
     };
 
+    // 🔍 Search Filter
+    searchInput.addEventListener("input", (e) => {
+      const keyword = e.target.value.toLowerCase();
+      membersList.innerHTML = "";
+      memberData
+        .filter(m => m.name.toLowerCase().includes(keyword) || m.email.toLowerCase().includes(keyword) || m.status.toLowerCase().includes(keyword))
+        .forEach(m => membersList.appendChild(createMemberCard(m, m.id)));
+    });
+
+    // 🧾 CSV Export
+    window.exportCSV = () => {
+      const rows = [["Name", "Email", "Status", "Shares", "Balance"]];
+      memberData.forEach(m => {
+        rows.push([m.name, m.email, m.status, m.shares, m.balance]);
+      });
+      const csv = rows.map(r => r.join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "members.csv";
+      a.click();
+    };
+
+    // 💸 Withdrawal Requests
+    async function loadWithdrawals() {
+      const snap = await getDocs(collection(db, "withdrawals"));
+      withdrawalsList.innerHTML = "";
+      snap.forEach(doc => {
+        const w = doc.data();
+        const div = document.createElement("div");
+        div.className = "bg-gray-800 p-4 rounded";
+        div.innerHTML = `
+          <p><strong>User:</strong> ${w.name}</p>
+          <p><strong>Amount:</strong> ₱${w.amount}</p>
+          <p><strong>Status:</strong> ${w.status}</p>
+          <p><strong>Date:</strong> ${w.date || "—"}</p>
+        `;
+        withdrawalsList.appendChild(div);
+      });
+    }
+
     loadMembers();
+    loadWithdrawals();
   </script>
 </body>
 </html>
