@@ -13,7 +13,9 @@
     <button id="adminBtn" class="bg-green-600 px-6 py-3 rounded hover:bg-green-700">Admin</button>
     <button id="memberBtn" class="bg-blue-600 px-6 py-3 rounded hover:bg-blue-700">Member</button>
   </div>
-
+  <div class="mt-8 text-center">
+    <a href="register.html" class="text-blue-400 underline">Register New Member</a>
+  </div>
   <script>
     document.getElementById('adminBtn').addEventListener('click', () => {
       localStorage.setItem('role', 'admin');
