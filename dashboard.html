@@ -1,47 +1,77 @@
 <!DOCTYPE html>
-<html lang="en" >
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Baccarat Fund Club Dashboard</title>
+  <title>Admin Dashboard – Baccarat Fund Club</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white min-h-screen p-6">
-  <div class="max-w-4xl mx-auto">
+<body class="bg-gray-900 text-white p-6 min-h-screen">
+  <div class="max-w-6xl mx-auto">
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold">🎲 Baccarat Fund Club Dashboard</h1>
-      <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
+      <h1 class="text-3xl font-bold">👑 Admin Dashboard</h1>
+      <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
     </div>
 
-    <div id="adminPanel" class="hidden">
-      <h2 class="text-xl font-bold mb-4">👑 Admin Panel - Member List</h2>
-      <div id="memberList" class="space-y-4"></div>
-    </div>
+    <h2 class="text-xl font-bold mb-2">📋 Approved Members</h2>
+    <div id="approvedList" class="grid md:grid-cols-2 gap-4 mb-10"></div>
 
-    <div id="memberPanel" class="hidden">
-      <h2 class="text-xl font-bold mb-4">👤 Member Panel</h2>
-      <div id="memberInfo" class="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md"></div>
-    </div>
+    <h2 class="text-xl font-bold mb-2">🕓 Pending Registrations</h2>
+    <div id="pendingList" class="grid md:grid-cols-2 gap-4"></div>
   </div>
 
   <script>
-    async function fetchMembers() {
-      try {
-        const res = await fetch("members.json");
-        const data = await res.json();
-        const local = JSON.parse(localStorage.getItem("newMembers") || "[]");
-        return [...data, ...local];
-      } catch {
-        return JSON.parse(localStorage.getItem("newMembers") || "[]");
-      }
+    function logout() {
+      localStorage.clear();
+      window.location.href = 'index.html';
     }
 
-    function renderAdmin(members) {
-      const list = document.getElementById("memberList");
-      list.innerHTML = "";
-      members.forEach(m => {
+    function getMembers() {
+      let approved = JSON.parse(localStorage.getItem("newMembers") || "[]");
+      let pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
+      return { approved, pending };
+    }
+
+    function saveMembers(approved, pending) {
+      localStorage.setItem("newMembers", JSON.stringify(approved));
+      localStorage.setItem("pendingMembers", JSON.stringify(pending));
+    }
+
+    function renderApproved(members) {
+      const container = document.getElementById("approvedList");
+      container.innerHTML = "";
+      let totalShares = 0, totalBalance = 0;
+
+      members.forEach((m, i) => {
+        totalShares += m.shares;
+        totalBalance += m.balance;
+
         const div = document.createElement("div");
-        div.className = "bg-gray-800 p-4 rounded shadow";
+        div.className = "bg-gray-800 p-4 rounded shadow space-y-2";
+        div.innerHTML = `
+          <p><strong>Name:</strong> <input value="${m.name}" onchange="updateField(${i}, 'name', this.value)" class="bg-gray-700 p-1 rounded w-full" /></p>
+          <p><strong>Email:</strong> ${m.email}</p>
+          <p><strong>Phone:</strong> <input value="${m.phone}" onchange="updateField(${i}, 'phone', this.value)" class="bg-gray-700 p-1 rounded w-full" /></p>
+          <p><strong>Shares:</strong> <input type="number" value="${m.shares}" onchange="updateField(${i}, 'shares', this.value)" class="bg-gray-700 p-1 rounded w-full" /></p>
+          <p><strong>Balance:</strong> ₱<input type="number" value="${m.balance}" onchange="updateField(${i}, 'balance', this.value)" class="bg-gray-700 p-1 rounded w-full" /></p>
+          <p><strong>Joined:</strong> ${m.joinDate}</p>
+          <button onclick="removeMember(${i})" class="bg-red-600 mt-2 px-3 py-1 rounded hover:bg-red-700">Delete</button>
+        `;
+        container.appendChild(div);
+      });
+
+      const summary = document.createElement("div");
+      summary.className = "col-span-2 bg-green-700 p-4 rounded mt-4";
+      summary.innerHTML = `<strong>📊 Total Shares:</strong> ${totalShares} | <strong>Total Balance:</strong> ₱${totalBalance.toFixed(2)}`;
+      container.appendChild(summary);
+    }
+
+    function renderPending(pending) {
+      const container = document.getElementById("pendingList");
+      container.innerHTML = "";
+      pending.forEach((m, i) => {
+        const div = document.createElement("div");
+        div.className = "bg-gray-800 p-4 rounded shadow space-y-2";
         div.innerHTML = `
           <p><strong>Name:</strong> ${m.name}</p>
           <p><strong>Email:</strong> ${m.email}</p>
@@ -49,48 +79,56 @@
           <p><strong>Shares:</strong> ${m.shares}</p>
           <p><strong>Balance:</strong> ₱${m.balance}</p>
           <p><strong>Joined:</strong> ${m.joinDate}</p>
+          <div class="flex gap-4">
+            <button onclick="approve(${i})" class="bg-green-600 px-3 py-1 rounded hover:bg-green-700">Approve</button>
+            <button onclick="reject(${i})" class="bg-red-600 px-3 py-1 rounded hover:bg-red-700">Reject</button>
+          </div>
         `;
-        list.appendChild(div);
+        container.appendChild(div);
       });
     }
 
-    function renderMember(member) {
-      const panel = document.getElementById("memberInfo");
-      if (!member) {
-        panel.innerHTML = "<p class='text-red-500'>Member not found.</p>";
-        return;
+    function updateField(index, field, value) {
+      const members = JSON.parse(localStorage.getItem("newMembers") || "[]");
+      if (field === 'shares' || field === 'balance') {
+        value = parseFloat(value);
       }
-      panel.innerHTML = `
-        <p><strong>Name:</strong> ${member.name}</p>
-        <p><strong>Email:</strong> ${member.email}</p>
-        <p><strong>Phone:</strong> ${member.phone}</p>
-        <p><strong>Shares:</strong> ${member.shares}</p>
-        <p><strong>Balance:</strong> ₱${member.balance}</p>
-        <p><strong>Joined:</strong> ${member.joinDate}</p>
-      `;
+      members[index][field] = value;
+      localStorage.setItem("newMembers", JSON.stringify(members));
+      renderApproved(members);
     }
 
-    (async () => {
-      const role = localStorage.getItem("role");
-      if (!role) return window.location.href = "index.html";
-
-      const members = await fetchMembers();
-
-      if (role === "admin") {
-        document.getElementById("adminPanel").classList.remove("hidden");
-        renderAdmin(members);
-      } else if (role === "member") {
-        document.getElementById("memberPanel").classList.remove("hidden");
-        const email = localStorage.getItem("memberEmail") || "";
-        const member = members.find(m => m.email.toLowerCase() === email.toLowerCase());
-        renderMember(member);
+    function removeMember(index) {
+      const members = JSON.parse(localStorage.getItem("newMembers") || "[]");
+      if (confirm("Are you sure you want to delete this member?")) {
+        members.splice(index, 1);
+        localStorage.setItem("newMembers", JSON.stringify(members));
+        renderApproved(members);
       }
+    }
 
-      document.getElementById("logoutBtn").addEventListener("click", () => {
-        localStorage.clear();
-        window.location.href = "index.html";
-      });
-    })();
+    function approve(i) {
+      let pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
+      let approved = JSON.parse(localStorage.getItem("newMembers") || "[]");
+      approved.push(pending[i]);
+      pending.splice(i, 1);
+      saveMembers(approved, pending);
+      renderApproved(approved);
+      renderPending(pending);
+    }
+
+    function reject(i) {
+      let pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
+      if (confirm("Reject this pending registration?")) {
+        pending.splice(i, 1);
+        localStorage.setItem("pendingMembers", JSON.stringify(pending));
+        renderPending(pending);
+      }
+    }
+
+    const { approved, pending } = getMembers();
+    renderApproved(approved);
+    renderPending(pending);
   </script>
 </body>
 </html>
