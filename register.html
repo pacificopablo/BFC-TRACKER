@@ -2,66 +2,54 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Register Member - Baccarat Fund Club</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register - Baccarat Fund</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
-  <div class="bg-gray-800 p-8 rounded-lg max-w-md w-full shadow-lg">
-    <h1 class="text-2xl font-bold mb-6 text-center">Register New Member</h1>
-    <form id="regForm" class="space-y-4">
-      <input type="text" id="name" placeholder="Full Name" required class="w-full p-3 rounded bg-gray-700" />
-      <input type="email" id="email" placeholder="Email" required class="w-full p-3 rounded bg-gray-700" />
-      <input type="text" id="phone" placeholder="Phone Number" required class="w-full p-3 rounded bg-gray-700" />
-      <input type="number" id="shares" placeholder="Shares" required class="w-full p-3 rounded bg-gray-700" />
-      <input type="number" id="balance" placeholder="Initial Balance (₱)" required class="w-full p-3 rounded bg-gray-700" />
-      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded font-semibold transition">Register</button>
-      <p id="message" class="text-center mt-3"></p>
-    </form>
-    <div class="text-center mt-4">
-      <a href="index.html" class="text-green-400 hover:underline">Back to Login</a>
-    </div>
+<body class="bg-gray-900 text-white flex items-center justify-center h-screen">
+  <div class="w-full max-w-sm">
+    <h1 class="text-2xl font-bold mb-4 text-center">📝 Register</h1>
+    <input id="name" placeholder="Full Name" class="mb-2 w-full p-2 rounded bg-gray-700" />
+    <input id="email" placeholder="Email" class="mb-2 w-full p-2 rounded bg-gray-700" />
+    <input id="phone" placeholder="Phone Number" class="mb-2 w-full p-2 rounded bg-gray-700" />
+    <input id="shares" type="number" placeholder="Shares" class="mb-2 w-full p-2 rounded bg-gray-700" />
+    <input id="balance" type="number" placeholder="Initial Balance (₱)" class="mb-2 w-full p-2 rounded bg-gray-700" />
+    <button onclick="register()" class="w-full bg-green-600 hover:bg-green-700 p-2 rounded">Submit</button>
+    <p id="msg" class="mt-2 text-center"></p>
   </div>
-
   <script>
-    document.getElementById("regForm").addEventListener("submit", function (e) {
-      e.preventDefault();
+    function register() {
       const name = document.getElementById("name").value.trim();
       const email = document.getElementById("email").value.trim().toLowerCase();
       const phone = document.getElementById("phone").value.trim();
       const shares = parseInt(document.getElementById("shares").value);
       const balance = parseFloat(document.getElementById("balance").value);
-      const message = document.getElementById("message");
+      const msg = document.getElementById("msg");
 
-      const newMember = {
-        id: Date.now().toString(),
-        name,
-        email,
-        phone,
-        shares,
-        balance,
-        deposits: 1,
-        withdrawals: 0,
-        joinDate: new Date().toISOString().split("T")[0]
-      };
-
-      const pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
-      const approved = JSON.parse(localStorage.getItem("newMembers") || "[]");
-      if (pending.some(m => m.email === email) || approved.some(m => m.email === email)) {
-        message.textContent = "❌ Email already exists.";
-        message.className = "text-red-500";
+      if (!name || !email || !phone || !shares || isNaN(balance)) {
+        msg.textContent = "❌ Please complete all fields.";
+        msg.className = "text-red-500";
         return;
       }
 
+      const pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
+      if (pending.some(m => m.email === email)) {
+        msg.textContent = "❌ You already registered.";
+        msg.className = "text-red-500";
+        return;
+      }
+
+      const newMember = {
+        id: Date.now().toString(),
+        name, email, phone, shares, balance,
+        joinDate: new Date().toISOString().split("T")[0]
+      };
+
       pending.push(newMember);
       localStorage.setItem("pendingMembers", JSON.stringify(pending));
-      message.textContent = "✅ Registration pending admin approval.";
-      message.className = "text-green-500";
-
-      setTimeout(() => {
-        window.location.href = "index.html";
-      }, 1500);
-    });
+      msg.textContent = "✅ Registered! Waiting for admin approval.";
+      msg.className = "text-green-500";
+    }
   </script>
 </body>
 </html>
