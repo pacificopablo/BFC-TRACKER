@@ -26,20 +26,22 @@
 
   <script>
     async function fetchMembers() {
-      const response = await fetch('members.json');
-      if (!response.ok) {
-        alert('Failed to load member data.');
-        return [];
+      try {
+        const res = await fetch("members.json");
+        const data = await res.json();
+        const local = JSON.parse(localStorage.getItem("newMembers") || "[]");
+        return [...data, ...local];
+      } catch {
+        return JSON.parse(localStorage.getItem("newMembers") || "[]");
       }
-      return response.json();
     }
 
     function renderAdmin(members) {
-      const list = document.getElementById('memberList');
-      list.innerHTML = '';
+      const list = document.getElementById("memberList");
+      list.innerHTML = "";
       members.forEach(m => {
-        const div = document.createElement('div');
-        div.className = 'bg-gray-800 p-4 rounded shadow';
+        const div = document.createElement("div");
+        div.className = "bg-gray-800 p-4 rounded shadow";
         div.innerHTML = `
           <p><strong>Name:</strong> ${m.name}</p>
           <p><strong>Email:</strong> ${m.email}</p>
@@ -53,9 +55,9 @@
     }
 
     function renderMember(member) {
-      const panel = document.getElementById('memberInfo');
+      const panel = document.getElementById("memberInfo");
       if (!member) {
-        panel.innerHTML = '<p class="text-red-500">Member not found.</p>';
+        panel.innerHTML = "<p class='text-red-500'>Member not found.</p>";
         return;
       }
       panel.innerHTML = `
@@ -69,29 +71,24 @@
     }
 
     (async () => {
-      const role = localStorage.getItem('role');
-      if (!role) {
-        alert('No role selected. Redirecting to role selection.');
-        window.location.href = 'index.html';
-        return;
-      }
+      const role = localStorage.getItem("role");
+      if (!role) return window.location.href = "index.html";
 
       const members = await fetchMembers();
 
-      if (role === 'admin') {
-        document.getElementById('adminPanel').classList.remove('hidden');
+      if (role === "admin") {
+        document.getElementById("adminPanel").classList.remove("hidden");
         renderAdmin(members);
-      } else if (role === 'member') {
-        document.getElementById('memberPanel').classList.remove('hidden');
-        const email = localStorage.getItem('memberEmail') || '';
+      } else if (role === "member") {
+        document.getElementById("memberPanel").classList.remove("hidden");
+        const email = localStorage.getItem("memberEmail") || "";
         const member = members.find(m => m.email.toLowerCase() === email.toLowerCase());
         renderMember(member);
       }
 
-      document.getElementById('logoutBtn').addEventListener('click', () => {
-        localStorage.removeItem('role');
-        localStorage.removeItem('memberEmail');
-        window.location.href = 'index.html';
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        localStorage.clear();
+        window.location.href = "index.html";
       });
     })();
   </script>
