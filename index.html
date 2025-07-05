@@ -7,23 +7,18 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center h-screen">
-
   <div class="bg-gray-800 p-8 rounded shadow-md w-full max-w-md">
     <h1 class="text-3xl font-bold mb-6 text-center">🔐 Login</h1>
-
     <form id="loginForm" class="space-y-4">
       <input type="email" id="email" placeholder="Email" required class="w-full p-2 rounded text-black" />
       <input type="password" id="password" placeholder="Password" required class="w-full p-2 rounded text-black" />
       <button type="submit" class="w-full bg-green-600 hover:bg-green-700 py-2 rounded">Login</button>
     </form>
-
     <p id="loginError" class="text-red-400 mt-4 hidden">❌ Invalid credentials or not yet approved.</p>
-
     <div class="mt-6 text-center">
       <a href="register.html" class="text-blue-400 hover:underline">Create an account</a>
     </div>
   </div>
-
   <script type="module">
     import { auth, db } from './firebase-config.js';
     import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -50,7 +45,6 @@
             localStorage.setItem("userRole", userData.role);
             localStorage.setItem("userName", userData.name);
             localStorage.setItem("userEmail", email);
-
             if (userData.role === "admin") {
               window.location.href = "admin.html";
             } else {
@@ -67,8 +61,6 @@
         loginError.classList.remove('hidden');
       }
     });
-<script type="module">
-  import { auth, db } from './firebase-config.js';
-</script>
+  </script>
 </body>
 </html>
