@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Baccarat Fund Club Register</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+  <div class="bg-gray-800 p-8 rounded-xl w-full max-w-md shadow-lg">
+    <h1 class="text-2xl font-bold mb-6 text-center">Register New Member</h1>
+    <form id="registerForm" class="space-y-4">
+      <input id="email" type="email" placeholder="Email" required class="w-full p-3 rounded bg-gray-700" />
+      <input id="password" type="password" placeholder="Password (min 6 chars)" required class="w-full p-3 rounded bg-gray-700" />
+      <input id="name" type="text" placeholder="Full Name" required class="w-full p-3 rounded bg-gray-700" />
+      <input id="phone" type="text" placeholder="Phone Number" required class="w-full p-3 rounded bg-gray-700" />
+      <input id="shares" type="number" placeholder="Number of Shares (min 1)" min="1" required class="w-full p-3 rounded bg-gray-700" />
+      <button type="submit" class="w-full bg-green-600 hover:bg-green-700 py-3 rounded font-semibold transition">Register</button>
+      <p id="message" class="mt-2 text-center"></p>
+    </form>
+    <p class="text-center mt-4">
+      <a href="index.html" class="text-blue-400 hover:underline">Back to Login</a>
+    </p>
+  </div>
+
+  <script type="module">
+    import { auth, db } from './firebase-config.js';
+    import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-auth.js";
+    import { doc, setDoc } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-firestore.js";
+
+    const registerForm = document.getElementById('registerForm');
+    const message = document.getElementById('message');
+
+    registerForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      message.textContent = '';
+
+      const email = registerForm.email.value.trim();
+      const password = registerForm.password.value.trim();
+      const name = registerForm.name.value.trim();
+      const phone = registerForm.phone.value.trim();
+      const shares = parseInt(registerForm.shares.value);
+
+      if (password.length < 6) {
+        message.textContent = "❌ Password must be at least 6 characters.";
+        message.className = "text-red-500 mt-2 text-center";
+        return;
+      }
+      if (shares < 1) {
+        message.textContent = "❌ You must buy at least 1 share.";
+        message.className = "text-red-500 mt-2 text-center";
+        return;
+      }
+
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const uid = userCredential.user.uid;
+        const joinDate = new Date().toISOString().split('T')[0];
+        await setDoc(doc(db, "members", uid), {
+          name,
+          phone,
+          shares,
+          joinDate,
+          deposits: 0,
+          withdrawals: 0,
+          balance: shares * 10
+        });
+        message.textContent = "✅ Registration successful! You may now login.";
+        message.className = "text-green-400 mt-2 text-center";
+        registerForm.reset();
+      } catch (error) {
+        message.textContent = "❌ " + error.message;
+        message.className = "text-red-500 mt-2 text-center";
+      }
+    });
+  </script>
+</body>
+</html>
