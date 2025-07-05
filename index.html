@@ -1,67 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Baccarat Fund Club - Login</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
-  <div class="bg-gray-800 p-8 rounded shadow-md w-full max-w-sm">
-    <h1 class="text-2xl font-bold mb-6 text-center">🔐 Baccarat Fund Club Login</h1>
+<body class="bg-gray-900 text-white flex items-center justify-center h-screen">
+
+  <div class="bg-gray-800 p-8 rounded shadow-md w-full max-w-md">
+    <h1 class="text-3xl font-bold mb-6 text-center">🔐 Login</h1>
+
     <form id="loginForm" class="space-y-4">
-      <div>
-        <label for="email" class="block mb-1">Email</label>
-        <input type="email" id="email" required class="w-full px-3 py-2 rounded text-black">
-      </div>
-      <div>
-        <label for="password" class="block mb-1">Password</label>
-        <input type="password" id="password" required class="w-full px-3 py-2 rounded text-black">
-      </div>
-      <button type="submit" class="w-full bg-green-600 py-2 rounded hover:bg-green-700">Login</button>
-      <p id="loginMessage" class="mt-2 text-sm text-red-400 hidden">Invalid email or password.</p>
+      <input type="email" id="email" placeholder="Email" required class="w-full p-2 rounded text-black" />
+      <input type="password" id="password" placeholder="Password" required class="w-full p-2 rounded text-black" />
+      <button type="submit" class="w-full bg-green-600 hover:bg-green-700 py-2 rounded">Login</button>
     </form>
 
-    <div class="mt-6 text-sm text-center space-y-2">
-      <a href="register.html" class="block text-blue-400 hover:underline">📋 Register as New Member</a>
-      <button onclick="forgotPassword()" class="text-blue-300 hover:underline">🔑 Forgot Password?</button>
+    <p id="loginError" class="text-red-400 mt-4 hidden">❌ Invalid credentials or not yet approved.</p>
+
+    <div class="mt-6 text-center">
+      <a href="register.html" class="text-blue-400 hover:underline">Create an account</a>
     </div>
   </div>
 
-  <script>
-    document.getElementById('loginForm').addEventListener('submit', async function (e) {
-      e.preventDefault();
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value.trim();
+  <script type="module">
+    import { auth, db } from './firebase-config.js';
+    import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-      if (email === 'admin@bfc.com' && password === 'admin123') {
-        localStorage.setItem('isAdmin', 'true');
-        window.location.href = 'admin.html';
-        return;
-      }
+    const form = document.getElementById('loginForm');
+    const loginError = document.getElementById('loginError');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = form.email.value.trim();
+      const password = form.password.value;
 
       try {
-        const response = await fetch('user.json');
-        const users = await response.json();
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const uid = userCredential.user.uid;
 
-        const matchedUser = users.find(user => user.email === email && user.password === password);
+        const docRef = doc(db, "users", uid);
+        const docSnap = await getDoc(docRef);
 
-        if (matchedUser) {
-          localStorage.setItem('isAdmin', 'false');
-          localStorage.setItem('loggedInUser', JSON.stringify(matchedUser));
-          window.location.href = 'member-dashboard.html';
+        if (docSnap.exists()) {
+          const userData = docSnap.data();
+          if (userData.status === "approved") {
+            localStorage.setItem("userRole", userData.role);
+            localStorage.setItem("userName", userData.name);
+            localStorage.setItem("userEmail", email);
+
+            if (userData.role === "admin") {
+              window.location.href = "admin.html";
+            } else {
+              window.location.href = "member-dashboard.html";
+            }
+          } else {
+            loginError.classList.remove('hidden');
+          }
         } else {
-          document.getElementById('loginMessage').classList.remove('hidden');
+          loginError.classList.remove('hidden');
         }
-      } catch (err) {
-        alert('Failed to load user data.');
-        console.error(err);
+      } catch (error) {
+        console.error(error);
+        loginError.classList.remove('hidden');
       }
     });
-
-    function forgotPassword() {
-      alert("Please contact the admin at admin@bfc.com to reset your password.");
-    }
   </script>
+
 </body>
 </html>
