@@ -9,7 +9,7 @@ const firebaseConfig = {
   storageBucket: "bfc-tracker.appspot.com",
   messagingSenderId: "127052459580",
   appId: "1:127052459580:web:ee9af6545f841d171cdd39"
-};
+}
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
