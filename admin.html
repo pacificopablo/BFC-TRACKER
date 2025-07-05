@@ -1,0 +1,115 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard - Baccarat Fund</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+</head>
+<body class="bg-gray-900 text-white p-6">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">🛡️ Admin Dashboard</h1>
+      <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded">Logout</button>
+    </div><div class="bg-gray-800 p-4 rounded mb-6">
+  <h2 class="text-xl font-bold mb-2">➕ Add New Member</h2>
+  <div class="grid grid-cols-2 gap-4">
+    <input id="newName" placeholder="Full Name" class="p-2 rounded bg-gray-700" />
+    <input id="newEmail" placeholder="Email" class="p-2 rounded bg-gray-700" />
+    <input id="newPhone" placeholder="Phone" class="p-2 rounded bg-gray-700" />
+    <input id="newShares" type="number" placeholder="Shares" class="p-2 rounded bg-gray-700" />
+    <input id="newBalance" type="number" placeholder="Balance" class="p-2 rounded bg-gray-700" />
+    <button onclick="addMember()" class="col-span-2 bg-blue-600 hover:bg-blue-700 p-2 rounded">Add Member</button>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+  <div>
+    <h2 class="text-xl font-bold mb-2">🕓 Pending Members</h2>
+    <ul id="pendingList" class="space-y-2"></ul>
+  </div>
+  <div>
+    <h2 class="text-xl font-bold mb-2">✅ Approved Members</h2>
+    <ul id="approvedList" class="space-y-2"></ul>
+  </div>
+</div>
+
+  </div>  <script>
+    if (!localStorage.getItem("admin")) {
+      window.location.href = "index.html";
+    }
+
+    const pendingList = document.getElementById("pendingList");
+    const approvedList = document.getElementById("approvedList");
+
+    let pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
+    let approved = JSON.parse(localStorage.getItem("newMembers") || "[]");
+
+    function render() {
+      pendingList.innerHTML = pending.map(m => `
+        <li class="bg-gray-800 p-3 rounded">
+          <p><strong>${m.name}</strong> (${m.email})</p>
+          <div class="mt-2">
+            <button onclick="approve('${m.id}')" class="bg-green-600 px-2 py-1 rounded mr-2">Approve</button>
+            <button onclick="reject('${m.id}')" class="bg-red-600 px-2 py-1 rounded">Reject</button>
+          </div>
+        </li>
+      `).join("");
+
+      approvedList.innerHTML = approved.map(m => `
+        <li class="bg-gray-800 p-3 rounded">
+          <p><strong>${m.name}</strong> (${m.email})</p>
+          <p>📞 ${m.phone} | 💼 Shares: ${m.shares} | 💰 ₱${m.balance.toFixed(2)}</p>
+        </li>
+      `).join("");
+    }
+
+    function approve(id) {
+      const member = pending.find(m => m.id === id);
+      if (member) {
+        approved.push(member);
+        pending = pending.filter(m => m.id !== id);
+        save();
+      }
+    }
+
+    function reject(id) {
+      pending = pending.filter(m => m.id !== id);
+      save();
+    }
+
+    function addMember() {
+      const name = document.getElementById("newName").value.trim();
+      const email = document.getElementById("newEmail").value.trim().toLowerCase();
+      const phone = document.getElementById("newPhone").value.trim();
+      const shares = parseInt(document.getElementById("newShares").value);
+      const balance = parseFloat(document.getElementById("newBalance").value);
+
+      if (!name || !email || !phone || !shares || isNaN(balance)) {
+        alert("❌ Complete all fields to add member.");
+        return;
+      }
+
+      const newMember = {
+        id: Date.now().toString(),
+        name, email, phone, shares, balance,
+        joinDate: new Date().toISOString().split("T")[0]
+      };
+
+      approved.push(newMember);
+      save();
+    }
+
+    function save() {
+      localStorage.setItem("pendingMembers", JSON.stringify(pending));
+      localStorage.setItem("newMembers", JSON.stringify(approved));
+      render();
+    }
+
+    function logout() {
+      localStorage.removeItem("admin");
+      window.location.href = "index.html";
+    }
+
+    render();
+  </script></body>
+</html>
