@@ -33,6 +33,7 @@
     const loginForm = document.getElementById('loginForm');
     const errorMsg = document.getElementById('errorMsg');
 
+    // Handle login form submission
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorMsg.textContent = '';
@@ -42,12 +43,21 @@
 
       try {
         await signInWithEmailAndPassword(auth, email, password);
+        // Redirect to dashboard after successful login
         window.location.href = 'dashboard.html';
       } catch (error) {
         errorMsg.textContent = "❌ " + error.message;
       }
     });
 
+    // Auto redirect if user already logged in
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        window.location.href = 'dashboard.html';
+      }
+    });
+
+    // Forgot password
     async function forgotPassword() {
       const email = prompt("Enter your registered email:");
       if (!email) return;
@@ -59,13 +69,6 @@
         alert("❌ " + error.message);
       }
     }
-
-    // Auto-redirect if already logged in
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        window.location.href = 'dashboard.html';
-      }
-    });
   </script>
 </body>
 </html>
