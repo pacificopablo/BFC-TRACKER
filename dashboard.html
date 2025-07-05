@@ -1,22 +1,37 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard - Member</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Member Dashboard - Baccarat Fund</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-900 text-white p-6">
+<body class="bg-gray-900 text-white min-h-screen p-6">
   <div class="max-w-xl mx-auto">
-    <div class="flex justify-between mb-4">
+    <div class="flex justify-between items-center mb-4">
       <h1 class="text-2xl font-bold">👤 Member Dashboard</h1>
       <button onclick="logout()" class="bg-red-600 px-3 py-1 rounded">Logout</button>
-    </div>
-    <div id="info" class="bg-gray-800 p-4 rounded"></div>
-  </div>
-  <script>
+    </div><div id="memberInfo" class="bg-gray-800 p-4 rounded"></div>
+
+<div class="mt-6">
+  <h2 class="text-xl font-semibold mb-2">💸 Request Transaction</h2>
+  <select id="txnType" class="bg-gray-700 p-2 rounded w-full mb-2">
+    <option value="deposit">Deposit</option>
+    <option value="withdraw">Withdraw</option>
+  </select>
+  <input id="txnAmount" type="number" placeholder="Amount (₱)" class="bg-gray-700 p-2 rounded w-full mb-2" />
+  <button onclick="requestTransaction()" class="bg-blue-600 hover:bg-blue-700 p-2 w-full rounded">Submit Request</button>
+  <p id="txnMsg" class="mt-2 text-sm"></p>
+</div>
+
+<div class="mt-6">
+  <h2 class="text-xl font-semibold mb-2">📜 Transaction History</h2>
+  <ul id="txnHistory" class="space-y-2"></ul>
+</div>
+
+  </div>  <script>
     const member = JSON.parse(localStorage.getItem("currentMember"));
-    const info = document.getElementById("info");
+    const info = document.getElementById("memberInfo");
+    const historyList = document.getElementById("txnHistory");
 
     if (!member) {
       window.location.href = "index.html";
@@ -29,12 +44,44 @@
         <p><strong>Balance:</strong> ₱${member.balance.toFixed(2)}</p>
         <p><strong>Joined:</strong> ${member.joinDate}</p>
       `;
+      renderHistory();
+    }
+
+    function requestTransaction() {
+      const type = document.getElementById("txnType").value;
+      const amount = parseFloat(document.getElementById("txnAmount").value);
+      const msg = document.getElementById("txnMsg");
+
+      if (isNaN(amount) || amount <= 0) {
+        msg.textContent = "❌ Enter a valid amount.";
+        msg.className = "text-red-500";
+        return;
+      }
+
+      const historyKey = `history_${member.id}`;
+      const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
+      history.push({ type, amount, status: "Pending", date: new Date().toLocaleString() });
+      localStorage.setItem(historyKey, JSON.stringify(history));
+      msg.textContent = `✅ ${type.charAt(0).toUpperCase() + type.slice(1)} request submitted and pending approval.`;
+      msg.className = "text-green-500";
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const historyKey = `history_${member.id}`;
+      const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
+      historyList.innerHTML = history.map(t => `
+        <li class="bg-gray-800 p-3 rounded border-l-4 ${t.type === 'deposit' ? 'border-green-500' : 'border-yellow-500'}">
+          <p><strong>${t.type.toUpperCase()}</strong> - ₱${t.amount.toFixed(2)}</p>
+          <p class="text-sm text-gray-400">${t.date}</p>
+          <p class="text-sm ${t.status === 'Pending' ? 'text-yellow-400' : 'text-green-400'}">Status: ${t.status}</p>
+        </li>
+      `).join("");
     }
 
     function logout() {
       localStorage.removeItem("currentMember");
       window.location.href = "index.html";
     }
-  </script>
-</body>
+  </script></body>
 </html>
