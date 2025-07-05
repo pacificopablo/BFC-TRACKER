@@ -34,34 +34,42 @@
   </section>
 
   <script>
-    const user = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
-    if (!user.email) window.location.href = 'index.html';
+    window.addEventListener('DOMContentLoaded', function () {
+      const user = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
 
-    document.getElementById('memberName').textContent = user.name;
-    document.getElementById('memberEmail').textContent = user.email;
-    document.getElementById('memberShares').textContent = user.shares;
-    document.getElementById('memberBalance').textContent = user.balance.toFixed(2);
-
-    document.getElementById('withdrawForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const amount = parseFloat(document.getElementById('amount').value);
-      const note = document.getElementById('note').value.trim();
-      if (!user.email || isNaN(amount) || amount <= 0) {
-        alert('Invalid request.');
+      // Redirect if not logged in
+      if (!user.email || !user.name) {
+        window.location.href = 'index.html';
         return;
       }
 
-      const withdrawRequests = JSON.parse(localStorage.getItem('withdrawRequests') || '[]');
-      withdrawRequests.push({
-        email: user.email,
-        amount,
-        note,
-        date: new Date().toISOString()
-      });
+      document.getElementById('memberName').textContent = user.name;
+      document.getElementById('memberEmail').textContent = user.email;
+      document.getElementById('memberShares').textContent = user.shares;
+      document.getElementById('memberBalance').textContent = user.balance.toFixed(2);
 
-      localStorage.setItem('withdrawRequests', JSON.stringify(withdrawRequests));
-      document.getElementById('withdrawForm').reset();
-      document.getElementById('withdrawMessage').classList.remove('hidden');
+      document.getElementById('withdrawForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const amount = parseFloat(document.getElementById('amount').value);
+        const note = document.getElementById('note').value.trim();
+
+        if (isNaN(amount) || amount <= 0) {
+          alert('Enter a valid amount.');
+          return;
+        }
+
+        const withdrawRequests = JSON.parse(localStorage.getItem('withdrawRequests') || '[]');
+        withdrawRequests.push({
+          email: user.email,
+          amount,
+          note,
+          date: new Date().toISOString()
+        });
+
+        localStorage.setItem('withdrawRequests', JSON.stringify(withdrawRequests));
+        document.getElementById('withdrawForm').reset();
+        document.getElementById('withdrawMessage').classList.remove('hidden');
+      });
     });
   </script>
 </body>
