@@ -45,17 +45,17 @@
         joinDate: new Date().toISOString().split("T")[0]
       };
 
-      const saved = JSON.parse(localStorage.getItem("newMembers") || "[]");
-      const duplicate = saved.find(m => m.email === email);
-      if (duplicate) {
-        message.textContent = "❌ Email already registered.";
+      const pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
+      const approved = JSON.parse(localStorage.getItem("newMembers") || "[]");
+      if (pending.some(m => m.email === email) || approved.some(m => m.email === email)) {
+        message.textContent = "❌ Email already exists.";
         message.className = "text-red-500";
         return;
       }
 
-      saved.push(newMember);
-      localStorage.setItem("newMembers", JSON.stringify(saved));
-      message.textContent = "✅ Registration successful!";
+      pending.push(newMember);
+      localStorage.setItem("pendingMembers", JSON.stringify(pending));
+      message.textContent = "✅ Registration pending admin approval.";
       message.className = "text-green-500";
 
       setTimeout(() => {
