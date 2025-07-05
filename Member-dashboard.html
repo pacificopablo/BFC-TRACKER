@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Member Dashboard – Baccarat Fund Club</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-6">
+  <div class="max-w-2xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">👤 Member Dashboard</h1>
+      <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
+    </div>
+
+    <div id="memberInfo" class="bg-gray-800 p-6 rounded-lg shadow-lg space-y-4">
+      <!-- Member details inserted here -->
+    </div>
+
+    <div class="mt-8 bg-gray-800 p-6 rounded-lg shadow-lg">
+      <h2 class="text-xl font-semibold mb-4">💳 Request a Transaction</h2>
+      <form id="txForm" class="space-y-4">
+        <select id="type" class="w-full p-2 bg-gray-700 rounded">
+          <option value="deposit">Deposit</option>
+          <option value="withdraw">Withdraw</option>
+        </select>
+        <input type="number" id="amount" placeholder="Amount in ₱" class="w-full p-2 bg-gray-700 rounded" required />
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded">Submit Request</button>
+        <p id="txMessage" class="text-green-400 text-center mt-2"></p>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    async function fetchMembers() {
+      try {
+        const r = await fetch("members.json");
+        const defaultMembers = await r.json();
+        const newMembers = JSON.parse(localStorage.getItem("newMembers") || "[]");
+        return [...defaultMembers, ...newMembers];
+      } catch {
+        return JSON.parse(localStorage.getItem("newMembers") || "[]");
+      }
+    }
+
+    function showMember(member) {
+      const div = document.getElementById("memberInfo");
+      if (!member) {
+        div.innerHTML = '<p class="text-red-500">Member not found.</p>';
+        return;
+      }
+      div.innerHTML = `
+        <p><strong>Name:</strong> ${member.name}</p>
+        <p><strong>Email:</strong> ${member.email}</p>
+        <p><strong>Phone:</strong> ${member.phone}</p>
+        <p><strong>Shares:</strong> ${member.shares}</p>
+        <p><strong>Balance:</strong> ₱${member.balance.toFixed(2)}</p>
+        <p><strong>Deposits:</strong> ${member.deposits}</p>
+        <p><strong>Withdrawals:</strong> ${member.withdrawals}</p>
+        <p><strong>Joined:</strong> ${member.joinDate}</p>
+      `;
+    }
+
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      localStorage.removeItem("role");
+      localStorage.removeItem("memberEmail");
+      window.location.href = "index.html";
+    });
+
+    document.getElementById("txForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const amount = parseFloat(document.getElementById("amount").value);
+      const type = document.getElementById("type").value;
+      const txMessage = document.getElementById("txMessage");
+
+      if (!amount || amount <= 0) {
+        txMessage.textContent = "Invalid amount.";
+        txMessage.className = "text-red-400 text-center";
+        return;
+      }
+
+      txMessage.textContent = `✅ ${type === "deposit" ? "Deposit" : "Withdrawal"} request for ₱${amount} submitted!`;
+      txMessage.className = "text-green-400 text-center";
+
+      document.getElementById("amount").value = "";
+    });
+
+    (async () => {
+      const email = localStorage.getItem("memberEmail") || "";
+      const members = await fetchMembers();
+      const member = members.find(m => m.email.toLowerCase() === email.toLowerCase());
+      showMember(member);
+    })();
+  </script>
+</body>
+</html>
