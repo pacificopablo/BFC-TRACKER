@@ -7,16 +7,23 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 text-white p-6 min-h-screen">
-  <div class="max-w-6xl mx-auto">
+  
+    <div class="max-w-6xl mx-auto">
+      <div class="mb-4 space-x-2 text-center">
+        <button onclick="showTab('all')" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">All</button>
+        <button onclick="showTab('approved')" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">Approved Only</button>
+        <button onclick="showTab('pending')" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded">Pending Only</button>
+      </div>
+    
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-3xl font-bold">👑 Admin Dashboard</h1>
       <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
     </div>
 
-    <h2 class="text-xl font-bold mb-2">📋 Approved Members</h2>
+    <h2 class="text-xl font-bold mb-2" id="approvedTitle">📋 Approved Members</h2>
     <div id="approvedList" class="grid md:grid-cols-2 gap-4 mb-10"></div>
 
-    <h2 class="text-xl font-bold mb-2">🕓 Pending Registrations</h2>
+    <h2 class="text-xl font-bold mb-2" id="pendingTitle">🕓 Pending Registrations</h2>
     <div id="pendingList" class="grid md:grid-cols-2 gap-4"></div>
   </div>
 
@@ -130,5 +137,32 @@
     renderApproved(approved);
     renderPending(pending);
   </script>
-</body>
+
+    <script>
+      function showTab(tab) {
+        const approvedSec = document.getElementById("approvedList");
+        const pendingSec = document.getElementById("pendingList");
+        const approvedTitle = document.getElementById("approvedTitle");
+        const pendingTitle = document.getElementById("pendingTitle");
+
+        if (tab === "approved") {
+          approvedSec.style.display = "grid";
+          approvedTitle.style.display = "block";
+          pendingSec.style.display = "none";
+          pendingTitle.style.display = "none";
+        } else if (tab === "pending") {
+          approvedSec.style.display = "none";
+          approvedTitle.style.display = "none";
+          pendingSec.style.display = "grid";
+          pendingTitle.style.display = "block";
+        } else {
+          approvedSec.style.display = "grid";
+          approvedTitle.style.display = "block";
+          pendingSec.style.display = "grid";
+          pendingTitle.style.display = "block";
+        }
+      }
+    </script>
+    </body>
+    
 </html>
