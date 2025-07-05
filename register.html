@@ -1,47 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Register Member - Baccarat Fund Club</title>
+  <meta charset="UTF-8" />
+  <title>Baccarat Fund Club - Register</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
-  <div class="bg-gray-800 p-6 rounded shadow-md w-full max-w-md">
-    <h1 class="text-2xl font-bold text-center mb-4">📋 Member Registration</h1>
+<body class="bg-gray-900 text-white flex items-center justify-center h-screen">
+
+  <div class="bg-gray-800 p-8 rounded shadow-md w-full max-w-md">
+    <h1 class="text-3xl font-bold mb-6 text-center">📝 Register</h1>
+
     <form id="registerForm" class="space-y-4">
-      <div>
-        <label class="block mb-1">Name</label>
-        <input type="text" id="name" required class="w-full px-3 py-2 rounded text-black">
-      </div>
-      <div>
-        <label class="block mb-1">Email</label>
-        <input type="email" id="email" required class="w-full px-3 py-2 rounded text-black">
-      </div>
-      <div>
-        <label class="block mb-1">Password</label>
-        <input type="password" id="password" required class="w-full px-3 py-2 rounded text-black">
-      </div>
-      <div>
-        <label class="block mb-1">Number of Shares</label>
-        <input type="number" id="shares" required class="w-full px-3 py-2 rounded text-black">
-      </div>
-      <div>
-        <label class="block mb-1">Balance (₱)</label>
-        <input type="number" id="balance" required class="w-full px-3 py-2 rounded text-black">
-      </div>
-      <button type="submit" class="w-full bg-green-600 hover:bg-green-700 py-2 rounded">Submit</button>
-      <p id="registerMsg" class="text-sm text-yellow-300 mt-2 hidden">✅ Registration submitted. Please inform the admin to add you manually.</p>
+      <input type="text" id="name" placeholder="Full Name" required class="w-full p-2 rounded text-black" />
+      <input type="email" id="email" placeholder="Email" required class="w-full p-2 rounded text-black" />
+      <input type="password" id="password" placeholder="Password" required class="w-full p-2 rounded text-black" />
+      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded">Create Account</button>
     </form>
+
+    <p id="registerStatus" class="text-green-400 mt-4 hidden">✅ Account created! Wait for admin approval.</p>
+    <div class="mt-6 text-center">
+      <a href="index.html" class="text-blue-400 hover:underline">Back to login</a>
+    </div>
   </div>
 
-  <script>
-    document.getElementById('registerForm').addEventListener('submit', function (e) {
+  <script type="module">
+    import { auth, db } from './firebase-config.js';
+    import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const form = document.getElementById('registerForm');
+    const statusMsg = document.getElementById('registerStatus');
+
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      // Simulate submission - no backend, user must inform admin to manually add to user.json
-      document.getElementById('registerMsg').classList.remove('hidden');
-      this.reset();
+      const name = form.name.value.trim();
+      const email = form.email.value.trim();
+      const password = form.password.value;
+
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const uid = userCredential.user.uid;
+
+        await setDoc(doc(db, "users", uid), {
+          name: name,
+          email: email,
+          role: "member",
+          shares: 0,
+          balance: 0,
+          status: "pending"
+        });
+
+        form.reset();
+        statusMsg.classList.remove('hidden');
+      } catch (error) {
+        alert("❌ Registration failed: " + error.message);
+        console.error(error);
+      }
     });
   </script>
+
 </body>
 </html>
