@@ -66,6 +66,44 @@
   <h2 class="text-2xl font-bold mt-10 mb-4">💰 Deposit & Cash Out Requests</h2>
   <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>
 
+  <!-- Member Details Modal -->
+  <div id="memberModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center">
+    <div class="bg-gray-800 p-6 rounded shadow-lg w-full max-w-md">
+      <h2 class="text-xl font-bold mb-4">Edit Member Details</h2>
+      <form id="memberDetailsForm" class="space-y-4">
+        <input type="hidden" id="memberId" />
+        <div>
+          <label for="memberName" class="block text-sm">Name</label>
+          <input type="text" id="memberName" class="p-2 w-full rounded bg-gray-700 text-white" required />
+        </div>
+        <div>
+          <label for="memberEmail" class="block text-sm">Email</label>
+          <input type="email" id="memberEmail" class="p-2 w-full rounded bg-gray-700 text-white" required />
+        </div>
+        <div>
+          <label for="memberStatus" class="block text-sm">Status</label>
+          <select id="memberStatus" class="p-2 w-full rounded bg-gray-700 text-white" required>
+            <option value="approved">Approved</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <div>
+          <label for="memberShares" class="block text-sm">Shares</label>
+          <input type="number" id="memberShares" min="0" class="p-2 w-full rounded bg-gray-700 text-white" required />
+        </div>
+        <div>
+          <label for="memberBalance" class="block text-sm">Balance (₱)</label>
+          <input type="number" id="memberBalance" min="0" step="0.01" class="p-2 w-full rounded bg-gray-700 text-white" required />
+        </div>
+        <div class="flex justify-end space-x-2">
+          <button type="button" id="cancelModal" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded">Cancel</button>
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { 
@@ -98,6 +136,9 @@
     const requestsList = document.getElementById("requestsList");
     const memberSelect = document.getElementById("memberSelect");
     const placeSharesForm = document.getElementById("placeSharesForm");
+    const memberModal = document.getElementById("memberModal");
+    const memberDetailsForm = document.getElementById("memberDetailsForm");
+    const cancelModal = document.getElementById("cancelModal");
 
     let allMembers = [];
     let fundChartInstance;
@@ -154,6 +195,7 @@
           <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${m.status === 'approved' ? 'bg-green-600' : m.status === 'pending' ? 'bg-yellow-600' : 'bg-red-600'}">${m.status}</span></p>
           <p><strong>Shares:</strong> ${m.shares || 0}</p>
           <p><strong>Balance:</strong> ₱${formatCurrency(m.balance || 0)}</p>
+          <button class="edit-member bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded mt-2" data-id="${m.id}">Edit</button>
         `;
         membersList.appendChild(div);
       });
@@ -177,7 +219,6 @@
       });
     }
 
-    // Fix search input event listener (correcting typo from 'search webinarsInput')
     searchInput.addEventListener("input", () => {
       const query = searchInput.value.toLowerCase();
       const filtered = allMembers.filter(m =>
@@ -263,7 +304,6 @@
       }
 
       try {
-        // Add transaction to Firestore
         await addDoc(collection(db, "transactions"), {
           memberId,
           memberName: allMembers.find(m => m.id === memberId)?.name || "Unknown",
@@ -278,6 +318,74 @@
       } catch (error) {
         console.error("Error placing shares:", error);
         alert("Failed to place shares. Please try again.");
+      }
+    });
+
+    // Handle member details editing
+    membersList.addEventListener("click", async (e) => {
+      if (e.target.classList.contains("edit-member")) {
+        const memberId = e.target.dataset.id;
+        const member = allMembers.find(m => m.id === memberId);
+        if (member) {
+          document.getElementById("memberId").value = member.id;
+          document.getElementById("memberName").value = member.name;
+          document.getElementById("memberEmail").value = member.email;
+          document.getElementById("memberStatus").value = member.status;
+          document.getElementById("memberShares").value = member.shares || 0;
+          document.getElementById("memberBalance").value = member.balance || 0;
+          memberModal.classList.remove("hidden");
+        }
+      }
+    });
+
+    // Handle modal cancel
+    cancelModal.addEventListener("click", () => {
+      memberModal.classList.add("hidden");
+      memberDetailsForm.reset();
+    });
+
+    // Handle member details form submission
+    memberDetailsForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const memberId = document.getElementById("memberId").value;
+      const name = document.getElementById("memberName").value.trim();
+      const email = document.getElementById("memberEmail").value.trim();
+      const status = document.getElementById("memberStatus").value;
+      const shares = parseInt(document.getElementById("memberShares").value);
+      const balance = parseFloat(document.getElementById("memberBalance").value);
+
+      // Basic validation
+      if (!name || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || shares < 0 || balance < 0) {
+        alert("Please enter valid details (name, valid email, non-negative shares and balance).");
+        return;
+      }
+
+      try {
+        const memberRef = doc(db, "users", memberId);
+        await updateDoc(memberRef, {
+          name,
+          email,
+          status,
+          shares,
+          balance
+        });
+        // Optionally log as a transaction for audit
+        await addDoc(collection(db, "transactions"), {
+          memberId,
+          memberName: name,
+          type: "update",
+          amount: balance,
+          shares,
+          status: "approved",
+          timestamp: new Date(),
+          description: "Updated member details"
+        });
+        alert("Member details updated successfully.");
+        memberModal.classList.add("hidden");
+        memberDetailsForm.reset();
+      } catch (error) {
+        console.error("Error updating member details:", error);
+        alert("Failed to update member details. Please try again.");
       }
     });
 
@@ -318,7 +426,7 @@
 
       snapshot.forEach(docSnap => {
         const data = docSnap.data();
-        if (data.status === "approved") {
+        if (data.status === "approved" && (data.type === "deposit" || data.type === "update")) {
           runningBalance += data.amount || 0;
           labels.push(data.timestamp?.toDate().toLocaleString('default', { month: 'short', year: 'numeric' }) || 'Unknown');
           balances.push(runningBalance);
