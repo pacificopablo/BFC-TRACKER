@@ -3,75 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Baccarat Fund Club Login</title>
+  <title>Baccarat Fund Club - Role Select</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
-  <div class="bg-gray-800 p-8 rounded-xl w-full max-w-md shadow-lg">
-    <h1 class="text-2xl font-bold mb-6 text-center">Baccarat Fund Club Login</h1>
-    <form id="loginForm" class="space-y-4">
-      <input id="email" type="email" placeholder="Email" required class="w-full p-3 rounded bg-gray-700" />
-      <input id="password" type="password" placeholder="Password" required class="w-full p-3 rounded bg-gray-700" />
-      <button type="submit" class="w-full bg-green-600 hover:bg-green-700 py-3 rounded font-semibold transition">Login</button>
-      <p id="errorMsg" class="text-red-500 mt-2 text-center"></p>
-    </form>
-
-    <div class="text-center mt-4 space-y-2 text-sm">
-      <a href="#" onclick="forgotPassword()" class="text-blue-400 hover:underline">Forgot Password?</a><br>
-      <a href="register.html" class="text-blue-400 hover:underline">Register a New Account</a>
-    </div>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-6">
+  <h1 class="text-4xl font-bold mb-8">Baccarat Fund Club</h1>
+  <p class="mb-6 text-center max-w-md">Select your role to enter the dashboard:</p>
+  <div class="space-x-6">
+    <button id="adminBtn" class="bg-green-600 px-6 py-3 rounded hover:bg-green-700">Admin</button>
+    <button id="memberBtn" class="bg-blue-600 px-6 py-3 rounded hover:bg-blue-700">Member</button>
   </div>
 
-  <script type="module">
-    import { auth } from './firebase-config.js';
-    import {
-      signInWithEmailAndPassword,
-      sendPasswordResetEmail,
-      onAuthStateChanged
-    } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-auth.js";
-
-    const loginForm = document.getElementById('loginForm');
-    const errorMsg = document.getElementById('errorMsg');
-
-    // 🔐 Handle login
-    loginForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      errorMsg.textContent = '';
-
-      const email = loginForm.email.value.trim();
-      const password = loginForm.password.value.trim();
-
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        console.log("✅ Login successful for:", user.email);
-        alert("✅ Login successful! Redirecting to dashboard...");
-        window.location.href = 'dashboard.html';
-      } catch (error) {
-        console.error("❌ Login error:", error.message);
-        errorMsg.textContent = "❌ " + error.message;
-      }
+  <script>
+    document.getElementById('adminBtn').addEventListener('click', () => {
+      localStorage.setItem('role', 'admin');
+      window.location.href = 'dashboard.html';
     });
 
-    // 🔄 Auto redirect if user already logged in
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        console.log("🔁 Already logged in:", user.email);
-        window.location.href = 'dashboard.html';
-      }
+    document.getElementById('memberBtn').addEventListener('click', () => {
+      const email = prompt('Enter your registered email:');
+      if (!email) return alert('Email is required');
+      localStorage.setItem('role', 'member');
+      localStorage.setItem('memberEmail', email.toLowerCase().trim());
+      window.location.href = 'dashboard.html';
     });
-
-    // 🛠 Forgot password
-    async function forgotPassword() {
-      const email = prompt("Enter your registered email:");
-      if (!email) return;
-      try {
-        await sendPasswordResetEmail(auth, email);
-        alert("📨 Password reset email sent.");
-      } catch (error) {
-        alert("❌ " + error.message);
-      }
-    }
   </script>
 </body>
 </html>
