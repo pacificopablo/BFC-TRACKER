@@ -7,10 +7,26 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 text-white p-6">
-  <h1 class="text-3xl font-bold mb-4">👑 Admin Dashboard</h1>
+  <h1 class="text-3xl font-bold mb-6">👑 Admin Dashboard</h1>
 
-  <section id="withdrawalsSection" class="mt-6">
-    <h2 class="text-xl font-bold mb-2">📝 Pending Withdrawals</h2>
+  <!-- Summary Section -->
+  <section class="mb-8">
+    <h2 class="text-2xl font-bold mb-2">📊 Fund Summary</h2>
+    <p>Total Members: <span id="totalMembers">0</span></p>
+    <p>Total Shares: <span id="totalShares">0</span></p>
+    <p>Total Balance: ₱<span id="totalBalance">0</span></p>
+    <button id="exportBtn" class="mt-3 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">📤 Export Members CSV</button>
+  </section>
+
+  <!-- Members List -->
+  <section class="mb-10">
+    <h2 class="text-2xl font-bold mb-4">👥 All Members</h2>
+    <div id="membersList" class="space-y-4"></div>
+  </section>
+
+  <!-- Withdrawals Section -->
+  <section class="mb-10">
+    <h2 class="text-2xl font-bold mb-4">📝 Pending Withdrawals</h2>
     <div id="withdrawalsList" class="space-y-4"></div>
   </section>
 
@@ -19,53 +35,143 @@
     import {
       collection,
       getDocs,
+      getDoc,
       updateDoc,
-      doc,
-      getDoc
+      deleteDoc,
+      doc
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    async function loadMembers() {
+      const membersList = document.getElementById("membersList");
+      const totalMembersEl = document.getElementById("totalMembers");
+      const totalSharesEl = document.getElementById("totalShares");
+      const totalBalanceEl = document.getElementById("totalBalance");
+
+      membersList.innerHTML = "";
+      let totalMembers = 0, totalShares = 0, totalBalance = 0;
+      const usersSnap = await getDocs(collection(db, "users"));
+
+      const csvRows = [["Name", "Email", "Status", "Shares", "Balance"]];
+
+      usersSnap.forEach(docSnap => {
+        const data = docSnap.data();
+        const id = docSnap.id;
+        totalMembers++;
+        totalShares += data.shares || 0;
+        totalBalance += data.balance || 0;
+
+        csvRows.push([
+          data.name,
+          data.email,
+          data.status,
+          data.shares,
+          data.balance
+        ]);
+
+        const div = document.createElement("div");
+        div.className = "bg-gray-700 p-4 rounded";
+        div.innerHTML = \`
+          <p><strong>Name:</strong> \${data.name}</p>
+          <p><strong>Email:</strong> \${data.email}</p>
+          <p><strong>Status:</strong> \${data.status}</p>
+          <p><strong>Shares:</strong> <input type="number" class="text-black px-1 rounded" value="\${data.shares}" id="shares-\${id}" /></p>
+          <p><strong>Balance:</strong> ₱<input type="number" class="text-black px-1 rounded" value="\${data.balance}" id="balance-\${id}" /></p>
+          <div class="mt-2 space-x-2">
+            <button class="bg-green-600 px-2 py-1 rounded approveBtn" data-id="\${id}">Approve</button>
+            <button class="bg-yellow-600 px-2 py-1 rounded updateBtn" data-id="\${id}">Update</button>
+            <button class="bg-red-600 px-2 py-1 rounded deleteBtn" data-id="\${id}">Delete</button>
+          </div>
+        \`;
+        membersList.appendChild(div);
+      });
+
+      totalMembersEl.textContent = totalMembers;
+      totalSharesEl.textContent = totalShares;
+      totalBalanceEl.textContent = totalBalance;
+
+      document.getElementById("exportBtn").onclick = () => {
+        const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(e => e.join(",")).join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "bfc_members.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+      document.querySelectorAll(".approveBtn").forEach(btn => {
+        btn.onclick = async () => {
+          await updateDoc(doc(db, "users", btn.dataset.id), { status: "approved" });
+          alert("✅ Approved!");
+          loadMembers();
+        };
+      });
+
+      document.querySelectorAll(".updateBtn").forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.dataset.id;
+          const newShares = parseInt(document.getElementById("shares-" + id).value);
+          const newBalance = parseFloat(document.getElementById("balance-" + id).value);
+          await updateDoc(doc(db, "users", id), { shares: newShares, balance: newBalance });
+          alert("🔄 Updated!");
+          loadMembers();
+        };
+      });
+
+      document.querySelectorAll(".deleteBtn").forEach(btn => {
+        btn.onclick = async () => {
+          if (confirm("❌ Delete this member?")) {
+            await deleteDoc(doc(db, "users", btn.dataset.id));
+            alert("🗑️ Deleted.");
+            loadMembers();
+          }
+        };
+      });
+    }
 
     async function loadWithdrawals() {
       const withdrawalsList = document.getElementById("withdrawalsList");
       withdrawalsList.innerHTML = "";
-
       const snapshot = await getDocs(collection(db, "withdrawals"));
+
       snapshot.forEach(async (docSnap) => {
         const data = docSnap.data();
         if (data.status === "pending") {
           const div = document.createElement("div");
           div.className = "bg-gray-700 p-4 rounded";
           div.innerHTML = \`
-            <p>📧 <strong>\${data.userEmail}</strong></p>
-            <p>💸 Amount: ₱\${data.amount}</p>
-            <button class="bg-green-600 mt-2 px-3 py-1 rounded approveBtn" data-id="\${docSnap.id}" data-userid="\${data.userId}" data-amount="\${data.amount}">Approve</button>
+            <p><strong>Email:</strong> \${data.userEmail}</p>
+            <p><strong>Amount:</strong> ₱\${data.amount}</p>
+            <button class="bg-green-600 mt-2 px-3 py-1 rounded approveWithdrawBtn" data-id="\${docSnap.id}" data-userid="\${data.userId}" data-amount="\${data.amount}">Approve</button>
           \`;
           withdrawalsList.appendChild(div);
         }
       });
 
-      document.querySelectorAll(".approveBtn").forEach(btn => {
-        btn.addEventListener("click", async () => {
-          const id = btn.getAttribute("data-id");
-          const userId = btn.getAttribute("data-userid");
-          const amount = parseFloat(btn.getAttribute("data-amount"));
-
+      document.querySelectorAll(".approveWithdrawBtn").forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.dataset.id;
+          const userId = btn.dataset.userid;
+          const amount = parseFloat(btn.dataset.amount);
           const userRef = doc(db, "users", userId);
           const userSnap = await getDoc(userRef);
           if (userSnap.exists()) {
-            const userData = userSnap.data();
-            const newBalance = (userData.balance || 0) - amount;
-
+            const newBalance = (userSnap.data().balance || 0) - amount;
             await updateDoc(userRef, { balance: newBalance });
             await updateDoc(doc(db, "withdrawals", id), { status: "approved" });
-
-            alert("✅ Withdrawal approved and balance updated!");
+            alert("✅ Withdrawal approved!");
             loadWithdrawals();
+            loadMembers();
           }
-        });
+        };
       });
     }
 
-    window.addEventListener("DOMContentLoaded", loadWithdrawals);
+    window.addEventListener("DOMContentLoaded", () => {
+      loadMembers();
+      loadWithdrawals();
+    });
   </script>
 </body>
 </html>
