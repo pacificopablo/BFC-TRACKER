@@ -1,195 +1,96 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Admin Dashboard - Baccarat Fund Club</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white p-6">  <div class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold">🛠️ Admin Dashboard</h1>
-    <button onclick="logout()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">🚪 Logout</button>
-  </div>  <!-- 👥 Manage Members Section -->  <section class="bg-gray-800 p-6 rounded-lg mb-10">
-    <h2 class="text-2xl font-semibold mb-4">👥 Manage Members</h2>
-    <div class="flex justify-between mb-4">
-      <button onclick="renderMemberTable()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">🔄 Refresh</button>
-      <button onclick="showAddMemberModal()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">➕ Add Member</button>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm border border-gray-700">
-        <thead class="bg-gray-700 text-gray-300">
-          <tr>
-            <th class="p-2 border">Name</th>
-            <th class="p-2 border">Email</th>
-            <th class="p-2 border">Shares</th>
-            <th class="p-2 border">Balance</th>
-            <th class="p-2 border">Status</th>
-            <th class="p-2 border">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="memberTableBody" class="text-white"></tbody>
-      </table>
-    </div>
-  </section>  <!-- 💸 Withdrawal Requests Section -->  <section class="bg-gray-800 p-6 rounded-lg mb-10">
-    <h2 class="text-2xl font-semibold mb-4">💸 Pending Withdrawal Requests</h2>
-    <div class="overflow-x-auto">
-      <table class="w-full table-auto border border-gray-700">
-        <thead class="bg-gray-700 text-gray-300">
-          <tr>
-            <th class="p-2 border border-gray-600">Email</th>
-            <th class="p-2 border border-gray-600">Amount</th>
-            <th class="p-2 border border-gray-600">Note</th>
-            <th class="p-2 border border-gray-600">Date</th>
-            <th class="p-2 border border-gray-600">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="withdrawalTableBody" class="text-white"></tbody>
-      </table>
-    </div>
-  </section>  <!-- Member Add/Edit Modal -->  <div id="memberModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-    <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md">
-      <h3 id="modalTitle" class="text-xl font-semibold mb-4">Add Member</h3>
-      <form id="memberForm" class="space-y-3">
-        <input type="hidden" id="editIndex" />
-        <div><input type="text" id="modalName" placeholder="Name" class="w-full p-2 rounded text-black" required></div>
-        <div><input type="email" id="modalEmail" placeholder="Email" class="w-full p-2 rounded text-black" required></div>
-        <div><input type="password" id="modalPassword" placeholder="Password" class="w-full p-2 rounded text-black" required></div>
-        <div><input type="number" id="modalShares" placeholder="Shares" class="w-full p-2 rounded text-black" required></div>
-        <div><input type="number" id="modalBalance" placeholder="Balance" class="w-full p-2 rounded text-black" required></div>
-        <div class="flex justify-between">
-          <button type="submit" class="bg-green-600 px-4 py-2 rounded hover:bg-green-700">💾 Save</button>
-          <button type="button" onclick="closeModal()" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">❌ Cancel</button>
-        </div>
-      </form>
-    </div>
-  </div>  <script>
-    let members = [];
+<body class="bg-gray-900 text-white p-6">
 
-    async function fetchMembers() {
-      try {
-        const res = await fetch('user.json');
-        members = await res.json();
-      } catch (e) {
-        console.error('Could not load user.json', e);
-        members = [];
-      }
-      renderMemberTable();
-    }
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold">🛡️ Admin Dashboard</h1>
+    <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
+  </div>
 
-    function renderMemberTable() {
-      const tbody = document.getElementById('memberTableBody');
-      tbody.innerHTML = '';
-      members.forEach((user, i) => {
-        const tr = document.createElement('tr');
-        tr.classList.add('border-b','border-gray-700');
-        tr.innerHTML = `
-          <td class="p-2 border">${user.name}</td>
-          <td class="p-2 border">${user.email}</td>
-          <td class="p-2 border text-center">${user.shares}</td>
-          <td class="p-2 border text-center">₱${user.balance}</td>
-          <td class="p-2 border text-center">${user.status || 'approved'}</td>
-          <td class="p-2 border text-center space-x-2">
-            <button onclick="editMember(${i})" class="bg-yellow-500 px-2 py-1 rounded hover:bg-yellow-600">✏️</button>
-            <button onclick="deleteMember(${i})" class="bg-red-600 px-2 py-1 rounded hover:bg-red-700">🗑️</button>
-          </td>`;
-        tbody.appendChild(tr);
+  <div class="mb-6">
+    <h2 class="text-2xl font-semibold mb-2">Pending Members</h2>
+    <div id="pendingList" class="space-y-4"></div>
+  </div>
+
+  <div>
+    <h2 class="text-2xl font-semibold mb-2">Approved Members</h2>
+    <div id="approvedList" class="space-y-4"></div>
+  </div>
+
+  <script type="module">
+    import { auth, db } from './firebase-config.js';
+    import {
+      signOut, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import {
+      collection, getDocs, updateDoc, deleteDoc, doc
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const pendingList = document.getElementById('pendingList');
+    const approvedList = document.getElementById('approvedList');
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return (window.location.href = "index.html");
+
+      const snapshot = await getDocs(collection(db, "users"));
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const userId = docSnap.id;
+        const card = document.createElement("div");
+        card.className = "bg-gray-800 p-4 rounded shadow";
+
+        card.innerHTML = `
+          <div><strong>${data.name}</strong> (${data.email})</div>
+          <div>Status: ${data.status}</div>
+          <div>Shares: <input id="shares-${userId}" type="number" class="text-black p-1 rounded" value="${data.shares}" /></div>
+          <div>Balance: <input id="balance-${userId}" type="number" class="text-black p-1 rounded" value="${data.balance}" /></div>
+          <div class="mt-2 space-x-2">
+            ${data.status === 'pending'
+              ? `<button class="bg-green-600 px-3 py-1 rounded" onclick="approveUser('${userId}')">✅ Approve</button>`
+              : ''
+            }
+            <button class="bg-blue-500 px-3 py-1 rounded" onclick="updateUser('${userId}')">💾 Update</button>
+            <button class="bg-red-600 px-3 py-1 rounded" onclick="deleteUser('${userId}')">🗑 Delete</button>
+          </div>
+        `;
+
+        if (data.status === 'pending') {
+          pendingList.appendChild(card);
+        } else {
+          approvedList.appendChild(card);
+        }
       });
-    }
-
-    function showAddMemberModal() {
-      document.getElementById('memberForm').reset();
-      document.getElementById('editIndex').value = '';
-      document.getElementById('modalTitle').innerText = 'Add Member';
-      document.getElementById('memberModal').classList.remove('hidden');
-    }
-
-    function editMember(index) {
-      const user = members[index];
-      document.getElementById('editIndex').value = index;
-      document.getElementById('modalName').value = user.name;
-      document.getElementById('modalEmail').value = user.email;
-      document.getElementById('modalPassword').value = user.password;
-      document.getElementById('modalShares').value = user.shares;
-      document.getElementById('modalBalance').value = user.balance;
-      document.getElementById('modalTitle').innerText = 'Edit Member';
-      document.getElementById('memberModal').classList.remove('hidden');
-    }
-
-    function closeModal() {
-      document.getElementById('memberModal').classList.add('hidden');
-    }
-
-    document.getElementById('memberForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const idx = document.getElementById('editIndex').value;
-      const newUser = {
-        name: document.getElementById('modalName').value,
-        email: document.getElementById('modalEmail').value,
-        password: document.getElementById('modalPassword').value,
-        shares: parseInt(document.getElementById('modalShares').value),
-        balance: parseFloat(document.getElementById('modalBalance').value),
-        status: 'approved'
-      };
-      if (idx === '') members.push(newUser);
-      else members[idx] = newUser;
-      closeModal();
-      renderMemberTable();
     });
 
-    function deleteMember(index) {
-      if (confirm('Delete this member?')) {
-        members.splice(index,1);
-        renderMemberTable();
+    window.approveUser = async (id) => {
+      await updateDoc(doc(db, "users", id), { status: "approved" });
+      window.location.reload();
+    };
+
+    window.updateUser = async (id) => {
+      const shares = parseFloat(document.getElementById(`shares-${id}`).value);
+      const balance = parseFloat(document.getElementById(`balance-${id}`).value);
+      await updateDoc(doc(db, "users", id), { shares, balance });
+      alert("✅ Updated");
+    };
+
+    window.deleteUser = async (id) => {
+      if (confirm("Are you sure?")) {
+        await deleteDoc(doc(db, "users", id));
+        window.location.reload();
       }
-    }
-
-    function renderWithdrawals() {
-      const requests = JSON.parse(localStorage.getItem('withdrawRequests')||'[]');
-      const tbody = document.getElementById('withdrawalTableBody');
-      tbody.innerHTML = '';
-      if (!requests.length) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">No pending requests.</td></tr>`;
-        return;
-      }
-      requests.forEach((req, i) => {
-        const tr = document.createElement('tr');
-        tr.classList.add('border-b','border-gray-700');
-        tr.innerHTML = `
-          <td class="p-2 border">${req.email}</td>
-          <td class="p-2 border">₱${req.amount.toFixed(2)}</td>
-          <td class="p-2 border">${req.note||'-'}</td>
-          <td class="p-2 border">${new Date(req.date).toLocaleString()}</td>
-          <td class="p-2 border text-center space-x-2">
-            <button onclick="approveWithdrawal(${i})" class="bg-green-600 px-2 py-1 rounded hover:bg-green-700">✅</button>
-            <button onclick="rejectWithdrawal(${i})" class="bg-red-600 px-2 py-1 rounded hover:bg-red-700">❌</button>
-          </td>`;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function approveWithdrawal(i) {
-      const reqs = JSON.parse(localStorage.getItem('withdrawRequests')||'[]');
-      const log = JSON.parse(localStorage.getItem('withdrawalLog')||'[]');
-      log.push(reqs.splice(i,1)[0]);
-      localStorage.setItem('withdrawRequests', JSON.stringify(reqs));
-      localStorage.setItem('withdrawalLog', JSON.stringify(log));
-      renderWithdrawals();
-    }
-
-    function rejectWithdrawal(i) {
-      const reqs = JSON.parse(localStorage.getItem('withdrawRequests')||'[]');
-      reqs.splice(i,1);
-      localStorage.setItem('withdrawRequests', JSON.stringify(reqs));
-      renderWithdrawals();
-    }
+    };
 
     function logout() {
-      localStorage.clear();
-      window.location.href = 'index.html';
+      signOut(auth).then(() => window.location.href = "index.html");
     }
+  </script>
 
-    window.addEventListener('DOMContentLoaded', () => {
-      fetchMembers();
-      renderWithdrawals();
-    });
-  </script></body>
+</body>
 </html>
