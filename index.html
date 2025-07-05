@@ -42,6 +42,8 @@
           const userData = docSnap.data();
           if (userData.status === "approved") {
             localStorage.setItem("userRole", userData.role);
+            localStorage.setItem("userName", userData.name);
+            localStorage.setItem("userEmail", email);
             if (userData.role === "admin") {
               window.location.href = "admin.html";
             } else {
