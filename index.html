@@ -1,31 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Baccarat Fund Club Login</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-
-<body class="bg-gray-900 text-white flex items-center justify-center h-screen">
-  <div class="bg-gray-800 p-8 rounded-xl w-96 shadow-lg">
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+  <div class="bg-gray-800 p-8 rounded-xl w-full max-w-md shadow-lg">
     <h1 class="text-2xl font-bold mb-6 text-center">Baccarat Fund Club Login</h1>
     <form id="loginForm" class="space-y-4">
-      <input id="email" type="email" placeholder="Email" required
-        class="w-full p-3 rounded bg-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500" />
-      <input id="password" type="password" placeholder="Password" required
-        class="w-full p-3 rounded bg-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500" />
-      <button type="submit"
-        class="w-full bg-green-600 hover:bg-green-700 py-3 rounded font-semibold transition">Login</button>
+      <input id="email" type="email" placeholder="Email" required class="w-full p-3 rounded bg-gray-700" />
+      <input id="password" type="password" placeholder="Password" required class="w-full p-3 rounded bg-gray-700" />
+      <button type="submit" class="w-full bg-green-600 hover:bg-green-700 py-3 rounded font-semibold transition">Login</button>
       <p id="errorMsg" class="text-red-500 mt-2 text-center"></p>
     </form>
+
+    <div class="text-center mt-4 space-y-2 text-sm">
+      <a href="#" onclick="forgotPassword()" class="text-blue-400 hover:underline">Forgot Password?</a><br>
+      <a href="register.html" class="text-blue-400 hover:underline">Register a New Account</a>
+    </div>
   </div>
 
   <script type="module">
     import { auth } from './firebase-config.js';
     import {
       signInWithEmailAndPassword,
+      sendPasswordResetEmail,
       onAuthStateChanged
     } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-auth.js";
 
@@ -47,7 +48,19 @@
       }
     });
 
-    // Auto redirect if already logged in
+    async function forgotPassword() {
+      const email = prompt("Enter your registered email:");
+      if (!email) return;
+
+      try {
+        await sendPasswordResetEmail(auth, email);
+        alert("📨 Password reset email sent. Check your inbox.");
+      } catch (error) {
+        alert("❌ " + error.message);
+      }
+    }
+
+    // Auto-redirect if already logged in
     onAuthStateChanged(auth, (user) => {
       if (user) {
         window.location.href = 'dashboard.html';
@@ -55,5 +68,4 @@
     });
   </script>
 </body>
-
 </html>
