@@ -6,7 +6,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
   authDomain: "bfc-tracker.firebaseapp.com",
   projectId: "bfc-tracker",
-  storageBucket: "bfc-tracker.firebasestorage.app",
+  storageBucket: "bfc-tracker.appspot.com",
   messagingSenderId: "127052459580",
   appId: "1:127052459580:web:ee9af6545f841d171cdd39"
 };
