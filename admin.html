@@ -7,7 +7,34 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 text-white p-6">
-  <h1 class="text-3xl font-bold mb-6">🛠️ Admin Dashboard</h1>
+
+  <h1 class="text-3xl font-bold mb-6 text-center">🛠️ Admin Dashboard</h1>
+
+  <!-- 👥 Manage Members Section -->
+  <section class="bg-gray-800 p-6 rounded-lg mb-10">
+    <h2 class="text-2xl font-semibold mb-4">👥 Manage Members</h2>
+    <div class="flex justify-between mb-4">
+      <button onclick="renderMemberTable()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">🔄 Refresh</button>
+      <button onclick="showAddMemberModal()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">➕ Add Member</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm border border-gray-700">
+        <thead class="bg-gray-700 text-gray-300">
+          <tr>
+            <th class="p-2 border">Name</th>
+            <th class="p-2 border">Email</th>
+            <th class="p-2 border">Shares</th>
+            <th class="p-2 border">Balance</th>
+            <th class="p-2 border">Status</th>
+            <th class="p-2 border">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="memberTableBody" class="text-white"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 💸 Withdrawal Requests Section -->
   <section class="bg-gray-800 p-6 rounded-lg mb-10">
     <h2 class="text-2xl font-semibold mb-4">💸 Pending Withdrawal Requests</h2>
     <div class="overflow-x-auto">
@@ -26,46 +53,153 @@
     </div>
   </section>
 
+  <!-- Member Add/Edit Modal -->
+  <div id="memberModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md">
+      <h3 id="modalTitle" class="text-xl font-semibold mb-4">Add Member</h3>
+      <form id="memberForm" class="space-y-3">
+        <input type="hidden" id="editIndex" />
+        <div><input type="text" id="modalName" placeholder="Name" class="w-full p-2 rounded text-black" required></div>
+        <div><input type="email" id="modalEmail" placeholder="Email" class="w-full p-2 rounded text-black" required></div>
+        <div><input type="password" id="modalPassword" placeholder="Password" class="w-full p-2 rounded text-black" required></div>
+        <div><input type="number" id="modalShares" placeholder="Shares" class="w-full p-2 rounded text-black" required></div>
+        <div><input type="number" id="modalBalance" placeholder="Balance" class="w-full p-2 rounded text-black" required></div>
+        <div class="flex justify-between">
+          <button type="submit" class="bg-green-600 px-4 py-2 rounded hover:bg-green-700">💾 Save</button>
+          <button type="button" onclick="closeModal()" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">❌ Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
-    function renderWithdrawals() {
-      const requests = JSON.parse(localStorage.getItem('withdrawRequests') || '[]');
-      const tbody = document.getElementById('withdrawalTableBody');
-      tbody.innerHTML = '';
-      if (!requests.length) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-gray-400">No pending requests.</td></tr>`;
-        return;
+    // Load members from user.json
+    let members = [];
+
+    async function fetchMembers() {
+      try {
+        const res = await fetch('user.json');
+        members = await res.json();
+      } catch (e) {
+        console.error('Could not load user.json', e);
+        members = [];
       }
-      requests.forEach((req, index) => {
+      renderMemberTable();
+    }
+
+    function renderMemberTable() {
+      const tbody = document.getElementById('memberTableBody');
+      tbody.innerHTML = '';
+      members.forEach((user, i) => {
         const tr = document.createElement('tr');
-        tr.classList.add("border-b", "border-gray-700");
+        tr.classList.add('border-b','border-gray-700');
         tr.innerHTML = `
-          <td class="p-2 border border-gray-600">${req.email}</td>
-          <td class="p-2 border border-gray-600">₱${req.amount.toFixed(2)}</td>
-          <td class="p-2 border border-gray-600">${req.note || '-'}</td>
-          <td class="p-2 border border-gray-600">${new Date(req.date).toLocaleString()}</td>
-          <td class="p-2 border border-gray-600 space-x-2">
-            <button onclick="approveWithdrawal(${index})" class="bg-green-600 px-3 py-1 rounded hover:bg-green-700">Approve</button>
-            <button onclick="rejectWithdrawal(${index})" class="bg-red-600 px-3 py-1 rounded hover:bg-red-700">Reject</button>
-          </td>
-        `;
+          <td class="p-2 border">${user.name}</td>
+          <td class="p-2 border">${user.email}</td>
+          <td class="p-2 border text-center">${user.shares}</td>
+          <td class="p-2 border text-center">₱${user.balance}</td>
+          <td class="p-2 border text-center">${user.status || 'approved'}</td>
+          <td class="p-2 border text-center space-x-2">
+            <button onclick="editMember(${i})" class="bg-yellow-500 px-2 py-1 rounded hover:bg-yellow-600">✏️</button>
+            <button onclick="deleteMember(${i})" class="bg-red-600 px-2 py-1 rounded hover:bg-red-700">🗑️</button>
+          </td>`;
         tbody.appendChild(tr);
       });
     }
-    function approveWithdrawal(index) {
-      const requests = JSON.parse(localStorage.getItem('withdrawRequests') || '[]');
-      const approved = JSON.parse(localStorage.getItem('withdrawalLog') || '[]');
-      approved.push(requests.splice(index,1)[0]);
-      localStorage.setItem('withdrawRequests', JSON.stringify(requests));
-      localStorage.setItem('withdrawalLog', JSON.stringify(approved));
+
+    function showAddMemberModal() {
+      document.getElementById('memberForm').reset();
+      document.getElementById('editIndex').value = '';
+      document.getElementById('modalTitle').innerText = 'Add Member';
+      document.getElementById('memberModal').classList.remove('hidden');
+    }
+
+    function editMember(index) {
+      const user = members[index];
+      document.getElementById('editIndex').value = index;
+      document.getElementById('modalName').value = user.name;
+      document.getElementById('modalEmail').value = user.email;
+      document.getElementById('modalPassword').value = user.password;
+      document.getElementById('modalShares').value = user.shares;
+      document.getElementById('modalBalance').value = user.balance;
+      document.getElementById('modalTitle').innerText = 'Edit Member';
+      document.getElementById('memberModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('memberModal').classList.add('hidden');
+    }
+
+    document.getElementById('memberForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const idx = document.getElementById('editIndex').value;
+      const newUser = {
+        name: document.getElementById('modalName').value,
+        email: document.getElementById('modalEmail').value,
+        password: document.getElementById('modalPassword').value,
+        shares: parseInt(document.getElementById('modalShares').value),
+        balance: parseFloat(document.getElementById('modalBalance').value),
+        status: 'approved'
+      };
+      if (idx === '') members.push(newUser);
+      else members[idx] = newUser;
+      closeModal();
+      renderMemberTable();
+    });
+
+    function deleteMember(index) {
+      if (confirm('Delete this member?')) {
+        members.splice(index,1);
+        renderMemberTable();
+      }
+    }
+
+    // Withdrawal request logic
+    function renderWithdrawals() {
+      const requests = JSON.parse(localStorage.getItem('withdrawRequests')||'[]');
+      const tbody = document.getElementById('withdrawalTableBody');
+      tbody.innerHTML = '';
+      if (!requests.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">No pending requests.</td></tr>`;
+        return;
+      }
+      requests.forEach((req, i) => {
+        const tr = document.createElement('tr');
+        tr.classList.add('border-b','border-gray-700');
+        tr.innerHTML = `
+          <td class="p-2 border">${req.email}</td>
+          <td class="p-2 border">₱${req.amount.toFixed(2)}</td>
+          <td class="p-2 border">${req.note||'-'}</td>
+          <td class="p-2 border">${new Date(req.date).toLocaleString()}</td>
+          <td class="p-2 border text-center space-x-2">
+            <button onclick="approveWithdrawal(${i})" class="bg-green-600 px-2 py-1 rounded hover:bg-green-700">✅</button>
+            <button onclick="rejectWithdrawal(${i})" class="bg-red-600 px-2 py-1 rounded hover:bg-red-700">❌</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function approveWithdrawal(i) {
+      const reqs = JSON.parse(localStorage.getItem('withdrawRequests')||'[]');
+      const log = JSON.parse(localStorage.getItem('withdrawalLog')||'[]');
+      log.push(reqs.splice(i,1)[0]);
+      localStorage.setItem('withdrawRequests', JSON.stringify(reqs));
+      localStorage.setItem('withdrawalLog', JSON.stringify(log));
       renderWithdrawals();
     }
-    function rejectWithdrawal(index) {
-      const requests = JSON.parse(localStorage.getItem('withdrawRequests') || '[]');
-      requests.splice(index,1);
-      localStorage.setItem('withdrawRequests', JSON.stringify(requests));
+    function rejectWithdrawal(i) {
+      const reqs = JSON.parse(localStorage.getItem('withdrawRequests')||'[]');
+      reqs.splice(i,1);
+      localStorage.setItem('withdrawRequests', JSON.stringify(reqs));
       renderWithdrawals();
     }
-    window.addEventListener('DOMContentLoaded', renderWithdrawals);
+
+    // Initial load
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchMembers();
+      renderWithdrawals();
+    });
   </script>
+
 </body>
 </html>
