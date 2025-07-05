@@ -50,25 +50,31 @@
         return;
       }
 
+      // Admin login check
       if (email === data.admin.email && password === data.admin.password) {
-        if (remember) localStorage.setItem("admin", "true");
-        else sessionStorage.setItem("admin", "true");
+        remember
+          ? localStorage.setItem("admin", "true")
+          : sessionStorage.setItem("admin", "true");
         window.location.href = "admin.html";
         return;
       }
 
+      // Combine approved members from JSON + localStorage
       const approvedLocal = JSON.parse(localStorage.getItem("approvedMembers") || "[]");
-      const approved = data.members.concat(approvedLocal);
+      const allApproved = [...data.members, ...approvedLocal];
+
+      const user = allApproved.find(m =>
+        m.email.toLowerCase() === email && m.password === password
+      );
+
       const pending = JSON.parse(localStorage.getItem("pendingMembers") || "[]");
+      const isPending = pending.some(m => m.email.toLowerCase() === email);
 
-      const approvedUser = approved.find(m => m.email === email && m.password === password);
-      const pendingUser = pending.find(m => m.email === email);
-
-      if (approvedUser) {
+      if (user) {
         const storage = remember ? localStorage : sessionStorage;
-        storage.setItem("currentMember", JSON.stringify(approvedUser));
+        storage.setItem("currentMember", JSON.stringify(user));
         window.location.href = "dashboard.html";
-      } else if (pendingUser) {
+      } else if (isPending) {
         msg.textContent = "⏳ Your account is still pending admin approval.";
         msg.className = "text-yellow-400";
       } else {
