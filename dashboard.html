@@ -1,96 +1,99 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" >
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dashboard – Baccarat Fund Club</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <title>Baccarat Fund Club Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white min-h-screen p-4">
-
+<body class="bg-gray-900 text-white min-h-screen p-6">
   <div class="max-w-4xl mx-auto">
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-3xl font-bold">🎲 Baccarat Fund Club Dashboard</h1>
-      <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
+      <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
     </div>
 
-    <div id="welcome" class="mb-6 text-lg font-semibold"></div>
-
     <div id="adminPanel" class="hidden">
-      <h2 class="text-xl font-bold mb-2">👑 Admin – Member List</h2>
-      <div id="memberList" class="space-y-2"></div>
+      <h2 class="text-xl font-bold mb-4">👑 Admin Panel - Member List</h2>
+      <div id="memberList" class="space-y-4"></div>
     </div>
 
     <div id="memberPanel" class="hidden">
-      <h2 class="text-xl font-bold mb-2">👤 Member Info</h2>
-      <div id="memberInfo" class="bg-gray-800 p-4 rounded-lg shadow-md"></div>
+      <h2 class="text-xl font-bold mb-4">👤 Member Panel</h2>
+      <div id="memberInfo" class="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md"></div>
     </div>
   </div>
 
-  <script type="module">
-    import { auth, db } from './firebase-config.js';
-    import {
-      onAuthStateChanged,
-      signOut
-    } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-auth.js";
-    import {
-      doc, getDoc, getDocs, collection
-    } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-firestore.js";
+  <script>
+    async function fetchMembers() {
+      const response = await fetch('members.json');
+      if (!response.ok) {
+        alert('Failed to load member data.');
+        return [];
+      }
+      return response.json();
+    }
 
-    const welcome = document.getElementById('welcome');
-    const adminPanel = document.getElementById('adminPanel');
-    const memberPanel = document.getElementById('memberPanel');
-    const memberList = document.getElementById('memberList');
-    const memberInfo = document.getElementById('memberInfo');
+    function renderAdmin(members) {
+      const list = document.getElementById('memberList');
+      list.innerHTML = '';
+      members.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'bg-gray-800 p-4 rounded shadow';
+        div.innerHTML = `
+          <p><strong>Name:</strong> ${m.name}</p>
+          <p><strong>Email:</strong> ${m.email}</p>
+          <p><strong>Phone:</strong> ${m.phone}</p>
+          <p><strong>Shares:</strong> ${m.shares}</p>
+          <p><strong>Balance:</strong> ₱${m.balance}</p>
+          <p><strong>Joined:</strong> ${m.joinDate}</p>
+        `;
+        list.appendChild(div);
+      });
+    }
 
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        window.location.href = "index.html";
+    function renderMember(member) {
+      const panel = document.getElementById('memberInfo');
+      if (!member) {
+        panel.innerHTML = '<p class="text-red-500">Member not found.</p>';
+        return;
+      }
+      panel.innerHTML = `
+        <p><strong>Name:</strong> ${member.name}</p>
+        <p><strong>Email:</strong> ${member.email}</p>
+        <p><strong>Phone:</strong> ${member.phone}</p>
+        <p><strong>Shares:</strong> ${member.shares}</p>
+        <p><strong>Balance:</strong> ₱${member.balance}</p>
+        <p><strong>Joined:</strong> ${member.joinDate}</p>
+      `;
+    }
+
+    (async () => {
+      const role = localStorage.getItem('role');
+      if (!role) {
+        alert('No role selected. Redirecting to role selection.');
+        window.location.href = 'index.html';
         return;
       }
 
-      welcome.textContent = `Welcome, ${user.email}`;
+      const members = await fetchMembers();
 
-      if (user.email === "smoakshadow@gmail.com") {
-        // Show all members
-        adminPanel.classList.remove("hidden");
-        const snapshot = await getDocs(collection(db, "members"));
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          const div = document.createElement('div');
-          div.className = "bg-gray-800 p-3 rounded";
-          div.innerHTML = `
-            <strong>${data.name}</strong><br>
-            📱 ${data.phone}<br>
-            📈 Shares: ${data.shares}<br>
-            💰 Balance: ₱${data.balance}
-          `;
-          memberList.appendChild(div);
-        });
-      } else {
-        // Show only current member info
-        memberPanel.classList.remove("hidden");
-        const ref = doc(db, "members", user.uid);
-        const snapshot = await getDoc(ref);
-        if (snapshot.exists()) {
-          const data = snapshot.data();
-          memberInfo.innerHTML = `
-            <p><strong>Name:</strong> ${data.name}</p>
-            <p><strong>Phone:</strong> ${data.phone}</p>
-            <p><strong>Shares:</strong> ${data.shares}</p>
-            <p><strong>Balance:</strong> ₱${data.balance}</p>
-            <p><strong>Join Date:</strong> ${data.joinDate}</p>
-          `;
-        } else {
-          memberInfo.innerHTML = "❌ No data found.";
-        }
+      if (role === 'admin') {
+        document.getElementById('adminPanel').classList.remove('hidden');
+        renderAdmin(members);
+      } else if (role === 'member') {
+        document.getElementById('memberPanel').classList.remove('hidden');
+        const email = localStorage.getItem('memberEmail') || '';
+        const member = members.find(m => m.email.toLowerCase() === email.toLowerCase());
+        renderMember(member);
       }
-    });
 
-    window.logout = async function () {
-      await signOut(auth);
-      window.location.href = "index.html";
-    };
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        localStorage.removeItem('role');
+        localStorage.removeItem('memberEmail');
+        window.location.href = 'index.html';
+      });
+    })();
   </script>
 </body>
 </html>
