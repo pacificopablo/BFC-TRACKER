@@ -4,93 +4,140 @@
   <meta charset="UTF-8" />
   <title>Admin Dashboard - Baccarat Fund Club</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-900 text-white p-6">
+  <div class="max-w-6xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">📋 Admin Dashboard</h1>
+      <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded">Logout</button>
+    </div>
 
-  <div class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold">🛡️ Admin Dashboard</h1>
-    <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
-  </div>
+    <h2 class="text-xl font-semibold mb-4">Pending Members</h2>
+    <div id="pendingList" class="space-y-4 mb-10"></div>
 
-  <div class="mb-6">
-    <h2 class="text-2xl font-semibold mb-2">Pending Members</h2>
-    <div id="pendingList" class="space-y-4"></div>
-  </div>
+    <h2 class="text-xl font-semibold mb-4">All Approved Members</h2>
+    <div id="approvedList" class="space-y-4 mb-10"></div>
 
-  <div>
-    <h2 class="text-2xl font-semibold mb-2">Approved Members</h2>
-    <div id="approvedList" class="space-y-4"></div>
+    <h2 class="text-xl font-semibold mb-4">💸 Withdrawal Requests</h2>
+    <div id="withdrawals" class="space-y-4"></div>
   </div>
 
   <script type="module">
     import { auth, db } from './firebase-config.js';
     import {
-      signOut, onAuthStateChanged
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import {
       collection, getDocs, updateDoc, deleteDoc, doc
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import {
+      signOut
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-    const pendingList = document.getElementById('pendingList');
-    const approvedList = document.getElementById('approvedList');
+    const pendingList = document.getElementById("pendingList");
+    const approvedList = document.getElementById("approvedList");
+    const withdrawals = document.getElementById("withdrawals");
 
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) return (window.location.href = "index.html");
+    async function loadUsers() {
+      const querySnapshot = await getDocs(collection(db, "users"));
+      pendingList.innerHTML = "";
+      approvedList.innerHTML = "";
 
-      const snapshot = await getDocs(collection(db, "users"));
-      snapshot.forEach(docSnap => {
+      querySnapshot.forEach((docSnap) => {
         const data = docSnap.data();
-        const userId = docSnap.id;
-        const card = document.createElement("div");
-        card.className = "bg-gray-800 p-4 rounded shadow";
+        const id = docSnap.id;
 
-        card.innerHTML = `
-          <div><strong>${data.name}</strong> (${data.email})</div>
-          <div>Status: ${data.status}</div>
-          <div>Shares: <input id="shares-${userId}" type="number" class="text-black p-1 rounded" value="${data.shares}" /></div>
-          <div>Balance: <input id="balance-${userId}" type="number" class="text-black p-1 rounded" value="${data.balance}" /></div>
-          <div class="mt-2 space-x-2">
-            ${data.status === 'pending'
-              ? `<button class="bg-green-600 px-3 py-1 rounded" onclick="approveUser('${userId}')">✅ Approve</button>`
-              : ''
-            }
-            <button class="bg-blue-500 px-3 py-1 rounded" onclick="updateUser('${userId}')">💾 Update</button>
-            <button class="bg-red-600 px-3 py-1 rounded" onclick="deleteUser('${userId}')">🗑 Delete</button>
+        const userCard = document.createElement("div");
+        userCard.className = "bg-gray-800 p-4 rounded shadow";
+
+        userCard.innerHTML = `
+          <div class="flex justify-between items-center">
+            <div>
+              <p><strong>Name:</strong> ${data.name}</p>
+              <p><strong>Email:</strong> ${data.email}</p>
+              <p><strong>Role:</strong> ${data.role}</p>
+              <p><strong>Status:</strong> ${data.status}</p>
+            </div>
+            <div class="space-x-2">
+              ${data.status === "pending" ? `
+                <button class="approve-btn bg-green-600 px-3 py-1 rounded" data-id="${id}">Approve</button>
+              ` : ""}
+              <button class="edit-btn bg-yellow-600 px-3 py-1 rounded" data-id="${id}">Edit</button>
+              <button class="delete-btn bg-red-600 px-3 py-1 rounded" data-id="${id}">Delete</button>
+            </div>
           </div>
         `;
 
-        if (data.status === 'pending') {
-          pendingList.appendChild(card);
+        if (data.status === "pending") {
+          pendingList.appendChild(userCard);
         } else {
-          approvedList.appendChild(card);
+          approvedList.appendChild(userCard);
         }
+      });
+
+      attachUserEventHandlers();
+    }
+
+    function attachUserEventHandlers() {
+      document.querySelectorAll(".approve-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-id");
+          await updateDoc(doc(db, "users", id), { status: "approved" });
+          alert("✅ User approved!");
+          loadUsers();
+        });
+      });
+
+      document.querySelectorAll(".delete-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-id");
+          await deleteDoc(doc(db, "users", id));
+          alert("🗑️ User deleted.");
+          loadUsers();
+        });
+      });
+
+      document.querySelectorAll(".edit-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-id");
+          const newName = prompt("✏️ Enter new name:");
+          if (newName) {
+            await updateDoc(doc(db, "users", id), { name: newName });
+            alert("✅ Name updated.");
+            loadUsers();
+          }
+        });
+      });
+    }
+
+    async function loadWithdrawals() {
+      const querySnapshot = await getDocs(collection(db, "withdrawals"));
+      withdrawals.innerHTML = "";
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const withdrawalCard = document.createElement("div");
+        withdrawalCard.className = "bg-gray-700 p-4 rounded shadow";
+
+        withdrawalCard.innerHTML = `
+          <p><strong>Member:</strong> ${data.name} (${data.email})</p>
+          <p><strong>Amount:</strong> ₱${data.amount}</p>
+          <p><strong>Status:</strong> ${data.status}</p>
+        `;
+
+        withdrawals.appendChild(withdrawalCard);
+      });
+    }
+
+    // 🔐 Logout Handler
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      signOut(auth).then(() => {
+        localStorage.clear();
+        window.location.href = "index.html";
+      }).catch((error) => {
+        alert("Logout failed: " + error.message);
       });
     });
 
-    window.approveUser = async (id) => {
-      await updateDoc(doc(db, "users", id), { status: "approved" });
-      window.location.reload();
-    };
-
-    window.updateUser = async (id) => {
-      const shares = parseFloat(document.getElementById(`shares-${id}`).value);
-      const balance = parseFloat(document.getElementById(`balance-${id}`).value);
-      await updateDoc(doc(db, "users", id), { shares, balance });
-      alert("✅ Updated");
-    };
-
-    window.deleteUser = async (id) => {
-      if (confirm("Are you sure?")) {
-        await deleteDoc(doc(db, "users", id));
-        window.location.reload();
-      }
-    };
-
-    function logout() {
-      signOut(auth).then(() => window.location.href = "index.html");
-    }
+    loadUsers();
+    loadWithdrawals();
   </script>
-
 </body>
 </html>
