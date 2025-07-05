@@ -1,165 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Baccarat Fund Club Dashboard</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard – Baccarat Fund Club</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-
 <body class="bg-gray-900 text-white min-h-screen p-4">
-  <div class="max-w-5xl mx-auto">
-    <h1 class="text-3xl font-bold mb-6 text-center">🎰 Baccarat Fund Club Dashboard</h1>
-    <div id="userInfo" class="mb-6 text-center text-green-300"></div>
 
-    <!-- Admin Panel -->
-    <div id="adminPanel" class="hidden bg-gray-800 p-4 rounded-xl mb-8">
-      <h2 class="text-xl font-semibold mb-4">👑 Admin Panel</h2>
-      <div class="grid grid-cols-2 gap-4 mb-4">
-        <input id="newEmail" class="p-2 rounded bg-gray-700" placeholder="New Member Email">
-        <input id="newPassword" type="password" class="p-2 rounded bg-gray-700" placeholder="Password">
-        <input id="newName" class="p-2 rounded bg-gray-700" placeholder="Full Name">
-        <input id="newPhone" class="p-2 rounded bg-gray-700" placeholder="Phone Number">
-        <input id="newShares" class="p-2 rounded bg-gray-700" type="number" placeholder="Shares (₱10/share)">
-      </div>
-      <button onclick="registerMember()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">Register Member</button>
-      <p id="adminMsg" class="mt-4 text-green-400"></p>
+  <div class="max-w-4xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">🎲 Baccarat Fund Club Dashboard</h1>
+      <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
     </div>
 
-    <!-- Member Dashboard -->
-    <div id="memberPanel" class="hidden bg-gray-800 p-4 rounded-xl mb-8">
-      <h2 class="text-xl font-semibold mb-4">👤 My Account</h2>
-      <div id="memberInfo" class="mb-4"></div>
+    <div id="welcome" class="mb-6 text-lg font-semibold"></div>
 
-      <h3 class="text-lg font-bold mb-2">💰 Submit Deposit/Withdraw Request</h3>
-      <select id="requestType" class="p-2 rounded bg-gray-700 mb-2 w-full">
-        <option value="deposit">Deposit</option>
-        <option value="withdraw">Withdraw</option>
-      </select>
-      <input id="requestAmount" type="number" class="p-2 rounded bg-gray-700 mb-2 w-full" placeholder="Amount in ₱">
-      <textarea id="requestNote" class="p-2 rounded bg-gray-700 mb-4 w-full" placeholder="Optional notes..."></textarea>
-      <button onclick="submitRequest()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">Submit Request</button>
-      <p id="requestMsg" class="mt-2 text-green-400"></p>
+    <div id="adminPanel" class="hidden">
+      <h2 class="text-xl font-bold mb-2">👑 Admin – Member List</h2>
+      <div id="memberList" class="space-y-2"></div>
     </div>
 
-    <div class="text-center">
-      <button onclick="logout()" class="mt-6 bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</button>
+    <div id="memberPanel" class="hidden">
+      <h2 class="text-xl font-bold mb-2">👤 Member Info</h2>
+      <div id="memberInfo" class="bg-gray-800 p-4 rounded-lg shadow-md"></div>
     </div>
   </div>
 
   <script type="module">
     import { auth, db } from './firebase-config.js';
     import {
-      signOut,
       onAuthStateChanged,
-      createUserWithEmailAndPassword
-    } from 'https://www.gstatic.com/firebasejs/9.24.0/firebase-auth.js';
+      signOut
+    } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-auth.js";
     import {
-      doc,
-      setDoc,
-      getDoc,
-      collection,
-      addDoc,
-    } from 'https://www.gstatic.com/firebasejs/9.24.0/firebase-firestore.js';
+      doc, getDoc, getDocs, collection
+    } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-firestore.js";
 
-    const adminEmail = "smoakshadow@gmail.com";
-
+    const welcome = document.getElementById('welcome');
     const adminPanel = document.getElementById('adminPanel');
     const memberPanel = document.getElementById('memberPanel');
-    const userInfo = document.getElementById('userInfo');
+    const memberList = document.getElementById('memberList');
+    const memberInfo = document.getElementById('memberInfo');
 
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        window.location.href = 'index.html';
+        window.location.href = "index.html";
         return;
       }
 
-      userInfo.textContent = `Logged in as: ${user.email}`;
+      welcome.textContent = `Welcome, ${user.email}`;
 
-      if (user.email === adminEmail) {
-        adminPanel.classList.remove('hidden');
+      if (user.email === "smoakshadow@gmail.com") {
+        // Show all members
+        adminPanel.classList.remove("hidden");
+        const snapshot = await getDocs(collection(db, "members"));
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const div = document.createElement('div');
+          div.className = "bg-gray-800 p-3 rounded";
+          div.innerHTML = `
+            <strong>${data.name}</strong><br>
+            📱 ${data.phone}<br>
+            📈 Shares: ${data.shares}<br>
+            💰 Balance: ₱${data.balance}
+          `;
+          memberList.appendChild(div);
+        });
       } else {
-        memberPanel.classList.remove('hidden');
-
-        const memberDoc = await getDoc(doc(db, 'members', user.uid));
-        if (memberDoc.exists()) {
-          const data = memberDoc.data();
-          document.getElementById('memberInfo').innerHTML = `
+        // Show only current member info
+        memberPanel.classList.remove("hidden");
+        const ref = doc(db, "members", user.uid);
+        const snapshot = await getDoc(ref);
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          memberInfo.innerHTML = `
             <p><strong>Name:</strong> ${data.name}</p>
             <p><strong>Phone:</strong> ${data.phone}</p>
             <p><strong>Shares:</strong> ${data.shares}</p>
-            <p><strong>Value:</strong> ₱${data.shares * 10}</p>
-            <p><strong>Joined:</strong> ${data.joinDate}</p>
+            <p><strong>Balance:</strong> ₱${data.balance}</p>
+            <p><strong>Join Date:</strong> ${data.joinDate}</p>
           `;
         } else {
-          document.getElementById('memberInfo').innerHTML = `<p class="text-red-400">⚠️ Profile not set by admin yet.</p>`;
+          memberInfo.innerHTML = "❌ No data found.";
         }
       }
     });
 
-    // Logout
-    function logout() {
-      signOut(auth).then(() => {
-        window.location.href = 'index.html';
-      });
-    }
-
-    // Admin: Register Member
-    async function registerMember() {
-      const email = document.getElementById('newEmail').value.trim();
-      const password = document.getElementById('newPassword').value.trim();
-      const name = document.getElementById('newName').value.trim();
-      const phone = document.getElementById('newPhone').value.trim();
-      const shares = parseInt(document.getElementById('newShares').value);
-      const joinDate = new Date().toISOString().split('T')[0];
-
-      if (!email || !password || !name || !shares) return alert("Fill in all fields");
-
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const uid = userCredential.user.uid;
-
-        await setDoc(doc(db, "members", uid), {
-          name,
-          phone,
-          shares,
-          joinDate,
-          deposits: 0,
-          withdrawals: 0,
-          balance: shares * 10
-        });
-
-        document.getElementById('adminMsg').textContent = `✅ Member ${email} registered successfully.`;
-      } catch (err) {
-        document.getElementById('adminMsg').textContent = `❌ ${err.message}`;
-      }
-    }
-
-    // Member: Submit Deposit/Withdraw Request
-    async function submitRequest() {
-      const user = auth.currentUser;
-      const type = document.getElementById('requestType').value;
-      const amount = parseInt(document.getElementById('requestAmount').value);
-      const note = document.getElementById('requestNote').value;
-
-      if (!amount || amount <= 0) return alert("Enter valid amount");
-
-      await addDoc(collection(db, "requests"), {
-        uid: user.uid,
-        email: user.email,
-        type,
-        amount,
-        note,
-        status: "pending",
-        date: new Date().toISOString()
-      });
-
-      document.getElementById('requestMsg').textContent = `✅ ${type} request submitted.`;
-      document.getElementById('requestAmount').value = '';
-      document.getElementById('requestNote').value = '';
-    }
+    window.logout = async function () {
+      await signOut(auth);
+      window.location.href = "index.html";
+    };
   </script>
 </body>
-
 </html>
