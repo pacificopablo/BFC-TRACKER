@@ -7,23 +7,19 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center h-screen">
-
   <div class="bg-gray-800 p-8 rounded shadow-md w-full max-w-md">
     <h1 class="text-3xl font-bold mb-6 text-center">📝 Register</h1>
-
     <form id="registerForm" class="space-y-4">
       <input type="text" id="name" placeholder="Full Name" required class="w-full p-2 rounded text-black" />
       <input type="email" id="email" placeholder="Email" required class="w-full p-2 rounded text-black" />
       <input type="password" id="password" placeholder="Password" required class="w-full p-2 rounded text-black" />
       <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded">Create Account</button>
     </form>
-
     <p id="registerStatus" class="text-green-400 mt-4 hidden">✅ Account created! Wait for admin approval.</p>
     <div class="mt-6 text-center">
       <a href="index.html" class="text-blue-400 hover:underline">Back to login</a>
     </div>
   </div>
-
   <script type="module">
     import { auth, db } from './firebase-config.js';
     import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -41,16 +37,14 @@
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const uid = userCredential.user.uid;
-
         await setDoc(doc(db, "users", uid), {
-          name: name,
-          email: email,
+          name,
+          email,
           role: "member",
           shares: 0,
           balance: 0,
           status: "pending"
         });
-
         form.reset();
         statusMsg.classList.remove('hidden');
       } catch (error) {
@@ -59,6 +53,5 @@
       }
     });
   </script>
-
 </body>
 </html>
