@@ -1,17 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Admin Dashboard - Baccarat Fund Club</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white p-6">
-
-  <h1 class="text-3xl font-bold mb-6 text-center">🛠️ Admin Dashboard</h1>
-
-  <!-- 👥 Manage Members Section -->
-  <section class="bg-gray-800 p-6 rounded-lg mb-10">
+<body class="bg-gray-900 text-white p-6">  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold">🛠️ Admin Dashboard</h1>
+    <button onclick="logout()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">🚪 Logout</button>
+  </div>  <!-- 👥 Manage Members Section -->  <section class="bg-gray-800 p-6 rounded-lg mb-10">
     <h2 class="text-2xl font-semibold mb-4">👥 Manage Members</h2>
     <div class="flex justify-between mb-4">
       <button onclick="renderMemberTable()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">🔄 Refresh</button>
@@ -32,10 +29,7 @@
         <tbody id="memberTableBody" class="text-white"></tbody>
       </table>
     </div>
-  </section>
-
-  <!-- 💸 Withdrawal Requests Section -->
-  <section class="bg-gray-800 p-6 rounded-lg mb-10">
+  </section>  <!-- 💸 Withdrawal Requests Section -->  <section class="bg-gray-800 p-6 rounded-lg mb-10">
     <h2 class="text-2xl font-semibold mb-4">💸 Pending Withdrawal Requests</h2>
     <div class="overflow-x-auto">
       <table class="w-full table-auto border border-gray-700">
@@ -51,10 +45,7 @@
         <tbody id="withdrawalTableBody" class="text-white"></tbody>
       </table>
     </div>
-  </section>
-
-  <!-- Member Add/Edit Modal -->
-  <div id="memberModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+  </section>  <!-- Member Add/Edit Modal -->  <div id="memberModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
     <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md">
       <h3 id="modalTitle" class="text-xl font-semibold mb-4">Add Member</h3>
       <form id="memberForm" class="space-y-3">
@@ -70,10 +61,7 @@
         </div>
       </form>
     </div>
-  </div>
-
-  <script>
-    // Load members from user.json
+  </div>  <script>
     let members = [];
 
     async function fetchMembers() {
@@ -154,7 +142,6 @@
       }
     }
 
-    // Withdrawal request logic
     function renderWithdrawals() {
       const requests = JSON.parse(localStorage.getItem('withdrawRequests')||'[]');
       const tbody = document.getElementById('withdrawalTableBody');
@@ -187,6 +174,7 @@
       localStorage.setItem('withdrawalLog', JSON.stringify(log));
       renderWithdrawals();
     }
+
     function rejectWithdrawal(i) {
       const reqs = JSON.parse(localStorage.getItem('withdrawRequests')||'[]');
       reqs.splice(i,1);
@@ -194,12 +182,14 @@
       renderWithdrawals();
     }
 
-    // Initial load
+    function logout() {
+      localStorage.clear();
+      window.location.href = 'index.html';
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       fetchMembers();
       renderWithdrawals();
     });
-  </script>
-
-</body>
+  </script></body>
 </html>
