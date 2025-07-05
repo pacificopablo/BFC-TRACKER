@@ -2,60 +2,46 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Baccarat Fund Club - Member Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Baccarat Fund Club - Login</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-6">
-  <h1 class="text-4xl font-bold mb-8">Baccarat Fund Club</h1>
-  <p class="mb-6 text-center max-w-md">Enter your registered email to log in:</p>
-
+<body class="bg-gray-900 text-white flex items-center justify-center h-screen">
   <div class="w-full max-w-sm">
-    <input id="emailInput" type="email" placeholder="Enter your email"
-      class="w-full mb-4 p-3 rounded bg-gray-700 text-white" />
-    <button onclick="login()" class="bg-blue-600 hover:bg-blue-700 w-full py-3 rounded">Login</button>
-    <p id="errorMsg" class="text-red-500 text-center mt-2"></p>
+    <h1 class="text-3xl font-bold mb-4 text-center">🔐 Baccarat Fund Login</h1>
+    <input id="email" type="email" placeholder="Email" class="mb-2 w-full p-2 rounded bg-gray-700" />
+    <input id="password" type="password" placeholder="Password" class="mb-2 w-full p-2 rounded bg-gray-700" />
+    <button onclick="login()" class="w-full bg-blue-600 hover:bg-blue-700 p-2 rounded">Login</button>
+    <p id="loginMsg" class="mt-2 text-center"></p>
+    <div class="text-center mt-4">
+      <a href="register.html" class="text-blue-400">Register as Member</a>
+    </div>
   </div>
-
-  <div class="mt-8 text-center">
-    <a href="register.html" class="text-green-400 underline">Register New Member</a>
-  </div>
-
   <script>
-    const adminEmail = "smoakshadow@gmail.com";
-    const adminPassword = "Gvr@1030"; // <-- Set your admin password here
+    const ADMIN_EMAIL = "smoakshadow@gmail.com";
+    const ADMIN_PASS = "admin123";
 
     function login() {
-      const email = document.getElementById("emailInput").value.trim().toLowerCase();
-      const error = document.getElementById("errorMsg");
-      error.textContent = "";
+      const email = document.getElementById("email").value.trim().toLowerCase();
+      const pass = document.getElementById("password").value.trim();
+      const msg = document.getElementById("loginMsg");
 
-      if (!email) {
-        error.textContent = "Please enter your email.";
+      if (email === ADMIN_EMAIL && pass === ADMIN_PASS) {
+        localStorage.setItem("admin", true);
+        window.location.href = "admin.html";
         return;
       }
 
-      if (email === adminEmail) {
-        const pwd = prompt("Enter admin password:");
-        if (pwd === adminPassword) {
-          localStorage.setItem("role", "admin");
-          window.location.href = "dashboard.html";
-        } else {
-          error.textContent = "Incorrect admin password.";
-        }
-        return;
-      }
+      const members = JSON.parse(localStorage.getItem("newMembers") || "[]");
+      const match = members.find(m => m.email === email && pass === "member123");
 
-      const approved = JSON.parse(localStorage.getItem("newMembers") || "[]");
-      const member = approved.find(m => m.email === email);
-      if (!member) {
-        error.textContent = "Member not found or not yet approved.";
-        return;
+      if (match) {
+        localStorage.setItem("currentMember", JSON.stringify(match));
+        window.location.href = "dashboard.html";
+      } else {
+        msg.textContent = "❌ Invalid credentials or not approved yet.";
+        msg.className = "text-red-500";
       }
-
-      localStorage.setItem("role", "member");
-      localStorage.setItem("memberEmail", email);
-      window.location.href = "member-dashboard.html";
     }
   </script>
 </body>
