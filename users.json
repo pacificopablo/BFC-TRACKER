@@ -24,5 +24,17 @@
       "password": "pass456",
       "joinDate": "2025-02-15"
     }
+    [
+  {
+    "id": "1751710614214",
+    "name": "Regina Lopez",
+    "email": "regielizalopez@gmail.com",
+    "phone": "09558478333",
+    "shares": 500,
+    "balance": 5000,
+    "password": "1630Regina",
+    "joinDate": "2025-07-05"
+  }
+]
   ]
 }
