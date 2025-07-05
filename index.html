@@ -33,7 +33,7 @@
     const loginForm = document.getElementById('loginForm');
     const errorMsg = document.getElementById('errorMsg');
 
-    // Handle login form submission
+    // 🔐 Handle login
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorMsg.textContent = '';
@@ -42,29 +42,32 @@
       const password = loginForm.password.value.trim();
 
       try {
-        await signInWithEmailAndPassword(auth, email, password);
-        // Redirect to dashboard after successful login
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        console.log("✅ Login successful for:", user.email);
+        alert("✅ Login successful! Redirecting to dashboard...");
         window.location.href = 'dashboard.html';
       } catch (error) {
+        console.error("❌ Login error:", error.message);
         errorMsg.textContent = "❌ " + error.message;
       }
     });
 
-    // Auto redirect if user already logged in
+    // 🔄 Auto redirect if user already logged in
     onAuthStateChanged(auth, (user) => {
       if (user) {
+        console.log("🔁 Already logged in:", user.email);
         window.location.href = 'dashboard.html';
       }
     });
 
-    // Forgot password
+    // 🛠 Forgot password
     async function forgotPassword() {
       const email = prompt("Enter your registered email:");
       if (!email) return;
-
       try {
         await sendPasswordResetEmail(auth, email);
-        alert("📨 Password reset email sent. Check your inbox.");
+        alert("📨 Password reset email sent.");
       } catch (error) {
         alert("❌ " + error.message);
       }
