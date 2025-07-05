@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,7 +8,10 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 text-white p-4">
-  <h1 class="text-3xl font-bold mb-6">👑 Baccarat Fund Admin Dashboard</h1>  <!-- Summary Cards -->  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <h1 class="text-3xl font-bold mb-6">👑 Baccarat Fund Admin Dashboard</h1>
+
+  <!-- Summary Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
     <div class="bg-gray-800 p-4 rounded shadow">
       <p class="text-sm">Total Members</p>
       <p class="text-2xl font-bold" id="totalMembers">0</p>
@@ -20,14 +24,31 @@
       <p class="text-sm">Total Balance</p>
       <p class="text-2xl font-bold">₱<span id="totalBalance">0.00</span></p>
     </div>
-  </div>  <!-- Financial Chart -->  <div class="bg-gray-800 p-4 rounded shadow mb-6">
+  </div>
+
+  <!-- Financial Chart -->
+  <div class="bg-gray-800 p-4 rounded shadow mb-6">
     <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
     <canvas id="fundChart" height="100"></canvas>
-  </div>  <!-- Member Search -->  <input type="text" id="searchInput" placeholder="Search by name, email, or status..." class="mb-4 p-2 w-full rounded bg-gray-700 text-white" />  <!-- Member List -->  <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>  <!-- Top 5 Shareholders -->  <div class="bg-gray-800 p-4 mt-8 rounded shadow">
+  </div>
+
+  <!-- Member Search -->
+  <input type="text" id="searchInput" placeholder="Search by name, email, or status..." class="mb-4 p-2 w-full rounded bg-gray-700 text-white" />
+
+  <!-- Member List -->
+  <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+  <!-- Top 5 Shareholders -->
+  <div class="bg-gray-800 p-4 mt-8 rounded shadow">
     <h2 class="text-xl font-bold mb-2">🏆 Top 5 Shareholders</h2>
     <ul id="topShareholders" class="list-disc list-inside text-sm"></ul>
-  </div>  <!-- Transaction Requests -->  <h2 class="text-2xl font-bold mt-10 mb-4">💰 Deposit & Cash Out Requests</h2>
-  <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>  <script type="module">
+  </div>
+
+  <!-- Transaction Requests -->
+  <h2 class="text-2xl font-bold mt-10 mb-4">💰 Deposit & Cash Out Requests</h2>
+  <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>
+
+  <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import {
       getFirestore, collection, getDocs, doc, updateDoc,
@@ -43,11 +64,9 @@
       appId: "1:127052459580:web:c3d5caa9302238c11cdd39"
     };
 
-    // Initialize Firebase & Firestore
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // DOM Elements
     const totalMembers = document.getElementById("totalMembers");
     const totalShares = document.getElementById("totalShares");
     const totalBalance = document.getElementById("totalBalance");
@@ -62,7 +81,6 @@
       return parseFloat(value).toLocaleString("en-PH", { minimumFractionDigits: 2 });
     }
 
-    // Load and display members
     async function loadMembers() {
       const snapshot = await getDocs(collection(db, "users"));
       allMembers = [];
@@ -113,7 +131,6 @@
       });
     }
 
-    // Search filter
     searchInput.addEventListener("input", () => {
       const queryText = searchInput.value.toLowerCase();
       const filtered = allMembers.filter(m =>
@@ -124,7 +141,6 @@
       displayMembers(filtered);
     });
 
-    // Listen for and calculate approved "buy" share transactions
     function listenForShareTransactions() {
       const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
       onSnapshot(q, snapshot => {
@@ -141,7 +157,6 @@
       });
     }
 
-    // Admin request listener with Approve button
     function listenForRequests() {
       const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
       onSnapshot(q, snapshot => {
@@ -169,7 +184,6 @@
       });
     }
 
-    // Approve transaction: update user and transaction
     window.approveTransaction = async (txId, userId, shares) => {
       const userRef = doc(db, "users", userId);
       const txRef = doc(db, "transactions", txId);
@@ -190,12 +204,11 @@
       }
     };
 
-    // Initialize everything
     loadMembers();
     listenForRequests();
     listenForShareTransactions();
 
-    // Example static chart (replace with real data if needed)
+    // Static chart example - replace with live data if you want
     const ctx = document.getElementById('fundChart').getContext('2d');
     new Chart(ctx, {
       type: 'line',
@@ -220,5 +233,6 @@
         }
       }
     });
-  </script></body>
+  </script>
+</body>
 </html>
