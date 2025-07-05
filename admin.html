@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Baccarat Fund Admin Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 text-white p-4">
   <h1 class="text-3xl font-bold mb-6">👑 Baccarat Fund Admin Dashboard</h1>
-
+  
   <!-- Summary Cards -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
     <div class="bg-gray-800 p-4 rounded shadow">
@@ -24,6 +24,24 @@
       <p class="text-sm">Total Balance</p>
       <p class="text-2xl font-bold">₱<span id="totalBalance">0.00</span></p>
     </div>
+  </div>
+
+  <!-- Place Shares Form -->
+  <div class="bg-gray-800 p-4 rounded shadow mb-6">
+    <h2 class="text-xl font-bold mb-2">📈 Place Shares</h2>
+    <form id="placeSharesForm" class="space-y-4">
+      <div>
+        <label for="memberSelect" class="block text-sm">Select Member</label>
+        <select id="memberSelect" class="p-2 w-full rounded bg-gray-700 text-white" required>
+          <option value="">Select a member</option>
+        </select>
+      </div>
+      <div>
+        <label for="sharesInput" class="block text-sm">Number of Shares</label>
+        <input type="number" id="sharesInput" min="1" class="p-2 w-full rounded bg-gray-700 text-white" placeholder="Enter number of shares" required />
+      </div>
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Place Shares</button>
+    </form>
   </div>
 
   <!-- Financial Chart -->
@@ -50,9 +68,9 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import {
-      getFirestore, collection, getDocs, doc, updateDoc,
-      query, orderBy, onSnapshot, getDoc
+    import { 
+      getFirestore, collection, getDocs, doc, updateDoc, addDoc, 
+      query, orderBy, onSnapshot 
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -74,21 +92,45 @@
     const topShareholders = document.getElementById("topShareholders");
     const searchInput = document.getElementById("searchInput");
     const requestsList = document.getElementById("requestsList");
+    const memberSelect = document.getElementById("memberSelect");
+    const placeSharesForm = document.getElementById("placeSharesForm");
 
     let allMembers = [];
+    let fundChartInstance;
 
     function formatCurrency(value) {
       return parseFloat(value).toLocaleString("en-PH", { minimumFractionDigits: 2 });
     }
 
-    async function loadMembers() {
+    // Populate member select dropdown
+    async function populateMemberSelect() {
       const snapshot = await getDocs(collection(db, "users"));
-      allMembers = [];
+      memberSelect.innerHTML = '<option value="">Select a member</option>';
       snapshot.forEach(docSnap => {
-        allMembers.push({ id: docSnap.id, ...docSnap.data() });
+        const data = docSnap.data();
+        if (data.status === 'approved') {
+          const option = document.createElement("option");
+          option.value = docSnap.id;
+          option.textContent = data.name;
+          memberSelect.appendChild(option);
+        }
       });
-      displayMembers(allMembers);
-      updateTopShareholders();
+    }
+
+    // Load members with real-time updates
+    function loadMembers() {
+      const q = query(collection(db, "users"));
+      onSnapshot(q, (snapshot) => {
+        allMembers = [];
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          allMembers.push({ id: docSnap.id, ...data });
+        });
+        displayMembers(allMembers);
+        updateTopShareholders();
+        updateFundChart();
+        populateMemberSelect();
+      });
     }
 
     function displayMembers(members) {
@@ -124,115 +166,169 @@
         .slice(0, 5);
 
       topShareholders.innerHTML = "";
-      top.forEach(m => {
+      top.forEach((m, i) => {
         const li = document.createElement("li");
         li.textContent = `${m.name} — ${m.shares} shares`;
         topShareholders.appendChild(li);
       });
     }
 
-    searchInput.addEventListener("input", () => {
-      const queryText = searchInput.value.toLowerCase();
+    search webinarsInput.addEventListener("input", () => {
+      const query = searchInput.value.toLowerCase();
       const filtered = allMembers.filter(m =>
-        m.name.toLowerCase().includes(queryText) ||
-        m.email.toLowerCase().includes(queryText) ||
-        m.status.toLowerCase().includes(queryText)
+        m.name.toLowerCase().includes(query) ||
+        m.email.toLowerCase().includes(query) ||
+        m.status.toLowerCase().includes(query)
       );
       displayMembers(filtered);
     });
 
-    function listenForShareTransactions() {
-      const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
-      onSnapshot(q, snapshot => {
-        let totalSh = 0, totalVal = 0;
-        snapshot.forEach(docSnap => {
-          const data = docSnap.data();
-          if (data.status === "approved" && data.type === "buy") {
-            totalSh += data.shares || 0;
-            totalVal += (data.shares || 0) * 10;
-          }
-        });
-        totalShares.textContent = totalSh;
-        totalBalance.textContent = formatCurrency(totalVal);
-      });
-    }
-
     function listenForRequests() {
       const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
-      onSnapshot(q, snapshot => {
+      onSnapshot(q, (snapshot) => {
         requestsList.innerHTML = "";
         snapshot.forEach(docSnap => {
           const data = docSnap.data();
-          const id = docSnap.id;
-          if (data.status === "pending" && data.type === "buy") {
+          if (data.status === "pending") {
             const div = document.createElement("div");
             div.className = "bg-gray-700 p-4 rounded";
             div.innerHTML = `
               <p><strong>Member:</strong> ${data.memberName}</p>
               <p><strong>Type:</strong> ${data.type}</p>
-              <p><strong>Shares:</strong> ${data.shares}</p>
               <p><strong>Amount:</strong> ₱${formatCurrency(data.amount)}</p>
               <p><strong>Date:</strong> ${data.timestamp?.toDate().toLocaleString() || "N/A"}</p>
-              <button class="mt-2 px-3 py-1 bg-green-600 rounded text-sm" onclick="approveTransaction('${id}', '${data.userId}', ${data.shares})">✅ Approve</button>
+              <button class="approve-btn bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded mt-2" data-id="${docSnap.id}" data-member-id="${data.memberId}">Approve</button>
+              <button class="reject-btn bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded mt-2" data-id="${docSnap.id}">Reject</button>
             `;
             requestsList.appendChild(div);
           }
         });
-        if (!requestsList.innerHTML) {
+        if (requestsList.innerHTML === "") {
           requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
         }
       });
     }
 
-    window.approveTransaction = async (txId, userId, shares) => {
-      const userRef = doc(db, "users", userId);
-      const txRef = doc(db, "transactions", txId);
-      try {
-        const userSnap = await getDoc(userRef);
-        if (!userSnap.exists()) throw new Error("User not found");
-        const userData = userSnap.data();
-        const newShares = (userData.shares || 0) + shares;
-        const newBalance = (userData.balance || 0) + (shares * 10);
-        await updateDoc(userRef, { shares: newShares, balance: newBalance });
-        await updateDoc(txRef, { status: "approved", applied: true });
-        alert("✅ Transaction approved and user updated!");
-        loadMembers();
-        listenForShareTransactions();
-      } catch (error) {
-        console.error("❌ Approval error:", error);
-        alert("❌ Failed to approve transaction. Check console.");
-      }
-    };
+    // Handle transaction approval/rejection
+    requestsList.addEventListener("click", async (e) => {
+      if (e.target.classList.contains("approve-btn") || e.target.classList.contains("reject-btn")) {
+        const transactionId = e.target.dataset.id;
+        const transactionRef = doc(db, "transactions", transactionId);
+        const isApprove = e.target.classList.contains("approve-btn");
+        const memberId = e.target.dataset.memberId;
 
-    loadMembers();
-    listenForRequests();
-    listenForShareTransactions();
+        try {
+          if (isApprove) {
+            const transactionSnap = await getDoc(transactionRef);
+            const transactionData = transactionSnap.data();
+            if (transactionData.type === "deposit") {
+              const memberRef = doc(db, "users", memberId);
+              const memberSnap = await getDoc(memberRef);
+              const memberData = memberSnap.data();
+              const newShares = (memberData.shares || 0) + (transactionData.shares || 0);
+              const newBalance = (memberData.balance || 0) + transactionData.amount;
 
-    // Static chart example - replace with live data if you want
-    const ctx = document.getElementById('fundChart').getContext('2d');
-    new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        datasets: [{
-          label: 'Fund Balance',
-          data: [15000, 18000, 21000, 25000, 29000, 34000],
-          backgroundColor: 'rgba(59, 130, 246, 0.2)',
-          borderColor: 'rgba(59, 130, 246, 1)',
-          borderWidth: 2,
-          fill: true,
-          tension: 0.3
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { labels: { color: 'white' } } },
-        scales: {
-          x: { ticks: { color: 'white' } },
-          y: { ticks: { color: 'white' }, beginAtZero: true }
+              await updateDoc(memberRef, {
+                shares: newShares,
+                balance: newBalance
+              });
+            }
+            await updateDoc(transactionRef, { status: isApprove ? "approved" : "rejected" });
+          } else {
+            await updateDoc(transactionRef, { status: "rejected" });
+          }
+        } catch (error) {
+          console.error("Error processing transaction:", error);
         }
       }
     });
+
+    // Handle share placement
+    placeSharesForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const memberId = memberSelect.value;
+      const shares = parseInt(document.getElementById("sharesInput").value);
+      const amount = shares * 10; // 1 share = 10 pesos
+
+      if (!memberId || shares <= 0) {
+        alert("Please select a member and enter a valid number of shares.");
+        return;
+      }
+
+      try {
+        // Add transaction to Firestore
+        await addDoc(collection(db, "transactions"), {
+          memberId,
+          memberName: allMembers.find(m => m.id === memberId).name,
+          type: "deposit",
+          amount,
+          shares,
+          status: "pending",
+          timestamp: new Date()
+        });
+        alert(`Successfully submitted ${shares} shares (₱${formatCurrency(amount)}) for approval.`);
+        placeSharesForm.reset();
+      } catch (error) {
+        console.error("Error placing shares:", error);
+        alert("Failed to place shares. Please try again.");
+      }
+    });
+
+    // Initialize chart
+    function initializeFundChart() {
+      const ctx = document.getElementById('fundChart').getContext('2d');
+      fundChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+          datasets: [{
+            label: 'Fund Balance',
+            data: [15000, 18000, 21000, 25000, 29000, 34000],
+            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+            borderColor: 'rgba(59, 130, 246, 1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { labels: { color: 'white' } } },
+          scales: {
+            x: { ticks: { color: 'white' } },
+            y: { ticks: { color: 'white' }, beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    // Update chart with real data
+    async function updateFundChart() {
+      const snapshot = await getDocs(query(collection(db, "transactions"), orderBy("timestamp", "asc")));
+      const balances = [];
+      const labels = [];
+      let runningBalance = 0;
+
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.status === "approved") {
+          runningBalance += data.amount;
+          labels.push(data.timestamp.toDate().toLocaleString('default', { month: 'short' }));
+          balances.push(runningBalance);
+        }
+      });
+
+      if (fundChartInstance) {
+        fundChartInstance.data.labels = labels.length > 0 ? labels : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+        fundChartInstance.data.datasets[0].data = balances.length > 0 ? balances : [15000, 18000, 21000, 25000, 29000, 34000];
+        fundChartInstance.update();
+      }
+    }
+
+    // Initialize
+    loadMembers();
+    listenForRequests();
+    initializeFundChart();
   </script>
 </body>
 </html>
