@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LocalStorage Admin Panel - Baccarat Fund Club</title>
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+<style>
+  input, select {
+    background-color: #1f2937; /* Tailwind gray-800 */
+    color: white;
+  }
+</style>
+</head>
+<body class="bg-gray-900 text-white p-6 min-h-screen">
+
+  <h1 class="text-4xl font-bold mb-6 text-center">🛠️ LocalStorage Admin Panel</h1>
+
+  <div class="max-w-7xl mx-auto space-y-10">
+
+    <!-- Pending Members Section -->
+    <section>
+      <h2 class="text-2xl font-semibold mb-2">⏳ Pending Members</h2>
+      <div class="mb-4 space-x-2">
+        <button onclick="exportMembers('pendingMembers')" class="bg-blue-600 px-3 py-1 rounded hover:bg-blue-700">Export Pending JSON</button>
+        <input type="file" id="importPendingFile" accept=".json" style="display:none" onchange="importMembers(event, 'pendingMembers')" />
+        <button onclick="document.getElementById('importPendingFile').click()" class="bg-green-600 px-3 py-1 rounded hover:bg-green-700">Import Pending JSON</button>
+      </div>
+      <table class="w-full table-auto border-collapse border border-gray-700">
+        <thead>
+          <tr class="bg-gray-800">
+            <th class="border border-gray-600 p-2">Name</th>
+            <th class="border border-gray-600 p-2">Email</th>
+            <th class="border border-gray-600 p-2">Phone</th>
+            <th class="border border-gray-600 p-2">Shares</th>
+            <th class="border border-gray-600 p-2">Balance (₱)</th>
+            <th class="border border-gray-600 p-2">Password</th>
+            <th class="border border-gray-600 p-2">Join Date</th>
+            <th class="border border-gray-600 p-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="pendingTableBody" class="divide-y divide-gray-700"></tbody>
+      </table>
+    </section>
+
+    <!-- Approved Members Section -->
+    <section>
+      <h2 class="text-2xl font-semibold mb-2">✅ Approved Members</h2>
+      <div class="mb-4 space-x-2">
+        <button onclick="exportMembers('approvedMembers')" class="bg-blue-600 px-3 py-1 rounded hover:bg-blue-700">Export Approved JSON</button>
+        <input type="file" id="importApprovedFile" accept=".json" style="display:none" onchange="importMembers(event, 'approvedMembers')" />
+        <button onclick="document.getElementById('importApprovedFile').click()" class="bg-green-600 px-3 py-1 rounded hover:bg-green-700">Import Approved JSON</button>
+      </div>
+      <table class="w-full table-auto border-collapse border border-gray-700">
+        <thead>
+          <tr class="bg-gray-800">
+            <th class="border border-gray-600 p-2">Name</th>
+            <th class="border border-gray-600 p-2">Email</th>
+            <th class="border border-gray-600 p-2">Phone</th>
+            <th class="border border-gray-600 p-2">Shares</th>
+            <th class="border border-gray-600 p-2">Balance (₱)</th>
+            <th class="border border-gray-600 p-2">Password</th>
+            <th class="border border-gray-600 p-2">Join Date</th>
+            <th class="border border-gray-600 p-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="approvedTableBody" class="divide-y divide-gray-700"></tbody>
+      </table>
+    </section>
+
+  </div>
+
+<script>
+  // Helper: Get localStorage members or empty array
+  function getLocalStorageMembers(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key)) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  // Helper: Save members list to localStorage
+  function saveLocalStorageMembers(key, data) {
+    localStorage.setItem(key, JSON.stringify(data));
+  }
+
+  // Render table rows for a list of members
+  function renderTable(tbodyId, members, isPending) {
+    const tbody = document.getElementById(tbodyId);
+    tbody.innerHTML = '';
+
+    if (members.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4">No ${isPending ? 'pending' : 'approved'} members</td></tr>`;
+      return;
+    }
+
+    members.forEach((member, i) => {
+      const tr = document.createElement('tr');
+
+      tr.innerHTML = `
+        <td class="border border-gray-600 p-2"><input type="text" value="${member.name || ''}" onchange="editMember('${tbodyId}', ${i}, 'name', this.value)" /></td>
+        <td class="border border-gray-600 p-2"><input type="email" value="${member.email || ''}" onchange="editMember('${tbodyId}', ${i}, 'email', this.value.toLowerCase())" /></td>
+        <td class="border border-gray-600 p-2"><input type="text" value="${member.phone || ''}" onchange="editMember('${tbodyId}', ${i}, 'phone', this.value)" /></td>
+        <td class="border border-gray-600 p-2"><input type="number" min="1" value="${member.shares || 0}" onchange="editMember('${tbodyId}', ${i}, 'shares', this.value)" /></td>
+        <td class="border border-gray-600 p-2"><input type="number" min="0" step="0.01" value="${member.balance || 0}" onchange="editMember('${tbodyId}', ${i}, 'balance', this.value)" /></td>
+        <td class="border border-gray-600 p-2"><input type="text" value="${member.password || ''}" onchange="editMember('${tbodyId}', ${i}, 'password', this.value)" /></td>
+        <td class="border border-gray-600 p-2">${member.joinDate || ''}</td>
+        <td class="border border-gray-600 p-2 space-x-2">
+          ${isPending ? `<button onclick="approveMember(${i})" class="bg-green-600 px-2 py-1 rounded">Approve</button>` : ''}
+          <button onclick="deleteMember('${tbodyId}', ${i})" class="bg-red-600 px-2 py-1 rounded">Delete</button>
+        </td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Edit member field handler
+  function editMember(tbodyId, index, field, value) {
+    const key = tbodyId === 'pendingTableBody' ? 'pendingMembers' : 'approvedMembers';
+    const members = getLocalStorageMembers(key);
+
+    if (!members[index]) return;
+    members[index][field] = field === 'shares' || field === 'balance' ? Number(value) : value;
+
+    saveLocalStorageMembers(key, members);
+  }
+
+  // Approve a pending member (move to approved)
+  function approveMember(index) {
+    const pending = getLocalStorageMembers('pendingMembers');
+    const approved = getLocalStorageMembers('approvedMembers');
+
+    const member = pending.splice(index, 1)[0];
+    if (!member) return;
+
+    approved.push(member);
+
+    saveLocalStorageMembers('pendingMembers', pending);
+    saveLocalStorageMembers('approvedMembers', approved);
+
+    renderTable('pendingTableBody', pending, true);
+    renderTable('approvedTableBody', approved, false);
+  }
+
+  // Delete a member from pending or approved
+  function deleteMember(tbodyId, index) {
+    const key = tbodyId === 'pendingTableBody' ? 'pendingMembers' : 'approvedMembers';
+    const members = getLocalStorageMembers(key);
+
+    members.splice(index, 1);
+    saveLocalStorageMembers(key, members);
+
+    renderTable(tbodyId, members, key === 'pendingMembers');
+  }
+
+  // Export members as JSON file
+  function exportMembers(key) {
+    const members = getLocalStorageMembers(key);
+    const dataStr = JSON.stringify(members, null, 2);
+    const blob = new Blob([dataStr], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${key}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // Import members from JSON file input
+  function importMembers(event, key) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const importedMembers = JSON.parse(e.target.result);
+
+        if (!Array.isArray(importedMembers)) {
+          alert('Invalid JSON file format. Must be an array of members.');
+          return;
+        }
+
+        // Optionally validate member objects here
+
+        // Merge with existing members, avoiding duplicates by email
+        const currentMembers = getLocalStorageMembers(key);
+        const emails = new Set(currentMembers.map(m => m.email.toLowerCase()));
+
+        const merged = [...currentMembers];
+        for (const m of importedMembers) {
+          if (m.email && !emails.has(m.email.toLowerCase())) {
+            merged.push(m);
+            emails.add(m.email.toLowerCase());
+          }
+        }
+
+        saveLocalStorageMembers(key, merged);
+        renderTable(key === 'pendingMembers' ? 'pendingTableBody' : 'approvedTableBody', merged, key === 'pendingMembers');
+        alert(`Successfully imported ${importedMembers.length} members into ${key}.`);
+      } catch(err) {
+        alert('Error parsing JSON file: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+
+    // Clear input value so same file can be imported multiple times
+    event.target.value = '';
+  }
+
+  // Initial render
+  function loadAll() {
+    renderTable('pendingTableBody', getLocalStorageMembers('pendingMembers'), true);
+    renderTable('approvedTableBody', getLocalStorageMembers('approvedMembers'), false);
+  }
+
+  loadAll();
+
+</script>
+
+</body>
+</html>
