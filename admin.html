@@ -1,8 +1,9 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Baccarat Fund Admin Dashboard</title>
+  <title>Admin Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
@@ -17,24 +18,34 @@
   </div>
 
   <input type="text" id="searchInput" placeholder="Search by name, email, or status..." class="mb-4 p-2 w-full rounded bg-gray-700 text-white" />
-  <button onclick="exportCSV()" class="bg-blue-600 px-4 py-2 rounded mb-4">⬇️ Export to CSV</button>
 
-  <div class="mb-6">
-    <canvas id="statusChart" class="bg-white rounded p-2"></canvas>
-  </div>
-
-  <p id="loadingText" class="text-gray-400 mb-4">Loading members...</p>
   <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
 
-  <h2 class="text-2xl font-bold mt-8 mb-4">💸 Withdrawal Requests</h2>
-  <div id="withdrawalsList" class="space-y-4"></div>
+  <!-- Edit Member Modal -->
+  <div id="editModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-50">
+    <div class="bg-white text-black p-6 rounded-lg w-full max-w-md">
+      <h2 class="text-xl font-bold mb-4">Edit Member</h2>
+      <input id="editName" class="mb-2 w-full p-2 border rounded" placeholder="Name" />
+      <input id="editEmail" class="mb-2 w-full p-2 border rounded" placeholder="Email" />
+      <input id="editShares" type="number" class="mb-2 w-full p-2 border rounded" placeholder="Shares" />
+      <input id="editBalance" type="number" class="mb-2 w-full p-2 border rounded" placeholder="Balance" />
+      <select id="editStatus" class="mb-4 w-full p-2 border rounded">
+        <option value="pending">Pending</option>
+        <option value="approved">Approved</option>
+      </select>
+      <div class="flex justify-end space-x-2">
+        <button id="closeModal" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
+        <button id="saveEdit" class="bg-blue-600 text-white px-4 py-2 rounded">Save Changes</button>
+      </div>
+    </div>
+  </div>
 
-  <!-- Single Module Script -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import {
+      getFirestore, collection, getDocs, doc, updateDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
       authDomain: "bfc-tracker.firebaseapp.com",
@@ -46,222 +57,83 @@
       measurementId: "G-PNYRCFJHYM"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // DOM elements
     const membersList = document.getElementById("membersList");
-    const withdrawalsList = document.getElementById("withdrawalsList");
     const totalMembers = document.getElementById("totalMembers");
     const totalShares = document.getElementById("totalShares");
     const totalBalance = document.getElementById("totalBalance");
-    const loadingText = document.getElementById("loadingText");
     const searchInput = document.getElementById("searchInput");
 
-    let memberData = [];
-    let currentPage = 1;
-    const itemsPerPage = 5;
+    let currentEditId = null;
 
-    function createMemberCard(data, id) {
-      const div = document.createElement("div");
-      div.className = "bg-gray-800 p-4 rounded shadow";
-      const statusColor = data.status === "approved" ? "bg-green-500" : "bg-yellow-500";
-      div.innerHTML = `
-        <p><strong>Name:</strong> ${data.name}</p>
-        <p><strong>Email:</strong> ${data.email}</p>
-        <p><strong>Status:</strong> 
-          <span class="px-2 py-1 text-xs font-semibold rounded ${statusColor}">
-            ${data.status}
-          </span>
-        </p>
-        <p><strong>Shares:</strong> ${data.shares}</p>
-        <p><strong>Balance:</strong> ₱${data.balance}</p>
-        ${data.status !== "approved" ? `<button class="bg-green-600 px-2 py-1 mt-2 rounded" onclick="approveUser('${id}')">Approve</button>` : ""}
-        <button class="bg-red-600 px-2 py-1 mt-2 ml-2 rounded" onclick="deleteUser('${id}')">Delete</button>
-        <div class="mt-2">
-          <button onclick="loadTransactions('${id}')" class="bg-purple-600 px-2 py-1 rounded">📈 View Transactions</button>
-          <div id="tx-${id}" class="mt-2 text-sm text-gray-300 hidden"></div>
-        </div>
-      `;
-      return div;
-    }
+    const modal = document.getElementById("editModal");
+    const editName = document.getElementById("editName");
+    const editEmail = document.getElementById("editEmail");
+    const editShares = document.getElementById("editShares");
+    const editBalance = document.getElementById("editBalance");
+    const editStatus = document.getElementById("editStatus");
+    const closeModal = document.getElementById("closeModal");
+    const saveEdit = document.getElementById("saveEdit");
 
-    function renderPaginatedMembers(data) {
-      membersList.innerHTML = "";
-      const start = (currentPage - 1) * itemsPerPage;
-      const pageData = data.slice(start, start + itemsPerPage);
-      pageData.forEach(m => membersList.appendChild(createMemberCard(m, m.id)));
-      renderPaginationControls(data.length);
-    }
-
-    function renderPaginationControls(totalItems) {
-      const totalPages = Math.ceil(totalItems / itemsPerPage);
-      const nav = document.createElement("div");
-      nav.className = "flex justify-center space-x-2 mt-4";
-      for (let i = 1; i <= totalPages; i++) {
-        const btn = document.createElement("button");
-        btn.textContent = i;
-        btn.className = `px-3 py-1 rounded ${i === currentPage ? 'bg-blue-600' : 'bg-gray-600'}`;
-        btn.onclick = () => {
-          currentPage = i;
-          renderPaginatedMembers(memberData);
-        };
-        nav.appendChild(btn);
-      }
-      membersList.appendChild(nav);
-    }
+    closeModal.onclick = () => modal.classList.add("hidden");
 
     async function loadMembers() {
-      loadingText.style.display = "block";
       const querySnapshot = await getDocs(collection(db, "users"));
       let memberCount = 0, shareTotal = 0, balanceTotal = 0;
-      let approvedCount = 0, pendingCount = 0;
-      const now = new Date();
-
-      memberData = [];
       membersList.innerHTML = "";
 
-      for (const docSnap of querySnapshot.docs) {
+      querySnapshot.forEach((docSnap) => {
         const data = docSnap.data();
         const id = docSnap.id;
-
-        if (data.status === "pending" && data.createdAt?.toDate) {
-          const ageInDays = (now - data.createdAt.toDate()) / (1000 * 60 * 60 * 24);
-          if (ageInDays > 7) {
-            await deleteDoc(doc(db, "users", id));
-            continue;
-          }
-        }
-
         memberCount++;
         shareTotal += data.shares;
         balanceTotal += data.balance;
-        if (data.status === "approved") approvedCount++;
-        if (data.status === "pending") pendingCount++;
 
-        memberData.push({ id, ...data });
-      }
+        const div = document.createElement("div");
+        div.className = "bg-gray-800 p-4 rounded shadow";
+        div.innerHTML = `
+          <p><strong>Name:</strong> ${data.name}</p>
+          <p><strong>Email:</strong> ${data.email}</p>
+          <p><strong>Status:</strong> ${data.status}</p>
+          <p><strong>Shares:</strong> ${data.shares}</p>
+          <p><strong>Balance:</strong> ₱${data.balance}</p>
+          <button class="bg-blue-600 px-2 py-1 mt-2 rounded" onclick="editMember('${id}', '${data.name}', '${data.email}', ${data.shares}, ${data.balance}, '${data.status}')">Edit</button>
+        `;
+        membersList.appendChild(div);
+      });
 
       totalMembers.textContent = memberCount;
       totalShares.textContent = shareTotal;
       totalBalance.textContent = balanceTotal.toFixed(2);
-      loadingText.style.display = "none";
-
-      drawChart(approvedCount, pendingCount);
-      renderPaginatedMembers(memberData);
     }
 
-    function drawChart(approved, pending) {
-      const ctx = document.getElementById('statusChart').getContext('2d');
-      new Chart(ctx, {
-        type: 'pie',
-        data: {
-          labels: ['Approved', 'Pending'],
-          datasets: [{
-            data: [approved, pending],
-            backgroundColor: ['#10B981', '#F59E0B']
-          }]
-        }
-      });
-    }
+    window.editMember = (id, name, email, shares, balance, status) => {
+      currentEditId = id;
+      editName.value = name;
+      editEmail.value = email;
+      editShares.value = shares;
+      editBalance.value = balance;
+      editStatus.value = status;
+      modal.classList.remove("hidden");
+    };
 
-    window.approveUser = async (id) => {
-      await updateDoc(doc(db, "users", id), { status: "approved" });
+    saveEdit.onclick = async () => {
+      if (!currentEditId) return;
+      const updatedData = {
+        name: editName.value,
+        email: editEmail.value,
+        shares: Number(editShares.value),
+        balance: Number(editBalance.value),
+        status: editStatus.value
+      };
+      await updateDoc(doc(db, "users", currentEditId), updatedData);
+      modal.classList.add("hidden");
       loadMembers();
     };
 
-    window.deleteUser = async (id) => {
-      if (confirm("Are you sure you want to delete this user?")) {
-        await deleteDoc(doc(db, "users", id));
-        loadMembers();
-      }
-    };
-
-    searchInput.addEventListener("input", (e) => {
-      const keyword = e.target.value.toLowerCase();
-      const filtered = memberData.filter(m =>
-        m.name.toLowerCase().includes(keyword) ||
-        m.email.toLowerCase().includes(keyword) ||
-        m.status.toLowerCase().includes(keyword)
-      );
-      currentPage = 1;
-      renderPaginatedMembers(filtered);
-    });
-
-    window.exportCSV = () => {
-      const rows = [["Name", "Email", "Status", "Shares", "Balance"]];
-      memberData.forEach(m => {
-        rows.push([m.name, m.email, m.status, m.shares, m.balance]);
-      });
-      const csv = rows.map(r => r.join(",")).join("\n");
-      const blob = new Blob([csv], { type: "text/csv" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "members.csv";
-      a.click();
-    };
-
-    window.loadTransactions = async (userId) => {
-      const txDiv = document.getElementById("tx-" + userId);
-      if (!txDiv) return;
-      if (txDiv.style.display === "block") {
-        txDiv.style.display = "none";
-        txDiv.innerHTML = "";
-        return;
-      }
-      txDiv.style.display = "block";
-      txDiv.innerHTML = "Loading...";
-
-      const q = query(collection(db, "transactions"), where("userId", "==", userId));
-      const txSnap = await getDocs(q);
-
-      if (txSnap.empty) {
-        txDiv.innerHTML = "No transactions found.";
-        return;
-      }
-
-      txDiv.innerHTML = "<ul>";
-      txSnap.forEach(tx => {
-        const t = tx.data();
-        txDiv.innerHTML += `<li>[${t.date}] ${t.type.toUpperCase()}: ${t.shares} shares</li>`;
-      });
-      txDiv.innerHTML += "</ul>";
-    };
-
-    async function loadWithdrawals() {
-      const snap = await getDocs(collection(db, "withdrawals"));
-      withdrawalsList.innerHTML = "";
-      snap.forEach(doc => {
-        const w = doc.data();
-        const div = document.createElement("div");
-        div.className = "bg-gray-800 p-4 rounded";
-        div.innerHTML = `
-          <p><strong>User:</strong> ${w.name}</p>
-          <p><strong>Amount:</strong> ₱${w.amount}</p>
-          <p><strong>Status:</strong> ${w.status}</p>
-          <p><strong>Date:</strong> ${w.date || "—"}</p>
-          ${w.status === "pending" ? `
-            <button onclick="approveWithdrawal('${doc.id}')" class="bg-green-600 px-2 py-1 mt-2 mr-2 rounded">Approve</button>
-            <button onclick="rejectWithdrawal('${doc.id}')" class="bg-red-600 px-2 py-1 mt-2 rounded">Reject</button>
-          ` : ""}
-        `;
-        withdrawalsList.appendChild(div);
-      });
-    }
-
-    window.approveWithdrawal = async (id) => {
-      await updateDoc(doc(db, "withdrawals", id), { status: "approved" });
-      loadWithdrawals();
-    };
-
-    window.rejectWithdrawal = async (id) => {
-      await updateDoc(doc(db, "withdrawals", id), { status: "rejected" });
-      loadWithdrawals();
-    };
-
     loadMembers();
-    loadWithdrawals();
   </script>
 </body>
 </html>
