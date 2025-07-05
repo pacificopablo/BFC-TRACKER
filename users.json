@@ -1,0 +1,28 @@
+{
+  "admin": {
+    "email": "smoakshadow@gmail.com",
+    "password": "admin123"
+  },
+  "members": [
+    {
+      "id": "1",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "phone": "09171234567",
+      "shares": 10,
+      "balance": 100,
+      "password": "pass123",
+      "joinDate": "2025-01-01"
+    },
+    {
+      "id": "2",
+      "name": "Jane Smith",
+      "email": "jane@example.com",
+      "phone": "09179876543",
+      "shares": 5,
+      "balance": 50,
+      "password": "pass456",
+      "joinDate": "2025-02-15"
+    }
+  ]
+}
