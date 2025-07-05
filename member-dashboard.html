@@ -32,60 +32,63 @@
       </div>
       <button type="submit" class="bg-yellow-500 px-4 py-2 rounded hover:bg-yellow-600">📤 Submit Request</button>
     </form>
-    <p id="withdrawStatus" class="mt-4 text-green-400 hidden">Request submitted successfully!</p>
+    <p id="withdrawStatus" class="mt-4 text-green-400 hidden">✅ Request submitted!</p>
   </section>
 
-  <script>
-    let currentUser = null;
+  <script type="module">
+    import { auth, db } from './firebase-config.js';
+    import {
+      onAuthStateChanged, signOut
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import {
+      doc, getDoc, addDoc, collection, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    function logout() {
-      localStorage.clear();
-      window.location.href = 'index.html';
-    }
+    let currentUserData = null;
 
-    async function loadMember() {
-      const email = localStorage.getItem('memberEmail');
-      if (!email) return logout();
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return window.location.href = "index.html";
 
-      try {
-        const res = await fetch('user.json');
-        const users = await res.json();
-        currentUser = users.find(u => u.email === email);
-        if (!currentUser) return logout();
-
-        document.getElementById('welcomeMessage').textContent = `Welcome, ${currentUser.name}`;
-        document.getElementById('memberShares').textContent = currentUser.shares;
-        document.getElementById('memberBalance').textContent = currentUser.balance.toFixed(2);
-      } catch (e) {
-        console.error('User data could not be loaded');
-        logout();
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (!userDoc.exists() || userDoc.data().status !== "approved") {
+        alert("❌ Access denied. You are not approved.");
+        return window.location.href = "index.html";
       }
-    }
 
-    document.getElementById('withdrawForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const amount = parseFloat(document.getElementById('withdrawAmount').value);
-      const note = document.getElementById('withdrawNote').value;
-
-      if (!amount || amount <= 0) return;
-
-      const request = {
-        email: currentUser.email,
-        amount: amount,
-        note: note,
-        date: new Date().toISOString()
-      };
-
-      const requests = JSON.parse(localStorage.getItem('withdrawRequests') || '[]');
-      requests.push(request);
-      localStorage.setItem('withdrawRequests', JSON.stringify(requests));
-
-      document.getElementById('withdrawForm').reset();
-      document.getElementById('withdrawStatus').classList.remove('hidden');
-      setTimeout(() => document.getElementById('withdrawStatus').classList.add('hidden'), 3000);
+      currentUserData = userDoc.data();
+      document.getElementById('welcomeMessage').textContent = `Welcome, ${currentUserData.name}`;
+      document.getElementById('memberShares').textContent = currentUserData.shares;
+      document.getElementById('memberBalance').textContent = currentUserData.balance.toFixed(2);
     });
 
-    window.onload = loadMember;
+    const form = document.getElementById("withdrawForm");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const amount = parseFloat(document.getElementById("withdrawAmount").value);
+      const note = document.getElementById("withdrawNote").value;
+
+      try {
+        await addDoc(collection(db, "withdrawals"), {
+          email: auth.currentUser.email,
+          name: currentUserData.name,
+          amount,
+          note,
+          status: "pending",
+          createdAt: serverTimestamp()
+        });
+
+        form.reset();
+        document.getElementById("withdrawStatus").classList.remove("hidden");
+        setTimeout(() => document.getElementById("withdrawStatus").classList.add("hidden"), 3000);
+      } catch (err) {
+        alert("❌ Error submitting request");
+        console.error(err);
+      }
+    });
+
+    function logout() {
+      signOut(auth).then(() => window.location.href = "index.html");
+    }
   </script>
 
 </body>
