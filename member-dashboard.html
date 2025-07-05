@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Member Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+</head>
+<body class="bg-gray-900 text-white p-6">
+  <h1 class="text-2xl font-bold mb-4">🎴 Member Dashboard</h1>
+
+  <div class="bg-gray-800 p-4 rounded mb-6">
+    <p><strong>Name:</strong> <span id="memberName"></span></p>
+    <p><strong>Email:</strong> <span id="memberEmail"></span></p>
+    <p><strong>Shares:</strong> <span id="memberShares"></span></p>
+    <p><strong>Balance:</strong> ₱<span id="memberBalance"></span></p>
+  </div>
+
+  <!-- 💸 Withdrawal Request Section -->
+  <section class="bg-gray-800 p-4 rounded mb-6">
+    <h2 class="text-xl font-bold mb-3">💸 Request Withdrawal</h2>
+    <form id="withdrawForm" class="space-y-4">
+      <div>
+        <label for="amount" class="block mb-1">Amount (₱):</label>
+        <input type="number" id="amount" min="1" class="w-full px-3 py-2 rounded" required />
+      </div>
+      <div>
+        <label for="note" class="block mb-1">Note (optional):</label>
+        <textarea id="note" rows="2" class="w-full px-3 py-2 rounded"></textarea>
+      </div>
+      <button type="submit" class="bg-green-600 px-4 py-2 rounded hover:bg-green-700">Submit Request</button>
+      <p id="withdrawMessage" class="mt-2 text-sm text-green-400 hidden">Request submitted!</p>
+    </form>
+  </section>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      const user = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+
+      // Redirect if not logged in
+      if (!user.email || !user.name) {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      document.getElementById('memberName').textContent = user.name;
+      document.getElementById('memberEmail').textContent = user.email;
+      document.getElementById('memberShares').textContent = user.shares;
+      document.getElementById('memberBalance').textContent = user.balance.toFixed(2);
+
+      document.getElementById('withdrawForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const amount = parseFloat(document.getElementById('amount').value);
+        const note = document.getElementById('note').value.trim();
+
+        if (isNaN(amount) || amount <= 0) {
+          alert('Enter a valid amount.');
+          return;
+        }
+
+        const withdrawRequests = JSON.parse(localStorage.getItem('withdrawRequests') || '[]');
+        withdrawRequests.push({
+          email: user.email,
+          amount,
+          note,
+          date: new Date().toISOString()
+        });
+
+        localStorage.setItem('withdrawRequests', JSON.stringify(withdrawRequests));
+        document.getElementById('withdrawForm').reset();
+        document.getElementById('withdrawMessage').classList.remove('hidden');
+      });
+    });
+  </script>
+</body>
+</html>
