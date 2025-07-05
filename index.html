@@ -9,13 +9,16 @@
 <body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-6">
   <h1 class="text-4xl font-bold mb-8">Baccarat Fund Club</h1>
   <p class="mb-6 text-center max-w-md">Select your role to enter the dashboard:</p>
+
   <div class="space-x-6">
     <button id="adminBtn" class="bg-green-600 px-6 py-3 rounded hover:bg-green-700">Admin</button>
     <button id="memberBtn" class="bg-blue-600 px-6 py-3 rounded hover:bg-blue-700">Member</button>
   </div>
+
   <div class="mt-8 text-center">
     <a href="register.html" class="text-blue-400 underline">Register New Member</a>
   </div>
+
   <script>
     document.getElementById('adminBtn').addEventListener('click', () => {
       localStorage.setItem('role', 'admin');
@@ -27,7 +30,7 @@
       if (!email) return alert('Email is required');
       localStorage.setItem('role', 'member');
       localStorage.setItem('memberEmail', email.toLowerCase().trim());
-      window.location.href = 'dashboard.html';
+      window.location.href = 'member-dashboard.html';
     });
   </script>
 </body>
