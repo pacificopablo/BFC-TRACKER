@@ -128,11 +128,12 @@
             const data = docSnap.data();
             allMembers.push({ id: docSnap.id, ...data });
           });
+          console.log("Members fetched:", allMembers);
           displayMembers(allMembers);
           updateTopShareholders();
         } catch (error) {
           console.error("Error loading members:", error);
-          membersList.innerHTML = '<p class="text-red-500">Failed to load members. Please try again later.</p>';
+          membersList.innerHTML = '<p class="text-red-500">Failed to load members: ' + error.message + '</p>';
         }
       }
 
@@ -213,7 +214,7 @@
           }
         }, (error) => {
           console.error("Error listening for requests:", error);
-          requestsList.innerHTML = '<p class="text-red-500">Failed to load requests.</p>';
+          requestsList.innerHTML = '<p class="text-red-500">Failed to load requests: ' + error.message + '</p>';
         });
       }
 
@@ -221,8 +222,9 @@
       membersList.addEventListener("click", (e) => {
         const target = e.target;
         const id = target.dataset.id;
+        console.log("Click detected on element:", target, "with ID:", id);
         if (target.classList.contains("edit-btn") && id) {
-          console ( "Edit button clicked for member ID:", id );
+          console.log("Edit button clicked for member ID:", id);
           const member = allMembers.find(m => m.id === id);
           if (member) {
             openEditModal(member);
@@ -231,19 +233,22 @@
             alert("Member data not found.");
           }
         } else if (target.classList.contains("delete-btn") && id) {
-          console ( "Delete button clicked for member ID:", id );
+          console.log("Delete button clicked for member ID:", id);
           const name = target.dataset.name;
           deleteMember(id, name);
+        } else {
+          console.log("No action taken: Not an edit or delete button");
         }
       });
 
       // Edit Member Functions
       function openEditModal(member) {
-        if (!member) {
-          console.error("Invalid member data for editing");
+        if (!member || !member.id) {
+          console.error("Invalid member data for editing:", member);
           alert("Cannot edit: Member data is invalid.");
           return;
         }
+        console.log("Opening edit modal for member:", member);
         editMemberId.value = member.id;
         editName.value = member.name || '';
         editEmail.value = member.email || '';
@@ -259,6 +264,7 @@
         const shares = parseInt(editShares.value);
         const balance = parseFloat(editBalance.value);
         if (isNaN(shares) || shares < 0 || isNaN(balance) || balance < 0) {
+          console.error("Invalid input: Shares or balance is invalid", { shares, balance });
           alert("Shares and balance must be non-negative numbers.");
           return;
         }
@@ -270,7 +276,7 @@
           balance: balance
         };
         try {
-          console ( "Updating member ID:", id, "with data:", updatedData );
+          console.log("Updating member ID:", id, "with data:", updatedData);
           await updateDoc(doc(db, "members", id), updatedData);
           editModal.classList.add("hidden");
           loadMembers();
@@ -282,6 +288,7 @@
       });
 
       cancelEdit.addEventListener("click", () => {
+        console.log("Cancel edit clicked");
         editModal.classList.add("hidden");
       });
 
@@ -289,7 +296,7 @@
       async function deleteMember(id, name) {
         if (confirm(`Are you sure you want to delete ${name || 'this member'}?`)) {
           try {
-            console ( "Deleting member ID:", id );
+            console.log("Deleting member ID:", id);
             await deleteDoc(doc(db, "members", id));
             loadMembers();
             alert("Member deleted successfully!");
@@ -297,6 +304,8 @@
             console.error("Error deleting member:", error);
             alert(`Failed to delete member: ${error.message}`);
           }
+        } else {
+          console.log("Delete cancelled for member ID:", id);
         }
       }
 
@@ -304,32 +313,37 @@
       listenForRequests();
 
       // Static chart for demo
-      const ctx = document.getElementById('fundChart').getContext('2d');
-      new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-          datasets: [{
-            label: 'Fund Balance',
-            data: [15000, 18000, 21000, 25000, 29000, 34000],
-            backgroundColor: 'rgba(59, 130, 246, 0.2)',
-            borderColor: 'rgba(59, 130, 246, 1)',
-            borderWidth: 2,
-            fill: true,
-            tension: 0.3
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { labels: { color: 'white' } },
+      try {
+        const ctx = document.getElementById('fundChart').getContext('2d');
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            datasets: [{
+              label: 'Fund Balance',
+              data: [15000, 18000, 21000, 25000, 29000, 34000],
+              backgroundColor: 'rgba(59, 130, 246, 0.2)',
+              borderColor: 'rgba(59, 130, 246, 1)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.3
+            }]
           },
-          scales: {
-            x: { ticks: { color: 'white' } },
-            y: { ticks: { color: 'white' }, beginAtZero: true }
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { labels: { color: 'white' } },
+            },
+            scales: {
+              x: { ticks: { color: 'white' } },
+              y: { ticks: { color: 'white' }, beginAtZero: true }
+            }
           }
-        }
-      });
+        });
+        console.log("Chart initialized successfully");
+      } catch (error) {
+        console.error("Error initializing chart:", error);
+      }
     </script>
   </body>
 </html>
