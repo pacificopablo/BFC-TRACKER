@@ -21,13 +21,28 @@
     <p class="mb-2">💰 Balance: ₱<span id="userBalance">0.00</span></p>
     <p id="loadingMessage" class="text-yellow-400 mt-2">Loading your data...</p>
 
-    <button id="logoutBtn" class="mt-6 w-full py-2 bg-red-600 hover:bg-red-700 rounded">Logout</button>
+    <button id="cashoutBtn" class="mt-4 w-full py-2 bg-yellow-500 hover:bg-yellow-600 text-black rounded">Request Cashout</button>
+    <button id="logoutBtn" class="mt-2 w-full py-2 bg-red-600 hover:bg-red-700 rounded">Logout</button>
+  </div>
+
+  <!-- Modal -->
+  <div id="cashoutModal" class="fixed inset-0 bg-black bg-opacity-50 hidden justify-center items-center">
+    <div class="bg-white text-black rounded-xl p-6 w-full max-w-sm">
+      <h2 class="text-xl font-bold mb-4">Cashout Request</h2>
+      <label for="cashoutAmount" class="block mb-2">Enter Amount:</label>
+      <input type="number" id="cashoutAmount" min="1" class="w-full p-2 border rounded mb-4" />
+      <div class="flex justify-end space-x-2">
+        <button id="cancelCashout" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
+        <button id="submitCashout" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Submit</button>
+      </div>
+      <p id="cashoutMessage" class="text-sm mt-2 text-center"></p>
+    </div>
   </div>
 
   <script type="module">
     import { auth, db } from './firebase-config.js';
     import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { doc, getDoc, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const nameField = document.getElementById("userName");
     const emailField = document.getElementById("userEmail");
@@ -36,8 +51,11 @@
     const joinDateField = document.getElementById("joinDate");
     const loadingMessage = document.getElementById("loadingMessage");
 
+    let currentUser = null;
+
     onAuthStateChanged(auth, async (user) => {
       if (user) {
+        currentUser = user;
         try {
           const uid = user.uid;
           const docSnap = await getDoc(doc(db, "users", uid));
@@ -68,6 +86,51 @@
         alert("Logout failed.");
         console.error(error);
       });
+    });
+
+    // Cashout modal logic
+    const modal = document.getElementById("cashoutModal");
+    const cashoutBtn = document.getElementById("cashoutBtn");
+    const cancelBtn = document.getElementById("cancelCashout");
+    const submitBtn = document.getElementById("submitCashout");
+    const amountInput = document.getElementById("cashoutAmount");
+    const messageBox = document.getElementById("cashoutMessage");
+
+    cashoutBtn.addEventListener("click", () => {
+      modal.classList.remove("hidden");
+      amountInput.value = "";
+      messageBox.textContent = "";
+    });
+
+    cancelBtn.addEventListener("click", () => {
+      modal.classList.add("hidden");
+    });
+
+    submitBtn.addEventListener("click", async () => {
+      const amount = parseFloat(amountInput.value);
+      if (!amount || amount <= 0) {
+        messageBox.textContent = "⚠️ Please enter a valid amount.";
+        messageBox.classList.add("text-red-500");
+        return;
+      }
+
+      try {
+        await addDoc(collection(db, "withdrawalRequests"), {
+          uid: currentUser.uid,
+          email: currentUser.email,
+          amount,
+          status: "pending",
+          createdAt: serverTimestamp()
+        });
+        messageBox.textContent = "✅ Request submitted!";
+        messageBox.classList.remove("text-red-500");
+        messageBox.classList.add("text-green-600");
+        setTimeout(() => modal.classList.add("hidden"), 1500);
+      } catch (err) {
+        console.error(err);
+        messageBox.textContent = "❌ Failed to submit request.";
+        messageBox.classList.add("text-red-500");
+      }
     });
   </script>
 </body>
