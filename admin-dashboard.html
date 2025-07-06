@@ -8,10 +8,6 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   </head>
   <body class="bg-gray-900 text-white p-4">
-    <!-- Loading Spinner -->
-    <div id="loadingSpinner" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center">
-      <div class="animate-spin h-10 w-10 border-4 border-blue-600 rounded-full"></div>
-    </div>
     <!-- Header with Logout Button -->
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-3xl font-bold">👑 Baccarat Fund Admin Dashboard</h1>
@@ -37,37 +33,10 @@
       <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
       <canvas id="fundChart" height="100"></canvas>
     </div>
-    <!-- Settings Section -->
-    <div class="bg-gray-800 p-4 rounded shadow mb-6">
-      <h2 class="text-xl font-bold mb-4">⚙️ Settings</h2>
-      <form id="settingsForm" class="flex flex-col space-y-4">
-        <div>
-          <label class="block text-sm mb-1">Share-to-Profit Conversion Rate (₱ per share)</label>
-          <input
-            type="number"
-            id="conversionRate"
-            class="w-full p-2 rounded bg-gray-700 text-white"
-            placeholder="Enter conversion rate (e.g., 100)"
-            required
-            min="0"
-            step="0.01"
-          />
-        </div>
-        <button type="submit" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700">Save Settings</button>
-      </form>
-      <p class="text-sm mt-2">Current Rate: ₱<span id="currentRate">Loading...</span> per share</p>
-    </div>
     <!-- Distribute Profit Section -->
     <div class="bg-gray-800 p-4 rounded shadow mb-6">
       <h2 class="text-xl font-bold mb-4">💸 Distribute Profit</h2>
       <form id="profitForm" class="flex flex-col space-y-4">
-        <div>
-          <label class="block text-sm mb-1">Distribution Mode</label>
-          <select id="distributionMode" class="w-full p-2 rounded bg-gray-700 text-white" required>
-            <option value="amount">By Amount (₱ per share)</option>
-            <option value="percentage">By Percentage</option>
-          </select>
-        </div>
         <div>
           <label class="block text-sm mb-1">Total Profit to Distribute (₱)</label>
           <input
@@ -134,15 +103,15 @@
     </div>
     <script type="module">
       // Import Firebase SDKs
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
       import {
         getFirestore, collection, getDocs, doc, updateDoc, deleteDoc,
-        query, orderBy, onSnapshot, setDoc, getDoc
-      } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
-      import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+        query, orderBy, onSnapshot
+      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+      import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
       const firebaseConfig = {
-        apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
+        apiKey: "AIzaSyCNstwoaWh_13lF0ON25otUpeH3OGINQ",
         authDomain: "bfc-tracker.firebaseapp.com",
         projectId: "bfc-tracker",
         storageBucket: "bfc-tracker.appspot.com",
@@ -156,7 +125,6 @@
       const auth = getAuth(app);
 
       // DOM Elements
-      const loadingSpinner = document.getElementById("loadingSpinner");
       const totalMembers = document.getElementById("totalMembers");
       const totalShares = document.getElementById("totalShares");
       const totalBalance = document.getElementById("totalBalance");
@@ -176,116 +144,14 @@
       const logoutBtn = document.getElementById("logoutBtn");
       const profitForm = document.getElementById("profitForm");
       const profitAmount = document.getElementById("profitAmount");
-      const distributionMode = document.getElementById("distributionMode");
-      const settingsForm = document.getElementById("settingsForm");
-      const conversionRateInput = document.getElementById("conversionRate");
-      const currentRateDisplay = document.getElementById("currentRate");
 
       let allMembers = [];
-      let conversionRate = 0;
 
       function formatCurrency(value) {
         return parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
       }
 
-      // Authentication Check
-      onAuthStateChanged(auth, (user) => {
-        if (!user) {
-          console.error("No user authenticated, redirecting to login.");
-          window.location.href = "/login.html";
-          return;
-        }
-        // Verify admin claim
-        user.getIdTokenResult().then((idTokenResult) => {
-          if (!idTokenResult.claims.admin) {
-            console.error("User is not an admin, redirecting to login.");
-            window.location.href = "/login.html";
-          } else {
-            console.log("Admin authenticated:", user.email);
-            initializeAppData();
-          }
-        }).catch((error) => {
-          console.error("Error checking admin claim:", error);
-          alert(`Authentication error: ${error.message}`);
-          window.location.href = "/login.html";
-        });
-      });
-
-      // Initialize Data
-      async function initializeAppData() {
-        loadingSpinner.classList.remove("hidden");
-        try {
-          await Promise.all([
-            loadMembers(),
-            loadConversionRate(),
-            listenForRequests()
-          ]);
-          console.log("All data loaded successfully.");
-        } catch (error) {
-          console.error("Error initializing app data:", error);
-          alert(`Failed to load data: ${error.message}`);
-        } finally {
-          loadingSpinner.classList.add("hidden");
-        }
-      }
-
-      // Load Conversion Rate
-      async function loadConversionRate() {
-        if (!currentRateDisplay) {
-          console.error("currentRateDisplay element not found.");
-          return;
-        }
-        currentRateDisplay.textContent = "Loading...";
-        try {
-          const rateDoc = await getDoc(doc(db, "settings", "profitRate"));
-          if (rateDoc.exists()) {
-            conversionRate = rateDoc.data().rate || 0;
-            currentRateDisplay.textContent = formatCurrency(conversionRate);
-          } else {
-            conversionRate = 0;
-            currentRateDisplay.textContent = formatCurrency(0);
-            console.log("No conversion rate set, defaulting to 0.");
-          }
-          console.log("Conversion rate loaded:", conversionRate);
-        } catch (error) {
-          console.error("Error loading conversion rate:", error);
-          currentRateDisplay.textContent = "Error";
-          throw error;
-        }
-      }
-
-      // Save Conversion Rate
-      settingsForm?.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const newRate = parseFloat(conversionRateInput.value);
-        if (isNaN(newRate) || newRate < 0) {
-          console.error("Invalid conversion rate:", newRate);
-          alert("Please enter a valid conversion rate (non-negative number).");
-          return;
-        }
-        loadingSpinner.classList.remove("hidden");
-        try {
-          await setDoc(doc(db, "settings", "profitRate"), { rate: newRate }, { merge: true });
-          conversionRate = newRate;
-          currentRateDisplay.textContent = formatCurrency(newRate);
-          settingsForm.reset();
-          alert("Conversion rate updated successfully!");
-        } catch (error) {
-          console.error("Error saving conversion rate:", error);
-          alert(`Failed to save conversion rate: ${error.message}`);
-        } finally {
-          loadingSpinner.classList.add("hidden");
-        }
-      });
-
-      // Load Members
       async function loadMembers() {
-        if (!membersList || !totalMembers || !totalShares || !totalBalance) {
-          console.error("DOM elements for members not found.");
-          membersList.innerHTML = '<p class="text-red-500">Error: UI elements not found.</p>';
-          return;
-        }
-        membersList.innerHTML = '<p class="text-gray-400">Loading members...</p>';
         try {
           const snapshot = await getDocs(collection(db, "members"));
           allMembers = [];
@@ -296,26 +162,23 @@
           console.log("Members fetched:", allMembers);
           displayMembers(allMembers);
           updateTopShareholders();
-          if (allMembers.length === 0) {
-            membersList.innerHTML = '<p class="text-gray-400">No members found.</p>';
-          }
         } catch (error) {
           console.error("Error loading members:", error);
-          membersList.innerHTML = `<p class="text-red-500">Failed to load members: ${error.message}</p>`;
-          throw error;
+          membersList.innerHTML = '<p class="text-red-500">Failed to load members: ' + error.message + '</p>';
         }
       }
 
-      // Display Members
       function displayMembers(members) {
         let memberCount = 0, shareTotal = 0, balanceTotal = 0;
         membersList.innerHTML = "";
+
         members.forEach(m => {
           memberCount++;
           shareTotal += m.shares || 0;
           balanceTotal += m.balance || 0;
+
           const div = document.createElement("div");
-          div.className = "bg-gray-800 p-ocampo rounded shadow";
+          div.className = "bg-gray-800 p-4 rounded shadow";
           div.innerHTML = `
             <p><strong>Name:</strong> ${m.name || 'N/A'}</p>
             <p><strong>Email:</strong> ${m.email || 'N/A'}</p>
@@ -329,22 +192,19 @@
           `;
           membersList.appendChild(div);
         });
+
         totalMembers.textContent = memberCount;
         totalShares.textContent = shareTotal;
         totalBalance.textContent = formatCurrency(balanceTotal);
       }
 
-      // Update Top Shareholders
       function updateTopShareholders() {
-        if (!topShareholders) {
-          console.error("topShareholders element not found.");
-          return;
-        }
         const top = [...allMembers]
           .filter(m => m.status === 'approved')
           .sort((a, b) => (b.shares || 0) - (a.shares || 0))
           .slice(0, 5);
-        topShareholders.innerHTML = top.length ? "" : '<li class="text-gray-400">No approved shareholders.</li>';
+
+        topShareholders.innerHTML = "";
         top.forEach((m) => {
           const li = document.createElement("li");
           li.textContent = `${m.name || 'N/A'} — ${m.shares || 0} shares`;
@@ -352,8 +212,7 @@
         });
       }
 
-      // Search Members
-      searchInput?.addEventListener("input", () => {
+      searchInput.addEventListener("input", () => {
         const query = searchInput.value.toLowerCase();
         const filtered = allMembers.filter(m =>
           (m.name || '').toLowerCase().includes(query) ||
@@ -363,21 +222,13 @@
         displayMembers(filtered);
       });
 
-      // Listen for Transaction Requests
       function listenForRequests() {
-        if (!requestsList) {
-          console.error("requestsList element not found.");
-          return;
-        }
-        requestsList.innerHTML = '<p class="text-gray-400">Loading requests...</p>';
         const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
         onSnapshot(q, (snapshot) => {
           requestsList.innerHTML = "";
-          let hasPending = false;
           snapshot.forEach(docSnap => {
             const data = docSnap.data();
             if (data.status === "pending") {
-              hasPending = true;
               const div = document.createElement("div");
               div.className = "bg-gray-700 p-4 rounded";
               div.innerHTML = `
@@ -389,111 +240,77 @@
               requestsList.appendChild(div);
             }
           });
-          if (!hasPending) {
+          if (requestsList.innerHTML === "") {
             requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
           }
         }, (error) => {
           console.error("Error listening for requests:", error);
-          requestsList.innerHTML = `<p class="text-red-500">Failed to load requests: ${error.message}</p>`;
+          requestsList.innerHTML = '<p class="text-red-500">Failed to load requests: ' + error.message + '</p>';
         });
       }
 
       // Logout Functionality
-      logoutBtn?.addEventListener("click", async () => {
+      logoutBtn.addEventListener("click", async () => {
         try {
           await signOut(auth);
           console.log("User logged out successfully");
-          window.location.href = "/login.html";
+          window.location.href = "/login.html"; // Redirect to login page
         } catch (error) {
           console.error("Error logging out:", error);
           alert(`Failed to log out: ${error.message}`);
         }
       });
 
-      // Distribute Profit
-      profitForm?.addEventListener("submit", async (e) => {
+      // Distribute Profit Functionality
+      profitForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const profit = parseFloat(profitAmount.value);
-        const mode = distributionMode.value;
-
         if (isNaN(profit) || profit <= 0) {
           console.error("Invalid profit amount:", profit);
           alert("Please enter a valid profit amount greater than 0.");
           return;
         }
 
-        loadingSpinner.classList.remove("hidden");
         try {
+          // Calculate total shares of approved members
           const approvedMembers = allMembers.filter(m => m.status === 'approved');
-          if (approvedMembers.length === 0) {
-            console.error("No approved members to distribute profit.");
-            alert("No approved members to distribute profit.");
-            return;
-          }
-
           const totalShares = approvedMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+
           if (totalShares === 0) {
-            console.error("No shares available for distribution.");
-            alert("No shares available for distribution among approved members.");
+            console.error("No approved members with shares to distribute profit.");
+            alert("No approved members with shares to distribute profit.");
             return;
           }
 
-          let totalDistributed = 0;
-          if (mode === "amount") {
-            if (conversionRate <= 0) {
-              console.error("Invalid conversion rate:", conversionRate);
-              alert("Please set a valid conversion rate in settings before distributing profit.");
-              return;
-            }
-            const requiredProfit = totalShares * conversionRate;
-            if (profit < requiredProfit) {
-              console.error("Profit too low:", profit, "required:", requiredProfit);
-              alert(`Profit amount (₱${formatCurrency(profit)}) is less than required (₱${formatCurrency(requiredProfit)}) for ${totalShares} shares at ₱${formatCurrency(conversionRate)} per share.`);
-              return;
-            }
-            for (const member of approvedMembers) {
-              const profitShare = Math.round((member.shares || 0) * conversionRate * 100) / 100;
-              const newBalance = (member.balance || 0) + profitShare;
-              totalDistributed += profitShare;
-              await updateDoc(doc(db, "members", member.id), { balance: newBalance });
-              console.log(`Distributed ${formatCurrency(profitShare)} to ${member.name || 'N/A'} (ID: ${member.id})`);
-            }
-          } else {
-            for (const member of approvedMembers) {
-              const sharePercentage = (member.shares || 0) / totalShares;
-              const profitShare = Math.round((profit * sharePercentage) * 100) / 100;
-              const newBalance = (member.balance || 0) + profitShare;
-              totalDistributed += profitShare;
-              await updateDoc(doc(db, "members", member.id), { balance: newBalance });
-              console.log(`Distributed ${formatCurrency(profitShare)} to ${member.name || 'N/A'} (ID: ${member.id})`);
-            }
+          // Calculate profit per share
+          const profitPerShare = profit / totalShares;
+
+          // Update each approved member's balance
+          for (const member of approvedMembers) {
+            const profitShare = (member.shares || 0) * profitPerShare;
+            const newBalance = (member.balance || 0) + profitShare;
+
+            await updateDoc(doc(db, "members", member.id), {
+              balance: newBalance
+            });
+            console.log(`Distributed ${formatCurrency(profitShare)} to ${member.name || 'N/A'} (ID: ${member.id})`);
           }
 
-          await setDoc(doc(db, "profit_distributions", Date.now().toString()), {
-            mode,
-            amount: totalDistributed,
-            timestamp: new Date(),
-            members: approvedMembers.map(m => ({
-              id: m.id,
-              profitShare: Math.round((m.shares * (mode === 'amount' ? conversionRate : profit / totalShares)) * 100) / 100
-            }))
-          });
-
+          // Reset form and reload members
           profitForm.reset();
           await loadMembers();
-          alert(`Successfully distributed ₱${formatCurrency(totalDistributed)} to ${approvedMembers.length} approved members!`);
+          alert(`Successfully distributed ₱${formatCurrency(profit)} to approved members!`);
         } catch (error) {
           console.error("Error distributing profit:", error);
           alert(`Failed to distribute profit: ${error.message}`);
-        } finally {
-          loadingSpinner.classList.add("hidden");
         }
       });
 
-      // Edit and Delete Members
-      membersList?.addEventListener("click", (e) => {
+      // Event Delegation for Edit and Delete Buttons
+      membersList.addEventListener("click", (e) => {
         const target = e.target;
         const id = target.dataset.id;
+        console.log("Click detected on element:", target, "with ID:", id);
         if (target.classList.contains("edit-btn") && id) {
           console.log("Edit button clicked for member ID:", id);
           const member = allMembers.find(m => m.id === id);
@@ -507,15 +324,19 @@
           console.log("Delete button clicked for member ID:", id);
           const name = target.dataset.name;
           deleteMember(id, name);
+        } else {
+          console.log("No action taken: Not an edit or delete button");
         }
       });
 
+      // Edit Member Functions
       function openEditModal(member) {
         if (!member || !member.id) {
           console.error("Invalid member data for editing:", member);
           alert("Cannot edit: Member data is invalid.");
           return;
-        buildings
+        }
+        console.log("Opening edit modal for member:", member);
         editMemberId.value = member.id;
         editName.value = member.name || '';
         editEmail.value = member.email || '';
@@ -525,7 +346,7 @@
         editModal.classList.remove("hidden");
       }
 
-      editForm?.addEventListener("submit", async (e) => {
+      editForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const id = editMemberId.value;
         const shares = parseInt(editShares.value);
@@ -542,41 +363,45 @@
           shares: shares,
           balance: balance
         };
-        loadingSpinner.classList.remove("hidden");
         try {
+          console.log("Updating member ID:", id, "with data:", updatedData);
           await updateDoc(doc(db, "members", id), updatedData);
           editModal.classList.add("hidden");
-          await loadMembers();
+          loadMembers();
           alert("Member updated successfully!");
         } catch (error) {
           console.error("Error updating member:", error);
           alert(`Failed to update member: ${error.message}`);
-        } finally {
-          loadingSpinner.classList.add("hidden");
         }
       });
 
-      cancelEdit?.addEventListener("click", () => {
+      cancelEdit.addEventListener("click", () => {
+        console.log("Cancel edit clicked");
         editModal.classList.add("hidden");
       });
 
+      // Delete Member Function
       async function deleteMember(id, name) {
         if (confirm(`Are you sure you want to delete ${name || 'this member'}?`)) {
-          loadingSpinner.classList.remove("hidden");
           try {
+            console.log("Deleting member ID:", id);
             await deleteDoc(doc(db, "members", id));
-            await loadMembers();
+            loadMembers();
             alert("Member deleted successfully!");
           } catch (error) {
             console.error("Error deleting member:", error);
             alert(`Failed to delete member: ${error.message}`);
-          } finally {
-            loadingSpinner.classList.add("hidden");
           }
+        } else {
+          console.log("Delete cancelled for member ID:", id);
         }
       }
 
-      // Initialize Chart
+      // Initialize
+      loadMembers();
+      listenForRequests();
+
+      // Static chart for demo
       try {
         const ctx = document.getElementById('fundChart').getContext('2d');
         new Chart(ctx, {
@@ -595,10 +420,11 @@
           },
           options: {
             responsive: true,
-            plugins: { legend: { labels: { color: 'white' } } },
+            plugins: {
+              legend: { labels: { color: 'white' } },
+            },
             scales: {
               x: { ticks: { color: 'white' } },
- DateTime: 07/07/2025 04:38 AM PST
               y: { ticks: { color: 'white' }, beginAtZero: true }
             }
           }
