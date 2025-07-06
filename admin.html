@@ -1,151 +1,348 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Baccarat Fund Admin Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body class="bg-gray-900 text-white min-h-screen flex flex-col">
+<!DOCTYPE html>  <html lang="en">  
+<head>  
+  <meta charset="UTF-8" />  
+  <title>Baccarat Fund Admin Dashboard</title>  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />  
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>  
+</head>  
+<body class="bg-gray-900 text-white min-h-screen">    <!-- Header -->    <header class="bg-gray-800 p-4 flex justify-between items-center shadow">  
+    <h1 class="text-2xl font-bold">Baccarat Fund Admin</h1>  
+    <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</button>  
+  </header>    <!-- Main -->    <main class="p-6 space-y-6">  
+    <!-- Member Overview -->  
+    <section class="bg-gray-800 p-4 rounded shadow">  
+      <h2 class="text-xl font-semibold mb-2">📊 Member Overview</h2>  
+      <canvas id="memberChart" height="100"></canvas>  
+    </section>  <!-- Member List -->  
+<section class="bg-gray-800 p-4 rounded shadow">  
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 space-y-2 md:space-y-0">  
+    <h2 class="text-xl font-semibold">👥 Member List</h2>  
+    <div class="flex items-center gap-2">  
+      <button id="addMemberBtn" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm">+ Add Member</button>  
+      <button id="addTxnBtn" class="bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded text-sm">+ Add Transaction</button>  
+      <input type="text" id="searchInput" placeholder="Search name/email..." class="px-3 py-1 rounded text-black text-sm" />  
+      <select id="statusFilter" class="text-sm px-2 py-1 rounded text-black">  
+        <option value="all">All</option>  
+        <option value="Approved">Approved</option>  
+        <option value="Pending">Pending</option>  
+      </select>  
+      <button id="exportCSV" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">Export CSV</button>  
+    </div>  
+  </div>  
 
-  <!-- Header -->
-  <header class="bg-gray-800 p-4 flex justify-between items-center shadow">
-    <h1 class="text-2xl font-bold">Baccarat Fund Admin</h1>
-    <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</button>
-  </header>
+  <table class="w-full text-sm cursor-pointer">  
+    <thead class="text-left text-gray-400 border-b border-gray-600">  
+      <tr>  
+        <th id="sortName" class="hover:underline">Name ⬍</th>  
+        <th>Email</th>  
+        <th id="sortShares" class="hover:underline">Shares ⬍</th>  
+        <th>Status</th>  
+      </tr>  
+    </thead>  
+    <tbody id="memberTableBody" class="text-gray-300"></tbody>  
+  </table>  
 
-  <!-- Main Content -->
-  <main class="p-4 sm:p-6 flex-1 space-y-6 overflow-auto">
-    <!-- Member Overview -->
-    <section class="bg-gray-800 p-4 rounded shadow">
-      <h2 class="text-xl font-semibold mb-2">📊 Member Overview</h2>
-      <canvas id="memberChart" height="100"></canvas>
-    </section>
+  <div class="flex justify-between items-center mt-4">  
+    <button id="prevPage" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">Previous</button>  
+    <span id="pageIndicator" class="text-sm text-gray-300"></span>  
+    <button id="nextPage" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">Next</button>  
+  </div>  
+</section>  
 
-    <!-- Member List -->
-    <section class="bg-gray-800 p-4 rounded shadow">
-      <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-2 mb-4">
-        <h2 class="text-xl font-semibold">👥 Member List</h2>
-        <div class="flex flex-wrap items-center gap-2">
-          <button id="addMemberBtn" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm">+ Add Member</button>
-          <button id="addTxnBtn" class="bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded text-sm">+ Add Transaction</button>
-          <input type="text" id="searchInput" placeholder="Search name/email..." class="px-3 py-1 rounded text-black text-sm" />
-          <select id="statusFilter" class="text-sm px-2 py-1 rounded text-black">
-            <option value="all">All</option>
-            <option value="Approved">Approved</option>
-            <option value="Pending">Pending</option>
-          </select>
-          <button id="exportCSV" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">Export CSV</button>
-        </div>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="min-w-full text-sm">
-          <thead class="text-left text-gray-400 border-b border-gray-600">
-            <tr>
-              <th id="sortName" class="hover:underline cursor-pointer px-2 py-1">Name ⬍</th>
-              <th class="px-2 py-1">Email</th>
-              <th id="sortShares" class="hover:underline cursor-pointer px-2 py-1">Shares ⬍</th>
-              <th class="px-2 py-1">Status</th>
-            </tr>
-          </thead>
-          <tbody id="memberTableBody" class="text-gray-300"></tbody>
-        </table>
-      </div>
-      <div class="flex justify-between items-center mt-4">
-        <button id="prevPage" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">Previous</button>
-        <span id="pageIndicator" class="text-sm text-gray-300"></span>
-        <button id="nextPage" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">Next</button>
-      </div>
-    </section>
+<!-- Withdrawal Requests -->  
+<section class="bg-gray-800 p-4 rounded shadow">  
+  <h2 class="text-xl font-semibold mb-2">📝 Withdrawal Requests</h2>  
+  <div id="withdrawalRequestsContainer" class="space-y-2 text-sm"></div>  
+</section>  
 
-    <!-- Withdrawal Requests -->
-    <section class="bg-gray-800 p-4 rounded shadow">
-      <h2 class="text-xl font-semibold mb-2">📝 Withdrawal Requests</h2>
-      <div id="withdrawalRequestsContainer" class="space-y-2 text-sm overflow-x-auto"></div>
-    </section>
+<!-- Transaction History with Filter -->  
+<section class="bg-gray-800 p-4 rounded shadow">  
+  <h2 class="text-xl font-semibold mb-2">🔁 Share Transaction History</h2>  
+  <div class="flex items-center gap-4 mb-4">  
+    <label for="txnFilterMember" class="text-sm">Filter by Member:</label>  
+    <select id="txnFilterMember" class="text-sm px-2 py-1 rounded text-black">  
+      <option value="all">All</option>  
+    </select>  
+  </div>  
+  <table class="w-full text-sm">  
+    <thead class="text-left text-gray-400 border-b border-gray-600">  
+      <tr>  
+        <th>Member</th>  
+        <th>Type</th>  
+        <th>Shares</th>  
+        <th>Date</th>  
+      </tr>  
+    </thead>  
+    <tbody id="transactionTableBody" class="text-gray-300"></tbody>  
+  </table>  
+</section>
 
-    <!-- Transaction History with Filter -->
-    <section class="bg-gray-800 p-4 rounded shadow">
-      <h2 class="text-xl font-semibold mb-2">🔁 Share Transaction History</h2>
-      <div class="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
-        <label for="txnFilterMember" class="text-sm">Filter by Member:</label>
-        <select id="txnFilterMember" class="px-2 py-1 rounded text-sm">
-          <option value="all">All</option>
-        </select>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="min-w-full text-sm">
-          <thead class="text-left text-gray-400 border-b border-gray-600">
-            <tr>
-              <th class="px-2 py-1">Member</th>
-              <th class="px-2 py-1">Type</th>
-              <th class="px-2 py-1">Shares</th>
-              <th class="px-2 py-1">Date</th>
-            </tr>
-          </thead>
-          <tbody id="transactionTableBody" class="text-gray-300"></tbody>
-        </table>
-      </div>
-    </section>
-  </main>
-
-  <!-- Modals Container -->
-  <div id="modalOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center overflow-auto hidden p-4">
-
-    <!-- Edit Member Modal -->
-    <div id="editModal" class="bg-gray-800 p-6 rounded shadow w-full max-w-md sm:max-w-lg hidden space-y-4">
-      <h2 class="text-lg font-bold">Edit Member</h2>
-      <input id="editName" class="w-full px-3 py-2 border rounded text-black" placeholder="Name" />
-      <input id="editEmail" class="w-full px-3 py-2 border rounded text-black" placeholder="Email" />
-      <input id="editShares" type="number" class="w-full px-3 py-2 border rounded text-black" placeholder="Shares" />
-      <select id="editStatus" class="w-full px-3 py-2 border rounded text-black">
-        <option value="Approved">Approved</option>
-        <option value="Pending">Pending</option>
-      </select>
-      <div class="flex justify-end gap-2 pt-2">
-        <button id="closeModal" class="bg-gray-400 px-3 py-1 rounded">Cancel</button>
-        <button id="saveChanges" class="bg-green-600 text-white px-3 py-1 rounded">Save</button>
-      </div>
-    </div>
-
-    <!-- Add Member Modal -->
-    <div id="addModal" class="bg-gray-800 p-6 rounded shadow w-full max-w-md sm:max-w-lg hidden space-y-4">
-      <h2 class="text-lg font-bold">Add New Member</h2>
-      <input id="addName" class="w-full px-3 py-2 border rounded text-black" placeholder="Name" />
-      <input id="addEmail" class="w-full px-3 py-2 border rounded text-black" placeholder="Email" />
-      <input id="addShares" type="number" class="w-full px-3 py-2 border rounded text-black" placeholder="Shares (0)" />
-      <select id="addStatus" class="w-full px-3 py-2 border rounded text-black">
-        <option value="Approved">Approved</option>
-        <option value="Pending">Pending</option>
-      </select>
-      <div class="flex justify-end gap-2 pt-2">
-        <button id="closeAddModal" class="bg-gray-400 px-3 py-1 rounded">Cancel</button>
-        <button id="createMember" class="bg-blue-600 text-white px-3 py-1 rounded">Create</button>
-      </div>
-    </div>
-
-    <!-- Add Transaction Modal -->
-    <div id="addTxnModal" class="bg-gray-800 p-6 rounded shadow w-full max-w-md sm:max-w-lg hidden space-y-4">
-      <h2 class="text-lg font-bold">Add Transaction</h2>
-      <select id="txnMember" class="w-full px-3 py-2 border rounded text-black">
-        <option value="" disabled selected>Select Member</option>
-      </select>
-      <select id="txnType" class="w-full px-3 py-2 border rounded text-black">
-        <option value="buy">Buy</option>
-        <option value="sell">Sell</option>
-      </select>
-      <input id="txnShares" type="number" class="w-full px-3 py-2 border rounded text-black" placeholder="Shares" />
-      <input id="txnDate" type="date" class="w-full px-3 py-2 border rounded text-black" />
-      <div class="flex justify-end gap-2 pt-2">
-        <button id="closeTxnModal" class="bg-gray-400 px-3 py-1 rounded">Cancel</button>
-        <button id="createTxn" class="bg-indigo-600 text-white px-3 py-1 rounded">Save</button>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- Firebase + Logic Scripts -->
-  <script type="module" src="./admin-dashboard.js"></script>
-</body>
+  </main>    <!-- Modals -->    <!-- Edit Member Modal -->    <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center hidden">  
+    <div class="bg-white text-black rounded p-6 w-full max-w-md space-y-4">  
+      <h2 class="text-lg font-bold">Edit Member</h2>  
+      <input id="editName" class="w-full px-3 py-2 border rounded" placeholder="Name" />  
+      <input id="editEmail" class="w-full px-3 py-2 border rounded" placeholder="Email" />  
+      <input id="editShares" type="number" class="w-full px-3 py-2 border rounded" placeholder="Shares" />  
+      <select id="editStatus" class="w-full px-3 py-2 border rounded">  
+        <option value="Approved">Approved</option>  
+        <option value="Pending">Pending</option>  
+      </select>  
+      <div class="flex justify-end gap-2 pt-2">  
+        <button id="closeModal" class="bg-gray-400 px-3 py-1 rounded">Cancel</button>  
+        <button id="saveChanges" class="bg-green-600 text-white px-3 py-1 rounded">Save</button>  
+      </div>  
+    </div>  
+  </div>    <!-- Add Member Modal -->    <div id="addModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center hidden">  
+    <div class="bg-white text-black rounded p-6 w-full max-w-md space-y-4">  
+      <h2 class="text-lg font-bold">Add New Member</h2>  
+      <input id="addName" class="w-full px-3 py-2 border rounded" placeholder="Name" />  
+      <input id="addEmail" class="w-full px-3 py-2 border rounded" placeholder="Email" />  
+      <input id="addShares" type="number" class="w-full px-3 py-2 border rounded" placeholder="Shares (0)" />  
+      <select id="addStatus" class="w-full px-3 py-2 border rounded">  
+        <option value="Approved">Approved</option>  
+        <option value="Pending">Pending</option>  
+      </select>  
+      <div class="flex justify-end gap-2 pt-2">  
+        <button id="closeAddModal" class="bg-gray-400 px-3 py-1 rounded">Cancel</button>  
+        <button id="createMember" class="bg-blue-600 text-white px-3 py-1 rounded">Create</button>  
+      </div>  
+    </div>  
+  </div>    <!-- Add Transaction Modal -->    <div id="addTxnModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center hidden">  
+    <div class="bg-white text-black rounded p-6 w-full max-w-md space-y-4">  
+      <h2 class="text-lg font-bold">Add Transaction</h2>  
+      <select id="txnMember" class="w-full px-3 py-2 border rounded">  
+        <option value="" disabled selected>Select Member</option>  
+      </select>  
+      <select id="txnType" class="w-full px-3 py-2 border rounded">  
+        <option value="buy">Buy</option>  
+        <option value="sell">Sell</option>  
+      </select>  
+      <input id="txnShares" type="number" class="w-full px-3 py-2 border rounded" placeholder="Shares" />  
+      <input id="txnDate" type="date" class="w-full px-3 py-2 border rounded" />  
+      <div class="flex justify-end gap-2 pt-2">  
+        <button id="closeTxnModal" class="bg-gray-400 px-3 py-1 rounded">Cancel</button>  
+        <button id="createTxn" class="bg-indigo-600 text-white px-3 py-1 rounded">Save</button>  
+      </div>  
+    </div>  
+  </div>    <!-- Firebase + Logic -->    <script type="module">  
+    import { auth, db } from './firebase-config.js';  
+    import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";  
+    import { collection, onSnapshot, doc, updateDoc, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";  
+  
+    // State  
+    let allMembers = [], allTxns = [], currentPage = 1, pageSize = 10;  
+    let sortBy = null, sortAsc = true, editingDocId = null;  
+  
+    // Elements  
+    const memberTable = document.getElementById("memberTableBody");  
+    const txnTable = document.getElementById("transactionTableBody");  
+    const txnFilter = document.getElementById("txnFilterMember");  
+    const ctx = document.getElementById('memberChart').getContext('2d');  
+    const chart = new Chart(ctx, {  
+      type: 'doughnut',  
+      data: { labels: ['Approved', 'Pending'], datasets: [{ data: [0, 0], backgroundColor: ['#10B981', '#F59E0B'] }] },  
+      options: { plugins: { legend: { position: 'bottom' } } }  
+    });  
+  
+    // Auth  
+    onAuthStateChanged(auth, user => { if (!user) location.href = "index.html"; });  
+    document.getElementById("logoutBtn").onclick = () => signOut(auth);  
+  
+    // Listeners  
+    document.getElementById("searchInput").addEventListener("input", () => { currentPage = 1; renderMembers(); });  
+    document.getElementById("statusFilter").addEventListener("change", () => { currentPage = 1; renderMembers(); });  
+    document.getElementById("prevPage").onclick = () => { currentPage--; renderMembers(); };  
+    document.getElementById("nextPage").onclick = () => { currentPage++; renderMembers(); };  
+    document.getElementById("sortName").onclick = () => toggleSort("name");  
+    document.getElementById("sortShares").onclick = () => toggleSort("shares");  
+    document.getElementById("exportCSV").onclick = exportCSV;  
+    document.getElementById("addMemberBtn").onclick = () => toggleModal("addModal", true);  
+    document.getElementById("closeAddModal").onclick = () => toggleModal("addModal", false);  
+    document.getElementById("createMember").onclick = createMember;  
+    document.getElementById("addTxnBtn").onclick = () => { populateTxnMembers(); toggleModal("addTxnModal", true); };  
+    document.getElementById("closeTxnModal").onclick = () => toggleModal("addTxnModal", false);  
+    document.getElementById("createTxn").onclick = createTransaction;  
+    document.getElementById("txnFilterMember").addEventListener("change", renderTxns);  
+  
+    // Firestore refs  
+    const membersRef = collection(db, "members");  
+    const withdrawalsRef = collection(db, "withdrawals");  
+    const transactionsRef = collection(db, "transactions");  
+  
+    // Live Data: Members  
+    onSnapshot(membersRef, snapshot => {  
+      allMembers = [];  
+      txnFilter.innerHTML = '<option value="all">All</option>';  
+      snapshot.forEach(doc => {  
+        const m = { id: doc.id, ...doc.data() };  
+        allMembers.push(m);  
+        // Populate txn filter dropdown  
+        const opt = document.createElement("option");  
+        opt.value = m.id;  
+        opt.textContent = m.name;  
+        txnFilter.appendChild(opt);  
+      });  
+      renderMembers();  
+      renderTxns();  
+    });  
+  
+    // Live Data: Transactions  
+    onSnapshot(transactionsRef, snapshot => {  
+      allTxns = [];  
+      snapshot.forEach(doc => allTxns.push({ id: doc.id, ...doc.data() }));  
+      renderTxns();  
+    });  
+  
+    // Live Data: Withdrawals  
+    onSnapshot(withdrawalsRef, snapshot => {  
+      const container = document.getElementById("withdrawalRequestsContainer");  
+      container.innerHTML = "";  
+      snapshot.forEach(doc => {  
+        const r = doc.data();  
+        if (r.status !== "Pending") return;  
+        const div = document.createElement("div");  
+        div.className = "bg-gray-700 p-3 rounded";  
+        div.innerHTML = `  
+          <div><strong>${r.name}</strong> requested <span class="text-green-400">$${r.amount}</span> on ${r.date}</div>  
+          <div class="mt-2">  
+            <button class="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs" onclick="approve('${doc.id}')">Approve</button>  
+            <button class="bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-xs ml-2" onclick="reject('${doc.id}')">Reject</button>  
+          </div>`;  
+        container.appendChild(div);  
+      });  
+    });  
+  
+    // Approve/Reject  
+    window.approve = id => updateDoc(doc(db, "withdrawals", id), { status: "Approved" });  
+    window.reject = id => updateDoc(doc(db, "withdrawals", id), { status: "Rejected" });  
+  
+    // Helpers  
+    function toggleModal(id, show) {  
+      document.getElementById(id).classList.toggle("hidden", !show);  
+    }  
+    function toggleSort(field) {  
+      if (sortBy === field) sortAsc = !sortAsc;  
+      else { sortBy = field; sortAsc = true; }  
+      renderMembers();  
+    }  
+  
+    // Render Members (with chart and pagination)  
+    function renderMembers() {  
+      const kw = document.getElementById("searchInput").value.toLowerCase();  
+      const st = document.getElementById("statusFilter").value;  
+      let list = allMembers.filter(m =>  
+        (m.name.toLowerCase().includes(kw) || m.email.toLowerCase().includes(kw)) &&  
+        (st==="all"||m.status===st)  
+      );  
+      if (sortBy) {  
+        list.sort((a,b)=> sortBy==="shares"  
+          ? (sortAsc? a.shares-b.shares : b.shares-a.shares)  
+          : (sortAsc? a.name.localeCompare(b.name): b.name.localeCompare(a.name))  
+        );  
+      }  
+      const total = list.length;  
+      const start = (currentPage-1)*pageSize;  
+      const page = list.slice(start, start+pageSize);  
+  
+      memberTable.innerHTML = "";  
+      let appr=0, pend=0;  
+      page.forEach(m=>{  
+        if(m.status==="Approved") appr++; else pend++;  
+        const row=document.createElement("tr");  
+        row.className="hover:bg-gray-700 cursor-pointer";  
+        row.innerHTML = `  
+          <td>${m.name}</td>  
+          <td>${m.email}</td>  
+          <td>${m.shares||0}</td>  
+          <td class="${m.status==='Approved'?'text-green-400':'text-yellow-400'}">${m.status}</td>`;  
+        row.onclick = () => openEdit(m);  
+        memberTable.appendChild(row);  
+      });  
+      chart.data.datasets[0].data = [appr, pend];  
+      chart.update();  
+  
+      const totalPages = Math.ceil(total/pageSize);  
+      document.getElementById("pageIndicator").textContent = `Page ${currentPage} of ${totalPages}`;  
+      document.getElementById("prevPage").disabled = currentPage <= 1;  
+      document.getElementById("nextPage").disabled = currentPage >= totalPages;  
+    }  
+  
+    // Render Transactions according to filter  
+    function renderTxns() {  
+      const selected = txnFilter.value;  
+      const list = allTxns.filter(txn => selected === "all" || txn.memberId === selected);  
+      const container = txnTable;  
+      container.innerHTML = "";  
+      list.forEach(t => {  
+        const row = document.createElement("tr");  
+        row.innerHTML = `  
+          <td>${t.memberName}</td>  
+          <td class="${t.type==='buy'?'text-green-400':'text-red-400'}">${t.type}</td>  
+          <td>${t.shares}</td>  
+          <td>${t.date}</td>`;  
+        container.appendChild(row);  
+      });  
+    }  
+  
+    // CRUD Helpers  
+    async function openEdit(m) {  
+      editingDocId = m.id;  
+      document.getElementById("editName").value = m.name;  
+      document.getElementById("editEmail").value = m.email;  
+      document.getElementById("editShares").value = m.shares;  
+      document.getElementById("editStatus").value = m.status;  
+      toggleModal("editModal", true);  
+    }  
+    async function saveEdit() {  
+      await updateDoc(doc(db,"members",editingDocId), {  
+        name: document.getElementById("editName").value,  
+        email: document.getElementById("editEmail").value,  
+        shares: Number(document.getElementById("editShares").value),  
+        status: document.getElementById("editStatus").value  
+      });  
+      toggleModal("editModal", false);  
+    }  
+    async function createMember() {  
+      await addDoc(membersRef, {  
+        name: document.getElementById("addName").value,  
+        email: document.getElementById("addEmail").value,  
+        shares: Number(document.getElementById("addShares").value)||0,  
+        status: document.getElementById("addStatus").value,  
+        createdAt: new Date().toISOString()  
+      });  
+      toggleModal("addModal", false);  
+    }  
+    function populateTxnMembers() {  
+      const sel = document.getElementById("txnMember");  
+      sel.innerHTML = '<option value="" disabled selected>Select Member</option>';  
+      allMembers.forEach(m => {  
+        const opt = document.createElement("option");  
+        opt.value = m.id; opt.textContent = m.name;  
+        sel.appendChild(opt);  
+      });  
+      document.getElementById("txnDate").value = new Date().toISOString().slice(0,10);  
+    }  
+    async function createTransaction() {  
+      const memberId = document.getElementById("txnMember").value;  
+      const member = allMembers.find(m=>m.id===memberId);  
+      await addDoc(transactionsRef, {  
+        memberId,  
+        memberName: member.name,  
+        type: document.getElementById("txnType").value,  
+        shares: Number(document.getElementById("txnShares").value),  
+        date: document.getElementById("txnDate").value  
+      });  
+      toggleModal("addTxnModal", false);  
+    }  
+    async function exportCSV() {  
+      const snap = await getDocs(membersRef);  
+      const rows=[["Name","Email","Shares","Status"]];  
+      snap.forEach(doc=>{ const m=doc.data(); rows.push([m.name,m.email,m.shares||0,m.status]); });  
+      const csv=rows.map(r=>r.join(",")).join("\n");  
+      const blob=new Blob([csv],{type:"text/csv"});  
+      const url=URL.createObjectURL(blob);  
+      const a=document.createElement("a"); a.href=url; a.download="members.csv"; a.click();  
+    }  
+  </script>  </body>  
 </html>
