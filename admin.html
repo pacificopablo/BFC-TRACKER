@@ -1,53 +1,139 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Baccarat Fund Admin Dashboard</title>
+  <title>Admin Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 text-white p-4">
-  <div class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold">👑 Baccarat Fund Admin Dashboard</h1>
-    <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">Logout</button>
+  <h1 class="text-3xl font-bold mb-4">👑 Admin Dashboard</h1>
+
+  <div id="summary" class="mb-6 space-y-1">
+    <p>Total Members: <span id="totalMembers">0</span></p>
+    <p>Total Shares: <span id="totalShares">0</span></p>
+    <p>Total Balance: ₱<span id="totalBalance">0</span></p>
   </div>
-  
-  <!-- [Rest of the HTML remains the same until the script tag] -->
+
+  <input type="text" id="searchInput" placeholder="Search by name, email, or status..." class="mb-4 p-2 w-full rounded bg-gray-700 text-white" />
+
+  <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+  <!-- Edit Member Modal -->
+  <div id="editModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-50">
+    <div class="bg-white text-black p-6 rounded-lg w-full max-w-md">
+      <h2 class="text-xl font-bold mb-4">Edit Member</h2>
+      <input id="editName" class="mb-2 w-full p-2 border rounded" placeholder="Name" />
+      <input id="editEmail" class="mb-2 w-full p-2 border rounded" placeholder="Email" />
+      <input id="editShares" type="number" class="mb-2 w-full p-2 border rounded" placeholder="Shares" />
+      <input id="editBalance" type="number" class="mb-2 w-full p-2 border rounded" placeholder="Balance" />
+      <select id="editStatus" class="mb-4 w-full p-2 border rounded">
+        <option value="pending">Pending</option>
+        <option value="approved">Approved</option>
+      </select>
+      <div class="flex justify-end space-x-2">
+        <button id="closeModal" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
+        <button id="saveEdit" class="bg-blue-600 text-white px-4 py-2 rounded">Save Changes</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module">
-    // [Previous script code remains the same until initializeFundChart]
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getFirestore, collection, getDocs, doc, updateDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    // Initialize chart
-    function initializeFundChart() {
-      const ctx = document.getElementById('fundChart').getContext('2d');
-      fundChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-          datasets: [{
-            label: 'Fund Balance',
-            data: [0, 0, 0, 0, 0, 0],
-            backgroundColor: 'rgba(59, 130, 246, 0.2)',
-            borderColor: 'rgba(59, 130, 246, 1)',
-            borderWidth: 2,
-            fill: true,
-            tension: 0.3
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { labels: { color: 'white' } } },
-          scales: {
-            x: { ticks: { color: 'white' } },
-            y: { ticks: { color: 'white' }, beginAtZero: true }
-          }
-        }
+    const firebaseConfig = {
+      apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
+      authDomain: "bfc-tracker.firebaseapp.com",
+      databaseURL: "https://bfc-tracker-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "bfc-tracker",
+      storageBucket: "bfc-tracker.firebasestorage.app",
+      messagingSenderId: "127052459580",
+      appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
+      measurementId: "G-PNYRCFJHYM"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const membersList = document.getElementById("membersList");
+    const totalMembers = document.getElementById("totalMembers");
+    const totalShares = document.getElementById("totalShares");
+    const totalBalance = document.getElementById("totalBalance");
+    const searchInput = document.getElementById("searchInput");
+
+    let currentEditId = null;
+
+    const modal = document.getElementById("editModal");
+    const editName = document.getElementById("editName");
+    const editEmail = document.getElementById("editEmail");
+    const editShares = document.getElementById("editShares");
+    const editBalance = document.getElementById("editBalance");
+    const editStatus = document.getElementById("editStatus");
+    const closeModal = document.getElementById("closeModal");
+    const saveEdit = document.getElementById("saveEdit");
+
+    closeModal.onclick = () => modal.classList.add("hidden");
+
+    async function loadMembers() {
+      const querySnapshot = await getDocs(collection(db, "users"));
+      let memberCount = 0, shareTotal = 0, balanceTotal = 0;
+      membersList.innerHTML = "";
+
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const id = docSnap.id;
+        memberCount++;
+        shareTotal += data.shares;
+        balanceTotal += data.balance;
+
+        const div = document.createElement("div");
+        div.className = "bg-gray-800 p-4 rounded shadow";
+        div.innerHTML = `
+          <p><strong>Name:</strong> ${data.name}</p>
+          <p><strong>Email:</strong> ${data.email}</p>
+          <p><strong>Status:</strong> ${data.status}</p>
+          <p><strong>Shares:</strong> ${data.shares}</p>
+          <p><strong>Balance:</strong> ₱${data.balance}</p>
+          <button class="bg-blue-600 px-2 py-1 mt-2 rounded" onclick="editMember('${id}', '${data.name}', '${data.email}', ${data.shares}, ${data.balance}, '${data.status}')">Edit</button>
+        `;
+        membersList.appendChild(div);
       });
-      updateFundChart(); // Call immediately to populate real data
+
+      totalMembers.textContent = memberCount;
+      totalShares.textContent = shareTotal;
+      totalBalance.textContent = balanceTotal.toFixed(2);
     }
 
-    // [Rest of the script remains the same]
+    window.editMember = (id, name, email, shares, balance, status) => {
+      currentEditId = id;
+      editName.value = name;
+      editEmail.value = email;
+      editShares.value = shares;
+      editBalance.value = balance;
+      editStatus.value = status;
+      modal.classList.remove("hidden");
+    };
+
+    saveEdit.onclick = async () => {
+      if (!currentEditId) return;
+      const updatedData = {
+        name: editName.value,
+        email: editEmail.value,
+        shares: Number(editShares.value),
+        balance: Number(editBalance.value),
+        status: editStatus.value
+      };
+      await updateDoc(doc(db, "users", currentEditId), updatedData);
+      modal.classList.add("hidden");
+      loadMembers();
+    };
+
+    loadMembers();
   </script>
 </body>
 </html>
