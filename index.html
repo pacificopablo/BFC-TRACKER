@@ -50,7 +50,7 @@
         if (userDoc.exists()) {
           const role = userDoc.data().role;
           if (role === "admin") {
-            window.location.href = "admin-dashboard.html";
+            window.location.href = "admin.html";
           } else if (role === "member") {
             window.location.href = "member-dashboard.html";
           } else {
