@@ -201,6 +201,7 @@
       let allMembers = [];
       let lastSubmissionTime = 0;
       const SUBMISSION_COOLDOWN = 5000; // 5 seconds
+      const SHARE_PRICE = 100; // ₱100 per share
 
       // Utility Functions
       const formatCurrency = (value) =>
@@ -216,19 +217,24 @@
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
-      // Load Fund Balance
+      // Load Fund Balance (Sum of Shares × Share Price)
       async function loadFundBalance() {
         try {
+          const snapshot = await getDocs(collection(db, "users"));
+          allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          const totalShares = allMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+          const calculatedFundBalance = totalShares * SHARE_PRICE;
+
           const fundSnapshot = await getDocs(collection(db, "fund"));
           if (fundSnapshot.empty) {
-            await setDoc(doc(db, "fund", "main"), { balance: 0 });
-            elements.fundBalance.textContent = formatCurrency(0);
-            return 0;
+            await setDoc(doc(db, "fund", "main"), { balance: calculatedFundBalance });
+          } else {
+            const fundRef = doc(db, "fund", fundSnapshot.docs[0].id);
+            await updateDoc(fundRef, { balance: calculatedFundBalance });
           }
-          const fundDoc = fundSnapshot.docs[0];
-          const balance = fundDoc.data().balance || 0;
-          elements.fundBalance.textContent = formatCurrency(balance);
-          return balance;
+
+          elements.fundBalance.textContent = formatCurrency(calculatedFundBalance);
+          return calculatedFundBalance;
         } catch (error) {
           console.error("Error loading fund balance:", error);
           showError(elements.profitError, `Nabigo sa pag-load ng fund balance: ${error.message}`);
@@ -245,11 +251,24 @@
           loadFundBalance().then(() => {
             loadMembers();
             listenForRequests();
+            listenForMemberChanges();
           });
         }
       });
 
-      // Load Members from 'users' collection
+      // Listen for Member Changes (Real-Time)
+      function listenForMemberChanges() {
+        onSnapshot(collection(db, "users"), (snapshot) => {
+          allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          displayMembers(allMembers);
+          loadFundBalance(); // Update fund balance on member changes
+        }, (error) => {
+          console.error("Error listening for member changes:", error);
+          showError(elements.profitError, `Nabigo sa pag-monitor ng mga miyembro: ${error.message}`);
+        });
+      }
+
+      // Load Members
       async function loadMembers() {
         showLoading(elements.membersList, "Naglo-load ng mga miyembro...");
         showLoading(elements.topShareholders, "Naglo-load ng mga shareholder...");
@@ -258,21 +277,10 @@
         elements.totalBalance.textContent = "Naglo-load...";
 
         try {
-          const snapshot = await getDocs(collection(db, "users"));
-          allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          if (allMembers.length === 0) {
-            elements.membersList.innerHTML = '<p class="text-gray-400">Walang nahanap na miyembro.</p>';
-            elements.topShareholders.innerHTML = '<p class="text-gray-400">Walang shareholders.</p>';
-            elements.totalMembers.textContent = "0";
-            elements.totalShares.textContent = "0";
-            elements.totalBalance.textContent = formatCurrency(0);
-          } else {
-            console.log("Mga miyembrong nakuha mula sa users collection:", allMembers);
-            displayMembers(allMembers);
-            updateTopShareholders();
-          }
+          displayMembers(allMembers);
+          updateTopShareholders();
         } catch (error) {
-          console.error("Error sa pag-load ng mga miyembro mula sa users collection:", error);
+          console.error("Error sa pag-load ng mga miyembro:", error);
           showError(elements.profitError, `Nabigo sa pag-load ng mga miyembro: ${error.message}`);
           elements.membersList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng mga miyembro.</p>';
           elements.totalMembers.textContent = "0";
@@ -348,7 +356,7 @@
           (m) =>
             (m.name || "").toLowerCase().includes(query) ||
             (m.email || "").toLowerCase().includes(query) ||
-            (m.status || "").toLowerCase().includes(query)
+            (m.status || "").toLowerCase(). включает(query)
         );
         displayMembers(filtered);
       });
@@ -416,29 +424,13 @@
         elements.distributeBtn.textContent = "Pinoproseso...";
 
         try {
-          const transactionType = elements.transactionType.value; // "profit" o "loss"
+          const transactionType = elements.transactionType.value;
           const amount = parseFloat(elements.profitAmount.value);
           if (isNaN(amount) || amount <= 0) {
             showError(elements.profitError, "Maglagay ng valid na halaga na higit sa 0.");
             return;
           }
 
-          // I-load ang fund balance
-          const fundSnapshot = await getDocs(collection(db, "fund"));
-          if (fundSnapshot.empty) {
-            showError(elements.profitError, "Walang fund data. I-initialize ang fund balance.");
-            return;
-          }
-          const fundDoc = fundSnapshot.docs[0];
-          const fundBalance = fundDoc.data().balance || 0;
-
-          // Suriin kung sapat ang fund balance para sa loss
-          if (transactionType === "loss" && amount > fundBalance) {
-            showError(elements.profitError, "Kulang ang fund balance para sa pagkatalo.");
-            return;
-          }
-
-          // Filter approved members at kalkulahin ang total shares
           const approvedMembers = allMembers.filter((m) => m.status === "approved");
           const totalShares = approvedMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
           if (totalShares === 0) {
@@ -446,41 +438,44 @@
             return;
           }
 
-          // Kalkulahin ang amount per share
-          const amountPerShare = amount / totalShares;
-
-          // Gumawa ng batch para sa atomic updates
-          const batch = writeBatch(db);
-
-          // I-update ang balances ng mga miyembro
-          approvedMembers.forEach((member) => {
-            const currentBalance = member.balance || 0;
-            let newBalance;
-            if (transactionType === "profit") {
-              newBalance = currentBalance + (member.shares || 0) * amountPerShare;
-            } else {
-              newBalance = currentBalance - (member.shares || 0) * amountPerShare;
-              if (newBalance < 0) newBalance = 0; // Iwasan ang negatibong balance
-            }
-            const userRef = doc(db, "users", member.id);
-            batch.update(userRef, { balance: newBalance });
-            console.log(
-              `${transactionType === "profit" ? "Idinagdag" : "Ibinawas"} ₱${formatCurrency(
-                (member.shares || 0) * amountPerShare
-              )} sa ${member.name || "N/A"} (Bagong balance: ₱${formatCurrency(newBalance)})`
-            );
-          });
-
-          // I-update ang fund balance
-          const fundRef = doc(db, "fund", fundDoc.id);
-          const newFundBalance = transactionType === "profit" ? fundBalance + amount : fundBalance - amount;
-          if (newFundBalance < 0) {
-            showError(elements.profitError, "Ang pagkatalo ay magreresulta sa negatibong fund balance.");
+          const sharesChange = amount / SHARE_PRICE; // Calculate share change based on amount
+          const fundSnapshot = await getDocs(collection(db, "fund"));
+          if (fundSnapshot.empty) {
+            showError(elements.profitError, "Walang fund data. I-initialize ang fund balance.");
             return;
           }
+          const fundDoc = fundSnapshot.docs[0];
+          const currentFundBalance = fundDoc.data().balance || 0;
+
+          if (transactionType === "loss" && sharesChange * SHARE_PRICE > currentFundBalance) {
+            showError(elements.profitError, "Kulang ang fund balance para sa pagkatalo.");
+            return;
+          }
+
+          const batch = writeBatch(db);
+          approvedMembers.forEach((member) => {
+            const currentShares = member.shares || 0;
+            const currentBalance = member.balance || 0;
+            let newShares;
+            if (transactionType === "profit") {
+              newShares = currentShares + (sharesChange * (currentShares / totalShares));
+            } else {
+              newShares = Math.max(0, currentShares - (sharesChange * (currentShares / totalShares)));
+            }
+            const userRef = doc(db, "users", member.id);
+            batch.update(userRef, { shares: newShares, balance: currentBalance }); // Balance unchanged
+          });
+
+          const newTotalShares = approvedMembers.reduce((sum, m) => {
+            const currentShares = m.shares || 0;
+            return sum + (transactionType === "profit"
+              ? currentShares + (sharesChange * (currentShares / totalShares))
+              : Math.max(0, currentShares - (sharesChange * (currentShares / totalShares))));
+          }, 0);
+          const newFundBalance = newTotalShares * SHARE_PRICE;
+          const fundRef = doc(db, "fund", fundDoc.id);
           batch.update(fundRef, { balance: newFundBalance });
 
-          // I-log ang transaction sa profit_distributions
           const auditRef = collection(db, "profit_distributions");
           batch.set(doc(auditRef), {
             type: transactionType,
@@ -491,10 +486,7 @@
             totalShares,
           });
 
-          // I-commit ang batch
           await batch.commit();
-
-          // I-reset ang form at i-reload ang data
           elements.profitForm.reset();
           await loadMembers();
           await loadFundBalance();
@@ -504,8 +496,8 @@
             )} sa ${approvedMembers.length} miyembro!`
           );
         } catch (error) {
-          console.error(`Error ${transactionType === "profit" ? "distributing profit" : "deducting loss"}:`, error.code, error.message);
-          showError(elements.profitError, `Nabigo ang ${transactionType === "profit" ? "pamimigay ng profit" : "pagbabawas ng loss"}: ${error.code} - ${error.message}`);
+          console.error(`Error ${transactionType === "profit" ? "distributing profit" : "deducting loss"}:`, error);
+          showError(elements.profitError, `Nabigo ang ${transactionType === "profit" ? "pamimigay ng profit" : "pagbabawas ng loss"}: ${error.message}`);
         } finally {
           elements.distributeBtn.disabled = false;
           elements.distributeBtn.textContent = "Submit Transaction";
@@ -548,9 +540,10 @@
           await updateDoc(doc(db, "users", id), updatedData);
           elements.editModal.classList.add("hidden");
           await loadMembers();
+          await loadFundBalance();
           alert("Matagumpay na na-update ang miyembro!");
         } catch (error) {
-          console.error("Error sa pag-update ng miyembro sa users collection:", error);
+          console.error("Error sa pag-update ng miyembro:", error);
           showError(elements.profitError, `Nabigo sa pag-update ng miyembro: ${error.message}`);
         }
       });
@@ -565,9 +558,10 @@
           try {
             await deleteDoc(doc(db, "users", id));
             await loadMembers();
+            await loadFundBalance();
             alert("Matagumpay na na-delete ang miyembro!");
           } catch (error) {
-            console.error("Error sa pag-delete ng miyembro mula sa users collection:", error);
+            console.error("Error sa pag-delete ng miyembro:", error);
             showError(elements.profitError, `Nabigo sa pag-delete ng miyembro: ${error.message}`);
           }
         }
