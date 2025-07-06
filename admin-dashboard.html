@@ -201,7 +201,6 @@
       let allMembers = [];
       let lastSubmissionTime = 0;
       const SUBMISSION_COOLDOWN = 5000; // 5 seconds
-      const SHARE_PRICE = 100; // ₱100 per share
 
       // Utility Functions
       const formatCurrency = (value) =>
@@ -217,24 +216,23 @@
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
-      // Load Fund Balance (Sum of Shares × Share Price)
+      // Load Fund Balance (Sum of Members' Balances)
       async function loadFundBalance() {
         try {
           const snapshot = await getDocs(collection(db, "users"));
           allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          const totalShares = allMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
-          const calculatedFundBalance = totalShares * SHARE_PRICE;
+          const totalBalance = allMembers.reduce((sum, m) => sum + (m.balance || 0), 0);
 
           const fundSnapshot = await getDocs(collection(db, "fund"));
           if (fundSnapshot.empty) {
-            await setDoc(doc(db, "fund", "main"), { balance: calculatedFundBalance });
+            await setDoc(doc(db, "fund", "main"), { balance: totalBalance });
           } else {
             const fundRef = doc(db, "fund", fundSnapshot.docs[0].id);
-            await updateDoc(fundRef, { balance: calculatedFundBalance });
+            await updateDoc(fundRef, { balance: totalBalance });
           }
 
-          elements.fundBalance.textContent = formatCurrency(calculatedFundBalance);
-          return calculatedFundBalance;
+          elements.fundBalance.textContent = formatCurrency(totalBalance);
+          return totalBalance;
         } catch (error) {
           console.error("Error loading fund balance:", error);
           showError(elements.profitError, `Nabigo sa pag-load ng fund balance: ${error.message}`);
@@ -328,6 +326,7 @@
         elements.totalMembers.textContent = memberCount;
         elements.totalShares.textContent = shareTotal;
         elements.totalBalance.textContent = formatCurrency(balanceTotal);
+        elements.fundBalance.textContent = formatCurrency(balanceTotal); // Sync fund balance with total balance
       }
 
       // Update Top Shareholders
@@ -356,7 +355,7 @@
           (m) =>
             (m.name || "").toLowerCase().includes(query) ||
             (m.email || "").toLowerCase().includes(query) ||
-            (m.status || "").toLowerCase(). включает(query)
+            (m.status || "").toLowerCase().includes(query)
         );
         displayMembers(filtered);
       });
@@ -438,7 +437,6 @@
             return;
           }
 
-          const sharesChange = amount / SHARE_PRICE; // Calculate share change based on amount
           const fundSnapshot = await getDocs(collection(db, "fund"));
           if (fundSnapshot.empty) {
             showError(elements.profitError, "Walang fund data. I-initialize ang fund balance.");
@@ -447,34 +445,30 @@
           const fundDoc = fundSnapshot.docs[0];
           const currentFundBalance = fundDoc.data().balance || 0;
 
-          if (transactionType === "loss" && sharesChange * SHARE_PRICE > currentFundBalance) {
+          if (transactionType === "loss" && amount > currentFundBalance) {
             showError(elements.profitError, "Kulang ang fund balance para sa pagkatalo.");
             return;
           }
 
+          const amountPerShare = amount / totalShares;
           const batch = writeBatch(db);
+          let newTotalBalance = 0;
+
           approvedMembers.forEach((member) => {
-            const currentShares = member.shares || 0;
             const currentBalance = member.balance || 0;
-            let newShares;
+            let newBalance;
             if (transactionType === "profit") {
-              newShares = currentShares + (sharesChange * (currentShares / totalShares));
+              newBalance = currentBalance + (member.shares || 0) * amountPerShare;
             } else {
-              newShares = Math.max(0, currentShares - (sharesChange * (currentShares / totalShares)));
+              newBalance = Math.max(0, currentBalance - (member.shares || 0) * amountPerShare);
             }
+            newTotalBalance += newBalance;
             const userRef = doc(db, "users", member.id);
-            batch.update(userRef, { shares: newShares, balance: currentBalance }); // Balance unchanged
+            batch.update(userRef, { balance: newBalance });
           });
 
-          const newTotalShares = approvedMembers.reduce((sum, m) => {
-            const currentShares = m.shares || 0;
-            return sum + (transactionType === "profit"
-              ? currentShares + (sharesChange * (currentShares / totalShares))
-              : Math.max(0, currentShares - (sharesChange * (currentShares / totalShares))));
-          }, 0);
-          const newFundBalance = newTotalShares * SHARE_PRICE;
           const fundRef = doc(db, "fund", fundDoc.id);
-          batch.update(fundRef, { balance: newFundBalance });
+          batch.update(fundRef, { balance: newTotalBalance });
 
           const auditRef = collection(db, "profit_distributions");
           batch.set(doc(auditRef), {
