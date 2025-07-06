@@ -113,7 +113,7 @@
 
     // Load transaction history
     function loadTransactionHistory() {
-      const q = query(collection(db, "transactions"), where("memberId", "==", currentUser.uid), orderBy("timestamp", "desc"));
+      const q = query(collection(db, "transactions"), where("memberId", "==", currentUser?.uid), orderBy("timestamp", "desc"));
       onSnapshot(q, (snapshot) => {
         transactionHistory.innerHTML = "<h2 class='text-xl font-bold mb-2'>Transaction History</h2>";
         if (snapshot.empty) {
@@ -124,7 +124,7 @@
           const data = doc.data();
           transactionHistory.innerHTML += `
             <p><strong>${data.type.charAt(0).toUpperCase() + data.type.slice(1)}:</strong> ₱${Number(data.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-            - ${data.status} on ${data.timestamp?.toDate().toLocaleString()}</p>
+            - ${data.status} on ${data.timestamp?.toDate().toLocaleString() || "N/A"}</p>
           `;
         });
       });
