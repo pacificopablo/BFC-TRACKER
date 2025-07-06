@@ -61,10 +61,8 @@
 
     import {
       collection, doc, getDocs, updateDoc, addDoc, deleteDoc,
-      query, where, serverTimestamp
+      getDoc, query, where, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-    const adminUID = "Sr1vh8YU16dX3NvsDacLHJWpSC13";
 
     const memberList = document.getElementById('memberList');
     const requestList = document.getElementById('requestList');
@@ -82,14 +80,27 @@
     showTab('members');
 
     onAuthStateChanged(auth, async (user) => {
-      if (!user || user.uid !== adminUID) {
+      if (!user) {
+        alert("Not logged in.");
+        window.location.href = "index.html";
+        return;
+      }
+
+      console.log("Logged in UID:", user.uid);
+      alert("Your UID: " + user.uid); // Remove this after setup
+
+      const adminRef = doc(db, "admins", user.uid);
+      const adminSnap = await getDoc(adminRef);
+
+      if (!adminSnap.exists()) {
         alert("Access denied.");
         window.location.href = "index.html";
-      } else {
-        loadMembers();
-        loadRequests();
-        loadProfits();
+        return;
       }
+
+      loadMembers();
+      loadRequests();
+      loadProfits();
     });
 
     logoutBtn.onclick = () => signOut(auth).then(() => window.location.href = "index.html");
