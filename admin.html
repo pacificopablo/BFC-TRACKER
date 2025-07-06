@@ -1,15 +1,15 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Baccarat Fund Admin Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white p-4">  <!-- Login Modal -->  <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center">
+<body class="bg-gray-900 text-white p-4">
+  <!-- Login Modal -->
+  <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center">
     <div class="bg-gray-800 p-6 rounded shadow-lg w-full max-w-sm">
       <h2 class="text-2xl font-bold mb-4">🔐 Admin Login</h2>
       <input type="email" id="loginEmail" placeholder="Email" class="w-full p-2 mb-2 rounded bg-gray-700 text-white" />
@@ -19,69 +19,63 @@
       </div>
       <button id="loginBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Login</button>
     </div>
-  </div>  <!-- Main Dashboard -->  <div id="dashboard" class="hidden">
-    <h1 class="text-3xl font-bold mb-6">👑 Baccarat Fund Admin Dashboard</h1><!-- Summary Cards -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-  <div class="bg-gray-800 p-4 rounded shadow">
-    <p class="text-sm">Total Members</p>
-    <p class="text-2xl font-bold" id="totalMembers">0</p>
   </div>
-  <div class="bg-gray-800 p-4 rounded shadow">
-    <p class="text-sm">Total Shares</p>
-    <p class="text-2xl font-bold" id="totalShares">0</p>
+
+  <!-- Main Dashboard -->
+  <div id="dashboard" class="hidden">
+    <h1 class="text-3xl font-bold mb-6">👑 Baccarat Fund Admin Dashboard</h1>
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="bg-gray-800 p-4 rounded shadow">
+        <p class="text-sm">Total Members</p>
+        <p class="text-2xl font-bold" id="totalMembers">0</p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded shadow">
+        <p class="text-sm">Total Shares</p>
+        <p class="text-2xl font-bold" id="totalShares">0</p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded shadow">
+        <p class="text-sm">Total Balance</p>
+        <p class="text-2xl font-bold">₱<span id="totalBalance">0.00</span></p>
+      </div>
+    </div>
+
+    <!-- Export Buttons -->
+    <div class="flex gap-4 mb-6">
+      <button id="exportMembers" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded">Export Members CSV</button>
+      <button id="exportTransactions" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded">Export Transactions CSV</button>
+    </div>
+
+    <!-- Member List -->
+    <input type="text" id="searchInput" placeholder="Search by name, email, or status..." class="mb-4 p-2 w-full rounded bg-gray-700 text-white" />
+    <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+    <!-- Top 5 Shareholders -->
+    <div class="bg-gray-800 p-4 mt-8 rounded shadow">
+      <h2 class="text-xl font-bold mb-2">🏆 Top 5 Shareholders</h2>
+      <ul id="topShareholders" class="list-disc list-inside text-sm"></ul>
+    </div>
+
+    <!-- Transaction Requests -->
+    <h2 class="text-2xl font-bold mt-10 mb-4">💰 Deposit & Cash Out Requests</h2>
+    <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>
+
+    <!-- Fund Chart -->
+    <div class="bg-gray-800 p-4 rounded shadow mt-6">
+      <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
+      <canvas id="fundChart" height="100"></canvas>
+    </div>
   </div>
-  <div class="bg-gray-800 p-4 rounded shadow">
-    <p class="text-sm">Total Balance</p>
-    <p class="text-2xl font-bold">₱<span id="totalBalance">0.00</span></p>
-  </div>
-</div>
 
-<!-- Export Buttons -->
-<div class="flex gap-4 mb-6">
-  <button id="exportMembers" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded">Export Members CSV</button>
-  <button id="exportTransactions" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded">Export Transactions CSV</button>
-</div>
-
-<!-- Member List -->
-<input type="text" id="searchInput" placeholder="Search by name, email, or status..." class="mb-4 p-2 w-full rounded bg-gray-700 text-white" />
-<div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-
-<!-- Top 5 Shareholders -->
-<div class="bg-gray-800 p-4 mt-8 rounded shadow">
-  <h2 class="text-xl font-bold mb-2">🏆 Top 5 Shareholders</h2>
-  <ul id="topShareholders" class="list-disc list-inside text-sm"></ul>
-</div>
-
-<!-- Transaction Requests -->
-<h2 class="text-2xl font-bold mt-10 mb-4">💰 Deposit & Cash Out Requests</h2>
-<div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>
-
-<!-- Fund Chart -->
-<div class="bg-gray-800 p-4 rounded shadow mt-6">
-  <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
-  <canvas id="fundChart" height="100"></canvas>
-</div>
-
-  </div>  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, collection, getDocs, deleteDoc, doc, query, orderBy, onSnapshot, updateDoc, addDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_AUTH_DOMAIN",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_STORAGE_BUCKET",
-      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+  <script type="module">
+    import { auth, db } from './firebase-config.js';
+    import { onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { collection, getDocs, deleteDoc, doc, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const pwInput = document.getElementById('loginPassword');
     const strengthText = document.getElementById('pwStrength');
+    const loginBtn = document.getElementById('loginBtn');
+
     pwInput.addEventListener('input', () => {
       const val = pwInput.value;
       let strength = 'Weak';
@@ -90,7 +84,7 @@
       strengthText.textContent = strength;
     });
 
-    document.getElementById('loginBtn').addEventListener('click', async () => {
+    loginBtn.addEventListener('click', async () => {
       try {
         await signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, pwInput.value);
       } catch (e) {
@@ -121,7 +115,6 @@
     const totalBalance = document.getElementById("totalBalance");
     const membersList = document.getElementById("membersList");
     const topShareholders = document.getElementById("topShareholders");
-    const searchInput = document.getElementById("searchInput");
     const requestsList = document.getElementById("requestsList");
 
     let allMembers = [];
@@ -132,16 +125,26 @@
     }
 
     async function initDashboard() {
+      // Auto-cleanup pending users/requests older than 7 days
       const now = Date.now();
       const cutoff = now - 7 * 24 * 60 * 60 * 1000;
-      (await getDocs(collection(db, 'users'))).forEach(s => {
+
+      const usersSnap = await getDocs(collection(db, 'users'));
+      usersSnap.forEach(s => {
         const d = s.data();
-        if (d.status === 'pending' && d.createdAt?.toMillis() < cutoff) deleteDoc(doc(db, 'users', s.id));
+        if (d.status === 'pending' && d.createdAt?.toMillis() < cutoff) {
+          deleteDoc(doc(db, 'users', s.id));
+        }
       });
-      (await getDocs(collection(db, 'transactions'))).forEach(s => {
+
+      const transactionsSnap = await getDocs(collection(db, 'transactions'));
+      transactionsSnap.forEach(s => {
         const d = s.data();
-        if (d.status === 'pending' && d.timestamp?.toMillis() < cutoff) deleteDoc(doc(db, 'transactions', s.id));
+        if (d.status === 'pending' && d.timestamp?.toMillis() < cutoff) {
+          deleteDoc(doc(db, 'transactions', s.id));
+        }
       });
+
       loadMembers();
       listenForRequests();
       initializeFundChart();
@@ -251,18 +254,32 @@
       });
     }
 
-    function downloadCSV(fn, rows) {
+    function downloadCSV(filename, rows) {
+      if (rows.length === 0) {
+        alert('No data to export');
+        return;
+      }
       const header = Object.keys(rows[0]).join(',') + "\n";
-      const body = rows.map(r => Object.values(r).map(v => '"' + v + '"').join(',')).join("\n");
+      const body = rows.map(r => Object.values(r).map(v => {
+        if (typeof v === 'string') return `"${v.replace(/"/g, '""')}"`; // escape quotes
+        return v;
+      }).join(',')).join("\n");
       const blob = new Blob([header + body], { type: 'text/csv' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = fn;
+      link.download = filename;
       link.click();
     }
 
     document.getElementById('exportMembers').addEventListener('click', () => {
-      downloadCSV('members.csv', allMembers.map(m => ({ id: m.id, name: m.name, email: m.email, status: m.status, shares: m.shares, balance: m.balance })));
+      downloadCSV('members.csv', allMembers.map(m => ({
+        id: m.id,
+        name: m.name,
+        email: m.email,
+        status: m.status,
+        shares: m.shares || 0,
+        balance: m.balance || 0
+      })));
     });
 
     document.getElementById('exportTransactions').addEventListener('click', async () => {
@@ -271,5 +288,6 @@
       snaps.forEach(s => rows.push({ id: s.id, ...s.data() }));
       downloadCSV('transactions.csv', rows);
     });
-  </script></body>
+  </script>
+</body>
 </html>
