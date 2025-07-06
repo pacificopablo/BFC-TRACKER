@@ -1,54 +1,94 @@
-<!-- login.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Login - Baccarat Fund Admin</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>User Login</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white flex items-center justify-center h-screen">
-  <div class="text-center space-y-4">
-    <h1 class="text-3xl font-bold">🔐 Admin Login</h1>
-    <button id="googleLogin" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700">Sign in with Google</button>
-    <p id="loginError" class="text-red-500 hidden">Access denied: Admin only</p>
+<body class="bg-gray-900 flex items-center justify-center min-h-screen text-white">
+  <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md">
+    <h2 class="text-2xl font-bold mb-6 text-center">Login to Your Account</h2>
+    
+    <form id="loginForm" class="space-y-4">
+      <div>
+        <label for="email" class="block mb-1">Email</label>
+        <input type="email" id="email" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
+      </div>
+      <div>
+        <label for="password" class="block mb-1">Password</label>
+        <input type="password" id="password" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
+      </div>
+      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded">Login</button>
+    </form>
+
+    <p id="errorMsg" class="text-red-400 text-center mt-4 hidden"></p>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
+    // Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
       authDomain: "bfc-tracker.firebaseapp.com",
+      databaseURL: "https://bfc-tracker-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "bfc-tracker",
-      storageBucket: "bfc-tracker.appspot.com",
+      storageBucket: "bfc-tracker.firebasestorage.app",
       messagingSenderId: "127052459580",
-      appId: "1:127052459580:web:c3d5caa9302238c11cdd39"
+      appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
+      measurementId: "G-PNYRCFJHYM"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
+    // Initialize Firebase
+    let app, auth, db;
+    try {
+      app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+      db = getFirestore(app);
+    } catch (error) {
+      console.error("Firebase initialization error:", error);
+      document.getElementById("errorMsg").textContent = "Failed to initialize Firebase.";
+      document.getElementById("errorMsg").classList.remove("hidden");
+    }
 
-    const adminEmails = [
-      "youradmin@email.com", // 🔁 Replace this with your actual admin email(s)
-      "secondadmin@email.com"
-    ];
+    const loginForm = document.getElementById("loginForm");
+    const errorMsg = document.getElementById("errorMsg");
 
-    document.getElementById("googleLogin").addEventListener("click", async () => {
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorMsg.classList.add("hidden");
+
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
       try {
-        const result = await signInWithPopup(auth, provider);
-        const email = result.user.email;
+        // Sign in with email and password
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
 
-        if (adminEmails.includes(email)) {
-          localStorage.setItem("isAdmin", "true");
-          window.location.href = "dashboard.html";
+        // Fetch user role from Firestore
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+          const role = userDoc.data().role;
+          if (role === "admin") {
+            window.location.href = "admin.html";
+          } else if (role === "member") {
+            window.location.href = "member-dashboard.html";
+          } else {
+            throw new Error("User role is invalid.");
+          }
         } else {
-          document.getElementById("loginError").classList.remove("hidden");
+          throw new Error("User data not found. Please contact support.");
         }
       } catch (error) {
-        alert("Login failed: " + error.message);
+        console.error("Login error:", error);
+        errorMsg.textContent = error.message;
+        errorMsg.classList.remove("hidden");
       }
     });
   </script>
