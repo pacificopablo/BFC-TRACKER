@@ -117,7 +117,7 @@
       let allMembers = [];
 
       function formatCurrency(value) {
-        return parseFloat(value).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+        return parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
       }
 
       async function loadMembers() {
@@ -148,14 +148,14 @@
           const div = document.createElement("div");
           div.className = "bg-gray-800 p-4 rounded shadow";
           div.innerHTML = `
-            <p><strong>Name:</strong> ${m.name}</p>
-            <p><strong>Email:</strong> ${m.email}</p>
-            <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${m.status === 'approved' ? 'bg-green-600' : m.status === 'pending' ? 'bg-yellow-600' : 'bg-red-600'}">${m.status}</span></p>
-            <p><strong>Shares:</strong> ${m.shares}</p>
+            <p><strong>Name:</strong> ${m.name || 'N/A'}</p>
+            <p><strong>Email:</strong> ${m.email || 'N/A'}</p>
+            <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${m.status === 'approved' ? 'bg-green-600' : m.status === 'pending' ? 'bg-yellow-600' : 'bg-red-600'}">${m.status || 'N/A'}</span></p>
+            <p><strong>Shares:</strong> ${m.shares || 0}</p>
             <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
             <div class="flex space-x-2 mt-2">
-              <button onclick="openEditModal('${m.id}', '${m.name}', '${m.email}', '${m.status}', ${m.shares}, ${m.balance})" class="bg-blue-600 px-3 py-1 rounded text-sm">Edit</button>
-              <button onclick="deleteMember('${m.id}', '${m.name}')" class="bg-red-600 px-3 py-1 rounded text-sm">Delete</button>
+              <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm">Edit</button>
+              <button data-id="${m.id}" data-name="${m.name || 'Unknown'}" class="delete-btn bg-red-600 px-3 py-1 rounded text-sm">Delete</button>
             </div>
           `;
           membersList.appendChild(div);
@@ -169,13 +169,13 @@
       function updateTopShareholders() {
         const top = [...allMembers]
           .filter(m => m.status === 'approved')
-          .sort((a, b) => b.shares - a.shares)
+          .sort((a, b) => (b.shares || 0) - (a.shares || 0))
           .slice(0, 5);
 
         topShareholders.innerHTML = "";
-        top.forEach((m, i) => {
+        top.forEach((m) => {
           const li = document.createElement("li");
-          li.textContent = `${m.name} — ${m.shares} shares`;
+          li.textContent = `${m.name || 'N/A'} — ${m.shares || 0} shares`;
           topShareholders.appendChild(li);
         });
       }
@@ -183,9 +183,9 @@
       searchInput.addEventListener("input", () => {
         const query = searchInput.value.toLowerCase();
         const filtered = allMembers.filter(m =>
-          m.name.toLowerCase().includes(query) ||
-          m.email.toLowerCase().includes(query) ||
-          m.status.toLowerCase().includes(query)
+          (m.name || '').toLowerCase().includes(query) ||
+          (m.email || '').toLowerCase().includes(query) ||
+          (m.status || '').toLowerCase().includes(query)
         );
         displayMembers(filtered);
       });
@@ -200,8 +200,8 @@
               const div = document.createElement("div");
               div.className = "bg-gray-700 p-4 rounded";
               div.innerHTML = `
-                <p><strong>Member:</strong> ${data.memberName}</p>
-                <p><strong>Type:</strong> ${data.type}</p>
+                <p><strong>Member:</strong> ${data.memberName || 'N/A'}</p>
+                <p><strong>Type:</strong> ${data.type || 'N/A'}</p>
                 <p><strong>Amount:</strong> ₱${formatCurrency(data.amount)}</p>
                 <p><strong>Date:</strong> ${data.timestamp?.toDate().toLocaleString() || "N/A"}</p>
               `;
@@ -217,35 +217,67 @@
         });
       }
 
+      // Event Delegation for Edit and Delete Buttons
+      membersList.addEventListener("click", (e) => {
+        const target = e.target;
+        const id = target.dataset.id;
+        if (target.classList.contains("edit-btn") && id) {
+          console ( "Edit button clicked for member ID:", id );
+          const member = allMembers.find(m => m.id === id);
+          if (member) {
+            openEditModal(member);
+          } else {
+            console.error("Member not found for ID:", id);
+            alert("Member data not found.");
+          }
+        } else if (target.classList.contains("delete-btn") && id) {
+          console ( "Delete button clicked for member ID:", id );
+          const name = target.dataset.name;
+          deleteMember(id, name);
+        }
+      });
+
       // Edit Member Functions
-      function openEditModal(id, name, email, status, shares, balance) {
-        editMemberId.value = id;
-        editName.value = name;
-        editEmail.value = email;
-        editStatus.value = status;
-        editShares.value = shares;
-        editBalance.value = balance;
+      function openEditModal(member) {
+        if (!member) {
+          console.error("Invalid member data for editing");
+          alert("Cannot edit: Member data is invalid.");
+          return;
+        }
+        editMemberId.value = member.id;
+        editName.value = member.name || '';
+        editEmail.value = member.email || '';
+        editStatus.value = member.status || 'pending';
+        editShares.value = member.shares || 0;
+        editBalance.value = member.balance || 0;
         editModal.classList.remove("hidden");
       }
 
       editForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const id = editMemberId.value;
+        const shares = parseInt(editShares.value);
+        const balance = parseFloat(editBalance.value);
+        if (isNaN(shares) || shares < 0 || isNaN(balance) || balance < 0) {
+          alert("Shares and balance must be non-negative numbers.");
+          return;
+        }
         const updatedData = {
           name: editName.value,
           email: editEmail.value,
           status: editStatus.value,
-          shares: parseInt(editShares.value),
-          balance: parseFloat(editBalance.value)
+          shares: shares,
+          balance: balance
         };
         try {
+          console ( "Updating member ID:", id, "with data:", updatedData );
           await updateDoc(doc(db, "members", id), updatedData);
           editModal.classList.add("hidden");
-          loadMembers(); // Refresh member list
+          loadMembers();
           alert("Member updated successfully!");
         } catch (error) {
           console.error("Error updating member:", error);
-          alert("Failed to update member.");
+          alert(`Failed to update member: ${error.message}`);
         }
       });
 
@@ -255,14 +287,15 @@
 
       // Delete Member Function
       async function deleteMember(id, name) {
-        if (confirm(`Are you sure you want to delete ${name}?`)) {
+        if (confirm(`Are you sure you want to delete ${name || 'this member'}?`)) {
           try {
+            console ( "Deleting member ID:", id );
             await deleteDoc(doc(db, "members", id));
-            loadMembers(); // Refresh member list
+            loadMembers();
             alert("Member deleted successfully!");
           } catch (error) {
             console.error("Error deleting member:", error);
-            alert("Failed to delete member.");
+            alert(`Failed to delete member: ${error.message}`);
           }
         }
       }
