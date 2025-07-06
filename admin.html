@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Baccarat Fund Admin Dashboard</title>
@@ -6,89 +7,145 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-gray-900 text-white min-h-screen flex flex-col">  <!-- Header -->  <header class="bg-gray-800 p-4 flex justify-between items-center shadow">
+<body class="bg-gray-900 text-white min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-gray-800 p-4 flex justify-between items-center shadow">
     <h1 class="text-2xl font-bold">Baccarat Fund Admin</h1>
     <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</button>
-  </header>  <!-- Main Content -->  <main class="p-4 sm:p-6 flex-1 space-y-6 overflow-auto">
+  </header>
+
+  <!-- Main Content -->
+  <main class="p-4 sm:p-6 flex-1 space-y-6 overflow-auto">
     <!-- Member Overview -->
     <section class="bg-gray-800 p-4 rounded shadow">
       <h2 class="text-xl font-semibold mb-2">📊 Member Overview</h2>
       <canvas id="memberChart" height="100"></canvas>
-    </section><!-- Member List -->
-<section class="bg-gray-800 p-4 rounded shadow">
-  <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-2 mb-4">
-    <h2 class="text-xl font-semibold">👥 Member List</h2>
-    <div class="flex flex-wrap items-center gap-2">
-      <button id="addMemberBtn" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm">+ Add Member</button>
-      <button id="addTxnBtn" class="bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded text-sm">+ Add Transaction</button>
-      <input type="text" id="searchInput" placeholder="Search name/email..." class="px-3 py-1 rounded text-black text-sm" />
-      <select id="statusFilter" class="text-sm px-2 py-1 rounded text-black">
-        <option value="all">All</option>
+    </section>
+
+    <!-- Member List -->
+    <section class="bg-gray-800 p-4 rounded shadow">
+      <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-2 mb-4">
+        <h2 class="text-xl font-semibold">👥 Member List</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="addMemberBtn" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm">+ Add Member</button>
+          <button id="addTxnBtn" class="bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded text-sm">+ Add Transaction</button>
+          <input type="text" id="searchInput" placeholder="Search name/email..." class="px-3 py-1 rounded text-black text-sm" />
+          <select id="statusFilter" class="text-sm px-2 py-1 rounded text-black">
+            <option value="all">All</option>
+            <option value="Approved">Approved</option>
+            <option value="Pending">Pending</option>
+          </select>
+          <button id="exportCSV" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">Export CSV</button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="text-left text-gray-400 border-b border-gray-600">
+            <tr>
+              <th id="sortName" class="hover:underline cursor-pointer px-2 py-1">Name ⬍</th>
+              <th class="px-2 py-1">Email</th>
+              <th id="sortShares" class="hover:underline cursor-pointer px-2 py-1">Shares ⬍</th>
+              <th class="px-2 py-1">Status</th>
+            </tr>
+          </thead>
+          <tbody id="memberTableBody" class="text-gray-300"></tbody>
+        </table>
+      </div>
+      <div class="flex justify-between items-center mt-4">
+        <button id="prevPage" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">Previous</button>
+        <span id="pageIndicator" class="text-sm text-gray-300"></span>
+        <button id="nextPage" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">Next</button>
+      </div>
+    </section>
+
+    <!-- Withdrawal Requests -->
+    <section class="bg-gray-800 p-4 rounded shadow">
+      <h2 class="text-xl font-semibold mb-2">📝 Withdrawal Requests</h2>
+      <div id="withdrawalRequestsContainer" class="space-y-2 text-sm overflow-x-auto"></div>
+    </section>
+
+    <!-- Transaction History with Filter -->
+    <section class="bg-gray-800 p-4 rounded shadow">
+      <h2 class="text-xl font-semibold mb-2">🔁 Share Transaction History</h2>
+      <div class="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
+        <label for="txnFilterMember" class="text-sm">Filter by Member:</label>
+        <select id="txnFilterMember" class="px-2 py-1 rounded text-sm">
+          <option value="all">All</option>
+        </select>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="text-left text-gray-400 border-b border-gray-600">
+            <tr>
+              <th class="px-2 py-1">Member</th>
+              <th class="px-2 py-1">Type</th>
+              <th class="px-2 py-1">Shares</th>
+              <th class="px-2 py-1">Date</th>
+            </tr>
+          </thead>
+          <tbody id="transactionTableBody" class="text-gray-300"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modals Container -->
+  <div id="modalOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center overflow-auto hidden p-4">
+
+    <!-- Edit Member Modal -->
+    <div id="editModal" class="bg-gray-800 p-6 rounded shadow w-full max-w-md sm:max-w-lg hidden space-y-4">
+      <h2 class="text-lg font-bold">Edit Member</h2>
+      <input id="editName" class="w-full px-3 py-2 border rounded text-black" placeholder="Name" />
+      <input id="editEmail" class="w-full px-3 py-2 border rounded text-black" placeholder="Email" />
+      <input id="editShares" type="number" class="w-full px-3 py-2 border rounded text-black" placeholder="Shares" />
+      <select id="editStatus" class="w-full px-3 py-2 border rounded text-black">
         <option value="Approved">Approved</option>
         <option value="Pending">Pending</option>
       </select>
-      <button id="exportCSV" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">Export CSV</button>
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="closeModal" class="bg-gray-400 px-3 py-1 rounded">Cancel</button>
+        <button id="saveChanges" class="bg-green-600 text-white px-3 py-1 rounded">Save</button>
+      </div>
     </div>
-  </div>
-  <div class="overflow-x-auto">
-    <table class="min-w-full text-sm">
-      <thead class="text-left text-gray-400 border-b border-gray-600">
-        <tr>
-          <th id="sortName" class="hover:underline cursor-pointer px-2 py-1">Name ⬍</th>
-          <th class="px-2 py-1">Email</th>
-          <th id="sortShares" class="hover:underline cursor-pointer px-2 py-1">Shares ⬍</th>
-          <th class="px-2 py-1">Status</th>
-        </tr>
-      </thead>
-      <tbody id="memberTableBody" class="text-gray-300"></tbody>
-    </table>
-  </div>
-  <div class="flex justify-between items-center mt-4">
-    <button id="prevPage" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">Previous</button>
-    <span id="pageIndicator" class="text-sm text-gray-300"></span>
-    <button id="nextPage" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">Next</button>
-  </div>
-</section>
 
-<!-- Withdrawal Requests -->
-<section class="bg-gray-800 p-4 rounded shadow">
-  <h2 class="text-xl font-semibold mb-2">📝 Withdrawal Requests</h2>
-  <div id="withdrawalRequestsContainer" class="space-y-2 text-sm overflow-x-auto"></div>
-</section>
+    <!-- Add Member Modal -->
+    <div id="addModal" class="bg-gray-800 p-6 rounded shadow w-full max-w-md sm:max-w-lg hidden space-y-4">
+      <h2 class="text-lg font-bold">Add New Member</h2>
+      <input id="addName" class="w-full px-3 py-2 border rounded text-black" placeholder="Name" />
+      <input id="addEmail" class="w-full px-3 py-2 border rounded text-black" placeholder="Email" />
+      <input id="addShares" type="number" class="w-full px-3 py-2 border rounded text-black" placeholder="Shares (0)" />
+      <select id="addStatus" class="w-full px-3 py-2 border rounded text-black">
+        <option value="Approved">Approved</option>
+        <option value="Pending">Pending</option>
+      </select>
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="closeAddModal" class="bg-gray-400 px-3 py-1 rounded">Cancel</button>
+        <button id="createMember" class="bg-blue-600 text-white px-3 py-1 rounded">Create</button>
+      </div>
+    </div>
 
-<!-- Transaction History with Filter -->
-<section class="bg-gray-800 p-4 rounded shadow">
-  <h2 class="text-xl font-semibold mb-2">🔁 Share Transaction History</h2>
-  <div class="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
-    <label for="txnFilterMember" class="text-sm">Filter by Member:</label>
-    <select id="txnFilterMember" class="px-2 py-1 rounded text-sm">
-      <option value="all">All</option>
-    </select>
-  </div>
-  <div class="overflow-x-auto">
-    <table class="min-w-full text-sm">
-      <thead class="text-left text-gray-400 border-b border-gray-600">
-        <tr>
-          <th class="px-2 py-1">Member</th>
-          <th class="px-2 py-1">Type</th>
-          <th class="px-2 py-1">Shares</th>
-          <th class="px-2 py-1">Date</th>
-        </tr>
-      </thead>
-      <tbody id="transactionTableBody" class="text-gray-300"></tbody>
-    </table>
-  </div>
-</section>
+    <!-- Add Transaction Modal -->
+    <div id="addTxnModal" class="bg-gray-800 p-6 rounded shadow w-full max-w-md sm:max-w-lg hidden space-y-4">
+      <h2 class="text-lg font-bold">Add Transaction</h2>
+      <select id="txnMember" class="w-full px-3 py-2 border rounded text-black">
+        <option value="" disabled selected>Select Member</option>
+      </select>
+      <select id="txnType" class="w-full px-3 py-2 border rounded text-black">
+        <option value="buy">Buy</option>
+        <option value="sell">Sell</option>
+      </select>
+      <input id="txnShares" type="number" class="w-full px-3 py-2 border rounded text-black" placeholder="Shares" />
+      <input id="txnDate" type="date" class="w-full px-3 py-2 border rounded text-black" />
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="closeTxnModal" class="bg-gray-400 px-3 py-1 rounded">Cancel</button>
+        <button id="createTxn" class="bg-indigo-600 text-white px-3 py-1 rounded">Save</button>
+      </div>
+    </div>
 
-  </main>  <!-- Modals -->  <div id="modalOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center overflow-auto hidden">
-    <div id="editModal" class="bg-gray-800 p-6 rounded shadow w-full max-w-md sm:max-w-lg hidden">
-      <!-- Edit form content... -->
-    </div>
-    <div id="addModal" class="bg-gray-800 p-6 rounded shadow w-full max-w-md sm:max-w-lg hidden">
-      <!-- Add member form content... -->
-    </div>
-    <div id="addTxnModal" class="bg-gray-800 p-6 rounded shadow w-full max-w-md sm:max-w-lg hidden">
-      <!-- Add transaction form content... -->
-    </div>
-  </div>  <!-- Firebase + Logic Scripts (unchanged) -->  <script type="module" src="./admin-dashboard.js"></script></body>
+  </div>
+
+  <!-- Firebase + Logic Scripts -->
+  <script type="module" src="./admin-dashboard.js"></script>
+</body>
 </html>
