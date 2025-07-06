@@ -1,50 +1,135 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Admin Dashboard</title>
+  <title>Baccarat Fund Admin Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 text-white p-4">
-  <h1 class="text-3xl font-bold mb-4">👑 Admin Dashboard</h1>
-
-  <div id="summary" class="mb-6 space-y-1">
-    <p>Total Members: <span id="totalMembers">0</span></p>
-    <p>Total Shares: <span id="totalShares">0</span></p>
-    <p>Total Balance: ₱<span id="totalBalance">0</span></p>
+  <h1 class="text-3xl font-bold mb-6">👑 Baccarat Fund Admin Dashboard</h1>
+  
+  <!-- Summary Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div class="bg-gray-800 p-4 rounded shadow">
+      <p class="text-sm">Total Members</p>
+      <p class="text-2xl font-bold" id="totalMembers">0</p>
+    </div>
+    <div class="bg-gray-800 p-4 rounded shadow">
+      <p class="text-sm">Total Shares</p>
+      <p class="text-2xl font-bold" id="totalShares">0</p>
+    </div>
+    <div class="bg-gray-800 p-4 rounded shadow">
+      <p class="text-sm">Total Balance</p>
+      <p class="text-2xl font-bold">₱<span id="totalBalance">0.00</span></p>
+    </div>
   </div>
 
+  <!-- Place Shares Form -->
+  <div class="bg-gray-800 p-4 rounded shadow mb-6">
+    <h2 class="text-xl font-bold mb-2">📈 Place Shares</h2>
+    <form id="placeSharesForm" class="space-y-4">
+      <div>
+        <label for="memberSelect" class="block text-sm">Select Member</label>
+        <select id="memberSelect" class="p-2 w-full rounded bg-gray-700 text-white" required>
+          <option value="">Select a member</option>
+        </select>
+      </div>
+      <div>
+        <label for="sharesInput" class="block text-sm">Number of Shares</label>
+        <input type="number" id="sharesInput" min="1" class="p-2 w-full rounded bg-gray-700 text-white" placeholder="Enter number of shares" required />
+      </div>
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Place Shares</button>
+    </form>
+  </div>
+
+  <!-- Distribute Profit Form -->
+  <div class="bg-gray-800 p-4 rounded shadow mb-6">
+    <h2 class="text-xl font-bold mb-2">💸 Distribute Profit</h2>
+    <form id="distributeProfitForm" class="space-y-4">
+      <div>
+        <label for="distributionType" class="block text-sm">Distribution Type</label>
+        <select id="distributionType" class="p-2 w-full rounded bg-gray-700 text-white" required>
+          <option value="percent">Percentage</option>
+          <option value="amount">Fixed Amount</option>
+        </select>
+      </div>
+      <div>
+        <label for="distributionValue" class="block text-sm">Value</label>
+        <input type="number" id="distributionValue" min="0" step="0.01" class="p-2 w-full rounded bg-gray-700 text-white" placeholder="Enter percentage or amount" required />
+      </div>
+      <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Distribute Profit</button>
+    </form>
+  </div>
+
+  <!-- Financial Chart -->
+  <div class="bg-gray-800 p-4 rounded shadow mb-6">
+    <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
+    <canvas id="fundChart" height="100"></canvas>
+  </div>
+
+  <!-- Member Search -->
   <input type="text" id="searchInput" placeholder="Search by name, email, or status..." class="mb-4 p-2 w-full rounded bg-gray-700 text-white" />
 
+  <!-- Member List -->
   <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
 
-  <!-- Edit Member Modal -->
-  <div id="editModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-50">
-    <div class="bg-white text-black p-6 rounded-lg w-full max-w-md">
-      <h2 class="text-xl font-bold mb-4">Edit Member</h2>
-      <input id="editName" class="mb-2 w-full p-2 border rounded" placeholder="Name" />
-      <input id="editEmail" class="mb-2 w-full p-2 border rounded" placeholder="Email" />
-      <input id="editShares" type="number" class="mb-2 w-full p-2 border rounded" placeholder="Shares" />
-      <input id="editBalance" type="number" class="mb-2 w-full p-2 border rounded" placeholder="Balance" />
-      <select id="editStatus" class="mb-4 w-full p-2 border rounded">
-        <option value="pending">Pending</option>
-        <option value="approved">Approved</option>
-      </select>
-      <div class="flex justify-end space-x-2">
-        <button id="closeModal" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
-        <button id="saveEdit" class="bg-blue-600 text-white px-4 py-2 rounded">Save Changes</button>
-      </div>
+  <!-- Top 5 Shareholders -->
+  <div class="bg-gray-800 p-4 mt-8 rounded shadow">
+    <h2 class="text-xl font-bold mb-2">🏆 Top 5 Shareholders</h2>
+    <ul id="topShareholders" class="list-disc list-inside text-sm"></ul>
+  </div>
+
+  <!-- Transaction Requests -->
+  <h2 class="text-2xl font-bold mt-10 mb-4">💰 Deposit & Cash Out Requests</h2>
+  <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>
+
+  <!-- Member Details Modal -->
+  <div id="memberModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center">
+    <div class="bg-gray-800 p-6 rounded shadow-lg w-full max-w-md">
+      <h2 class="text-xl font-bold mb-4">Edit Member Details</h2>
+      <form id="memberDetailsForm" class="space-y-4">
+        <input type="hidden" id="memberId" />
+        <div>
+          <label for="memberName" class="block text-sm">Name</label>
+          <input type="text" id="memberName" class="p-2 w-full rounded bg-gray-700 text-white" required />
+        </div>
+        <div>
+          <label for="memberEmail" class="block text-sm">Email</label>
+          <input type="email" id="memberEmail" class="p-2 w-full rounded bg-gray-700 text-white" required />
+        </div>
+        <div>
+          <label for="memberStatus" class="block text-sm">Status</label>
+          <select id="memberStatus" class="p-2 w-full rounded bg-gray-700 text-white" required>
+            <option value="approved">Approved</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <div>
+          <label for="memberShares" class="block text-sm">Shares</label>
+          <input type="number" id="memberShares" min="0" class="p-2 w-full rounded bg-gray-700 text-white" required />
+        </div>
+        <div>
+          <label for="memberBalance" class="block text-sm">Balance (₱)</label>
+          <input type="number" id="memberBalance" min="0" step="0.01" class="p-2 w-full rounded bg-gray-700 text-white" required />
+        </div>
+        <div class="flex justify-end space-x-2">
+          <button type="button" id="cancelModal" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded">Cancel</button>
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Save</button>
+        </div>
+      </form>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import {
-      getFirestore, collection, getDocs, doc, updateDoc
+    import { 
+      getFirestore, collection, getDocs, doc, updateDoc, addDoc, getDoc,
+      query, orderBy, onSnapshot 
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
@@ -59,81 +144,386 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const analytics = getAnalytics(app);
 
-    const membersList = document.getElementById("membersList");
     const totalMembers = document.getElementById("totalMembers");
     const totalShares = document.getElementById("totalShares");
     const totalBalance = document.getElementById("totalBalance");
+    const membersList = document.getElementById("membersList");
+    const topShareholders = document.getElementById("topShareholders");
     const searchInput = document.getElementById("searchInput");
+    const requestsList = document.getElementById("requestsList");
+    const memberSelect = document.getElementById("memberSelect");
+    const placeSharesForm = document.getElementById("placeSharesForm");
+    const memberModal = document.getElementById("memberModal");
+    const memberDetailsForm = document.getElementById("memberDetailsForm");
+    const cancelModal = document.getElementById("cancelModal");
 
-    let currentEditId = null;
+    let allMembers = [];
+    let fundChartInstance;
 
-    const modal = document.getElementById("editModal");
-    const editName = document.getElementById("editName");
-    const editEmail = document.getElementById("editEmail");
-    const editShares = document.getElementById("editShares");
-    const editBalance = document.getElementById("editBalance");
-    const editStatus = document.getElementById("editStatus");
-    const closeModal = document.getElementById("closeModal");
-    const saveEdit = document.getElementById("saveEdit");
+    function formatCurrency(value) {
+      return parseFloat(value).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+    }
 
-    closeModal.onclick = () => modal.classList.add("hidden");
+    // Populate member select dropdown
+    async function populateMemberSelect() {
+      const snapshot = await getDocs(collection(db, "users"));
+      memberSelect.innerHTML = '<option value="">Select a member</option>';
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.status === 'approved') {
+          const option = document.createElement("option");
+          option.value = docSnap.id;
+          option.textContent = data.name;
+          memberSelect.appendChild(option);
+        }
+      });
+    }
 
-    async function loadMembers() {
-      const querySnapshot = await getDocs(collection(db, "users"));
+    // Load members with real-time updates
+    function loadMembers() {
+      const q = query(collection(db, "users"));
+      onSnapshot(q, (snapshot) => {
+        allMembers = [];
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          allMembers.push({ id: docSnap.id, ...data });
+        });
+        displayMembers(allMembers);
+        updateTopShareholders();
+        updateFundChart();
+        populateMemberSelect();
+      });
+    }
+
+    function displayMembers(members) {
       let memberCount = 0, shareTotal = 0, balanceTotal = 0;
       membersList.innerHTML = "";
 
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const id = docSnap.id;
+      members.forEach(m => {
         memberCount++;
-        shareTotal += data.shares;
-        balanceTotal += data.balance;
+        shareTotal += m.shares || 0;
+        balanceTotal += m.balance || 0;
 
         const div = document.createElement("div");
         div.className = "bg-gray-800 p-4 rounded shadow";
         div.innerHTML = `
-          <p><strong>Name:</strong> ${data.name}</p>
-          <p><strong>Email:</strong> ${data.email}</p>
-          <p><strong>Status:</strong> ${data.status}</p>
-          <p><strong>Shares:</strong> ${data.shares}</p>
-          <p><strong>Balance:</strong> ₱${data.balance}</p>
-          <button class="bg-blue-600 px-2 py-1 mt-2 rounded" onclick="editMember('${id}', '${data.name}', '${data.email}', ${data.shares}, ${data.balance}, '${data.status}')">Edit</button>
+          <p><strong>Name:</strong> ${m.name}</p>
+          <p><strong>Email:</strong> ${m.email}</p>
+          <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${m.status === 'approved' ? 'bg-green-600' : m.status === 'pending' ? 'bg-yellow-600' : 'bg-red-600'}">${m.status}</span></p>
+          <p><strong>Shares:</strong> ${m.shares || 0}</p>
+          <p><strong>Balance:</strong> ₱${formatCurrency(m.balance || 0)}</p>
+          <button class="edit-member bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded mt-2" data-id="${m.id}">Edit</button>
         `;
         membersList.appendChild(div);
       });
 
       totalMembers.textContent = memberCount;
       totalShares.textContent = shareTotal;
-      totalBalance.textContent = balanceTotal.toFixed(2);
+      totalBalance.textContent = formatCurrency(balanceTotal);
     }
 
-    window.editMember = (id, name, email, shares, balance, status) => {
-      currentEditId = id;
-      editName.value = name;
-      editEmail.value = email;
-      editShares.value = shares;
-      editBalance.value = balance;
-      editStatus.value = status;
-      modal.classList.remove("hidden");
-    };
+    function updateTopShareholders() {
+      const top = [...allMembers]
+        .filter(m => m.status === 'approved')
+        .sort((a, b) => (b.shares || 0) - (a.shares || 0))
+        .slice(0, 5);
 
-    saveEdit.onclick = async () => {
-      if (!currentEditId) return;
-      const updatedData = {
-        name: editName.value,
-        email: editEmail.value,
-        shares: Number(editShares.value),
-        balance: Number(editBalance.value),
-        status: editStatus.value
-      };
-      await updateDoc(doc(db, "users", currentEditId), updatedData);
-      modal.classList.add("hidden");
-      loadMembers();
-    };
+      topShareholders.innerHTML = "";
+      top.forEach((m, i) => {
+        const li = document.createElement("li");
+        li.textContent = `${m.name} — ${m.shares || 0} shares`;
+        topShareholders.appendChild(li);
+      });
+    }
 
+    searchInput.addEventListener("input", () => {
+      const query = searchInput.value.toLowerCase();
+      const filtered = allMembers.filter(m =>
+        m.name.toLowerCase().includes(query) ||
+        m.email.toLowerCase().includes(query) ||
+        m.status.toLowerCase().includes(query)
+      );
+      displayMembers(filtered);
+    });
+
+    function listenForRequests() {
+      const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
+      onSnapshot(q, (snapshot) => {
+        requestsList.innerHTML = "";
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          if (data.status === "pending") {
+            const div = document.createElement("div");
+            div.className = "bg-gray-700 p-4 rounded";
+            div.innerHTML = `
+              <p><strong>Member:</strong> ${data.memberName}</p>
+              <p><strong>Type:</strong> ${data.type}</p>
+              <p><strong>Amount:</strong> ₱${formatCurrency(data.amount)}</p>
+              <p><strong>Shares:</strong> ${data.shares || 0}</p>
+              <p><strong>Date:</strong> ${data.timestamp?.toDate().toLocaleString() || "N/A"}</p>
+              <button class="approve-btn bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded mt-2" data-id="${docSnap.id}" data-member-id="${data.memberId}">Approve</button>
+              <button class="reject-btn bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded mt-2" data-id="${docSnap.id}">Reject</button>
+            `;
+            requestsList.appendChild(div);
+          }
+        });
+        if (requestsList.innerHTML === "") {
+          requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
+        }
+      });
+    }
+
+    // Handle transaction approval/rejection
+    requestsList.addEventListener("click", async (e) => {
+      if (e.target.classList.contains("approve-btn") || e.target.classList.contains("reject-btn")) {
+        const transactionId = e.target.dataset.id;
+        const transactionRef = doc(db, "transactions", transactionId);
+        const isApprove = e.target.classList.contains("approve-btn");
+        const memberId = e.target.dataset.memberId;
+
+        try {
+          if (isApprove) {
+            const transactionSnap = await getDoc(transactionRef);
+            const transactionData = transactionSnap.data();
+            if (transactionData.type === "deposit") {
+              const memberRef = doc(db, "users", memberId);
+              const memberSnap = await getDoc(memberRef);
+              const memberData = memberSnap.data();
+              const newShares = (memberData.shares || 0) + (transactionData.shares || 0);
+              const newBalance = (memberData.balance || 0) + (transactionData.amount || 0);
+
+              await updateDoc(memberRef, {
+                shares: newShares,
+                balance: newBalance
+              });
+            }
+            await updateDoc(transactionRef, { status: "approved" });
+          } else {
+            await updateDoc(transactionRef, { status: "rejected" });
+          }
+        } catch (error) {
+          console.error("Error processing transaction:", error);
+          alert("Failed to process transaction. Please try again.");
+        }
+      }
+    });
+
+    // Handle share placement
+    placeSharesForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const memberId = memberSelect.value;
+      const shares = parseInt(document.getElementById("sharesInput").value);
+      const amount = shares * 10; // 1 share = 10 pesos
+
+      if (!memberId || shares <= 0) {
+        alert("Please select a member and enter a valid number of shares.");
+        return;
+      }
+
+      try {
+        await addDoc(collection(db, "transactions"), {
+          memberId,
+          memberName: allMembers.find(m => m.id === memberId)?.name || "Unknown",
+          type: "deposit",
+          amount,
+          shares,
+          status: "pending",
+          timestamp: new Date()
+        });
+        alert(`Successfully submitted ${shares} shares (₱${formatCurrency(amount)}) for approval.`);
+        placeSharesForm.reset();
+      } catch (error) {
+        console.error("Error placing shares:", error);
+        alert("Failed to place shares. Please try again.");
+      }
+    });
+
+    // Handle member details editing
+    membersList.addEventListener("click", async (e) => {
+      if (e.target.classList.contains("edit-member")) {
+        const memberId = e.target.dataset.id;
+        const member = allMembers.find(m => m.id === memberId);
+        if (member) {
+          document.getElementById("memberId").value = member.id;
+          document.getElementById("memberName").value = member.name;
+          document.getElementById("memberEmail").value = member.email;
+          document.getElementById("memberStatus").value = member.status;
+          document.getElementById("memberShares").value = member.shares || 0;
+          document.getElementById("memberBalance").value = member.balance || 0;
+          memberModal.classList.remove("hidden");
+        }
+      }
+    });
+
+    // Handle modal cancel
+    cancelModal.addEventListener("click", () => {
+      memberModal.classList.add("hidden");
+      memberDetailsForm.reset();
+    });
+
+    // Handle member details form submission
+    memberDetailsForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const memberId = document.getElementById("memberId").value;
+      const name = document.getElementById("memberName").value.trim();
+      const email = document.getElementById("memberEmail").value.trim();
+      const status = document.getElementById("memberStatus").value;
+      const shares = parseInt(document.getElementById("memberShares").value);
+      const balance = parseFloat(document.getElementById("memberBalance").value);
+
+      if (!name || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || shares < 0 || balance < 0) {
+        alert("Please enter valid details (name, valid email, non-negative shares and balance).");
+        return;
+      }
+
+      try {
+        const memberRef = doc(db, "users", memberId);
+        await updateDoc(memberRef, {
+          name,
+          email,
+          status,
+          shares,
+          balance
+        });
+        await addDoc(collection(db, "transactions"), {
+          memberId,
+          memberName: name,
+          type: "update",
+          amount: balance,
+          shares,
+          status: "approved",
+          timestamp: new Date(),
+          description: "Updated member details"
+        });
+        alert("Member details updated successfully.");
+        memberModal.classList.add("hidden");
+        memberDetailsForm.reset();
+      } catch (error) {
+        console.error("Error updating member details:", error);
+        alert("Failed to update member details. Please try again.");
+      }
+    });
+
+    // Handle profit distribution
+    document.getElementById("distributeProfitForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const distributionType = document.getElementById("distributionType").value;
+      const distributionValue = parseFloat(document.getElementById("distributionValue").value);
+
+      if (isNaN(distributionValue) || distributionValue <= 0) {
+        alert("Please enter a valid positive value for distribution.");
+        return;
+      }
+
+      let confirmMessage = distributionType === "percent"
+        ? `Are you sure you want to distribute a ${distributionValue}% profit to all approved members?`
+        : `Are you sure you want to distribute ₱${formatCurrency(distributionValue)} to all approved members?`;
+
+      if (!confirm(confirmMessage)) {
+        return;
+      }
+
+      try {
+        const approvedMembers = allMembers.filter(m => m.status === "approved");
+        if (approvedMembers.length === 0) {
+          alert("No approved members to distribute profit to.");
+          return;
+        }
+
+        for (const member of approvedMembers) {
+          let profit;
+          if (distributionType === "percent") {
+            // Calculate profit as a percentage of share value (1 share = 10 pesos)
+            profit = (member.shares || 0) * 10 * (distributionValue / 100);
+          } else {
+            // Distribute fixed amount equally among approved members
+            profit = distributionValue;
+          }
+          const newBalance = (member.balance || 0) + profit;
+
+          await updateDoc(doc(db, "users", member.id), {
+            balance: newBalance
+          });
+
+          await addDoc(collection(db, "transactions"), {
+            memberId: member.id,
+            memberName: member.name,
+            type: "profit",
+            amount: profit,
+            shares: 0,
+            status: "approved",
+            timestamp: new Date(),
+            description: distributionType === "percent" 
+              ? `${distributionValue}% profit distribution`
+              : `Fixed amount profit distribution of ₱${formatCurrency(distributionValue)}`
+          });
+        }
+
+        alert(`Successfully distributed ${distributionType === "percent" ? distributionValue + "%" : "₱" + formatCurrency(distributionValue)} profit to ${approvedMembers.length} members.`);
+        document.getElementById("distributeProfitForm").reset();
+      } catch (error) {
+        console.error("Error distributing profit:", error);
+        alert("Failed to distribute profit. Please try again.");
+      }
+    });
+
+    // Initialize chart
+    function initializeFundChart() {
+      const ctx = document.getElementById('fundChart').getContext('2d');
+      fundChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+          datasets: [{
+            label: 'Fund Balance',
+            data: [15000, 18000, 21000, 25000, 29000, 34000],
+            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+            borderColor: 'rgba(59, 130, 246, 1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { labels: { color: 'white' } } },
+          scales: {
+            x: { ticks: { color: 'white' } },
+            y: { ticks: { color: 'white' }, beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    // Update chart with real data
+    async function updateFundChart() {
+      const snapshot = await getDocs(query(collection(db, "transactions"), orderBy("timestamp", "asc")));
+      const balances = [];
+      const labels = [];
+      let runningBalance = 0;
+
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.status === "approved" && (data.type === "deposit" || data.type === "update" || data.type === "profit")) {
+          runningBalance += data.amount || 0;
+          labels.push(data.timestamp?.toDate().toLocaleString('default', { month: 'short', year: 'numeric' }) || 'Unknown');
+          balances.push(runningBalance);
+        }
+      });
+
+      if (fundChartInstance) {
+        fundChartInstance.data.labels = labels.length > 0 ? labels : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+        fundChartInstance.data.datasets[0].data = balances.length > 0 ? balances : [15000, 18000, 21000, 25000, 29000, 34000];
+        fundChartInstance.update();
+      }
+    }
+
+    // Initialize
     loadMembers();
+    listenForRequests();
+    initializeFundChart();
   </script>
 </body>
 </html>
