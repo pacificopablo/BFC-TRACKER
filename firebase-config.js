@@ -1,3 +1,4 @@
+// firebase-config.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -9,10 +10,9 @@ const firebaseConfig = {
   projectId: "bfc-tracker",
   storageBucket: "bfc-tracker.firebasestorage.app",
   messagingSenderId: "127052459580",
-  appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
-  measurementId: "G-PNYRCFJHYM"
+  appId: "1:127052459580:web:ee9af6545f841d171cdd39",
+  measurementId: "G-TJEMF05CH7"
 };
-
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
