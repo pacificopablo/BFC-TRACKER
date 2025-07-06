@@ -4,105 +4,205 @@
   <meta charset="UTF-8" />
   <title>Baccarat Fund Admin Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-gray-900 text-white p-4">
-  <h1 class="text-3xl font-bold mb-6">👑 Baccarat Fund Admin Dashboard</h1>
+<body class="bg-gray-900 text-white min-h-screen">
 
-  <div class="bg-gray-800 p-4 rounded shadow mb-6">
-    <h2 class="text-xl font-bold mb-2">🔐 Access Control</h2>
-    <p>If you're not the admin, you'll be redirected automatically.</p>
-  </div>
+  <!-- Header -->
+  <header class="bg-gray-800 p-4 flex justify-between items-center shadow">
+    <h1 class="text-2xl font-bold">Baccarat Fund Admin</h1>
+    <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</button>
+  </header>
 
-  <!-- Dashboard Sections -->
-  <div id="dashboardContent" class="hidden">
-    <div class="bg-gray-800 p-4 rounded shadow mb-6">
-      <h2 class="text-xl font-bold mb-2">📊 Members Overview</h2>
-      <p>Total Members: <span id="totalMembers">0</span></p>
-      <p>Total Shares: <span id="totalShares">0</span></p>
-      <p>Total Balance: ₱<span id="totalBalance">0.00</span></p>
-    </div>
-    <div id="membersList" class="space-y-4"></div>
-  </div>
+  <!-- Main -->
+  <main class="p-6 space-y-6">
 
+    <!-- Section: Stats -->
+    <section class="bg-gray-800 p-4 rounded shadow">
+      <h2 class="text-xl font-semibold mb-2">📊 Member Overview</h2>
+      <canvas id="memberChart" height="100"></canvas>
+    </section>
+
+    <!-- Section: Member List -->
+    <section class="bg-gray-800 p-4 rounded shadow">
+      <div class="flex justify-between items-center mb-2">
+        <h2 class="text-xl font-semibold">👥 Member List</h2>
+        <button id="exportCSV" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">Export CSV</button>
+      </div>
+      <table class="w-full text-sm">
+        <thead class="text-left text-gray-400 border-b border-gray-600">
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Shares</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="memberTableBody" class="text-gray-300">
+          <!-- JS will populate -->
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Section: Withdrawal Requests -->
+    <section class="bg-gray-800 p-4 rounded shadow">
+      <h2 class="text-xl font-semibold mb-2">📝 Withdrawal Requests</h2>
+      <div id="withdrawalRequestsContainer" class="space-y-2 text-sm">
+        <!-- JS will populate -->
+      </div>
+    </section>
+
+    <!-- Section: Transaction Log -->
+    <section class="bg-gray-800 p-4 rounded shadow">
+      <h2 class="text-xl font-semibold mb-2">🔁 Share Transaction History</h2>
+      <table class="w-full text-sm">
+        <thead class="text-left text-gray-400 border-b border-gray-600">
+          <tr>
+            <th>Member</th>
+            <th>Type</th>
+            <th>Shares</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody id="transactionTableBody" class="text-gray-300">
+          <!-- JS will populate -->
+        </tbody>
+      </table>
+    </section>
+
+  </main>
+
+  <!-- Scripts -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { auth, db } from './firebase-config.js';
+    import {
+      signOut, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import {
+      collection, onSnapshot, doc, updateDoc, getDocs
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
-      authDomain: "bfc-tracker.firebaseapp.com",
-      projectId: "bfc-tracker",
-      storageBucket: "bfc-tracker.appspot.com",
-      messagingSenderId: "127052459580",
-      appId: "1:127052459580:web:c3d5caa9302238c11cdd39"
-    };
+    // Redirect if not logged in
+    onAuthStateChanged(auth, user => {
+      if (!user) {
+        window.location.href = "index.html";
+      }
+    });
 
-    const ADMIN_UID = "Dhx5CzjJPIYTaQ1jTgeRxZpdmf22";
+    // Logout
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      signOut(auth);
+    });
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
+    // Member Chart
+    const ctx = document.getElementById('memberChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Approved', 'Pending'],
+        datasets: [{
+          data: [0, 0],
+          backgroundColor: ['#10B981', '#F59E0B'],
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
 
-    async function isAdmin(uid) {
-      const userDoc = await getDoc(doc(db, "users", uid));
-      return userDoc.exists() && userDoc.data().role === "admin";
-    }
+    // Member List + Chart Data
+    const memberTable = document.getElementById("memberTableBody");
+    const membersRef = collection(db, "members");
+    onSnapshot(membersRef, (snapshot) => {
+      memberTable.innerHTML = "";
+      let approved = 0, pending = 0;
+      snapshot.forEach(doc => {
+        const m = doc.data();
+        if (m.status === "Approved") approved++;
+        else pending++;
 
-    async function loadMembers() {
-      const membersList = document.getElementById("membersList");
-      const snapshot = await getDocs(collection(db, "members"));
-      let total = 0, shares = 0, balance = 0;
-      membersList.innerHTML = "";
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${m.name}</td>
+          <td>${m.email}</td>
+          <td>${m.shares || 0}</td>
+          <td class="${m.status === 'Approved' ? 'text-green-400' : 'text-yellow-400'}">${m.status}</td>
+        `;
+        memberTable.appendChild(row);
+      });
+      chart.data.datasets[0].data = [approved, pending];
+      chart.update();
+    });
 
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        total++;
-        shares += data.shares || 0;
-        balance += data.balance || 0;
+    // Withdrawal Requests
+    const withdrawalContainer = document.getElementById("withdrawalRequestsContainer");
+    const withdrawalsRef = collection(db, "withdrawals");
+    onSnapshot(withdrawalsRef, (snapshot) => {
+      withdrawalContainer.innerHTML = "";
+      snapshot.forEach(doc => {
+        const r = doc.data();
+        if (r.status === "Approved" || r.status === "Rejected") return;
 
         const div = document.createElement("div");
-        div.className = "bg-gray-700 p-4 rounded shadow";
+        div.classList.add("bg-gray-700", "p-3", "rounded");
         div.innerHTML = `
-          <p><strong>${data.name}</strong></p>
-          <p>Email: ${data.email}</p>
-          <p>Status: ${data.status}</p>
-          <p>Shares: ${data.shares}</p>
-          <p>Balance: ₱${(data.balance || 0).toFixed(2)}</p>
+          <div><strong>${r.name}</strong> requested <span class="text-green-400">$${r.amount}</span> on ${r.date}</div>
+          <div class="mt-2">
+            <button class="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs" onclick="approve('${doc.id}')">Approve</button>
+            <button class="bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-xs ml-2" onclick="reject('${doc.id}')">Reject</button>
+          </div>
         `;
-        membersList.appendChild(div);
+        withdrawalContainer.appendChild(div);
+      });
+    });
+
+    // Approve/Reject functions
+    window.approve = async function (id) {
+      await updateDoc(doc(db, "withdrawals", id), { status: "Approved" });
+    };
+
+    window.reject = async function (id) {
+      await updateDoc(doc(db, "withdrawals", id), { status: "Rejected" });
+    };
+
+    // Export to CSV
+    document.getElementById("exportCSV").addEventListener("click", async () => {
+      const snapshot = await getDocs(membersRef);
+      const rows = [["Name", "Email", "Shares", "Status"]];
+      snapshot.forEach(doc => {
+        const m = doc.data();
+        rows.push([m.name, m.email, m.shares || 0, m.status]);
       });
 
-      document.getElementById("totalMembers").textContent = total;
-      document.getElementById("totalShares").textContent = shares;
-      document.getElementById("totalBalance").textContent = balance.toFixed(2);
-    }
+      const csv = rows.map(e => e.join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
 
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        alert("You must be signed in.");
-        window.location.href = "login.html";
-        return;
-      }
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "members.csv";
+      a.click();
+    });
 
-      try {
-        const isUserAdmin = await isAdmin(user.uid);
-        if (user.uid === ADMIN_UID || isUserAdmin) {
-          document.getElementById("dashboardContent").classList.remove("hidden");
-          loadMembers();
-        } else {
-          alert("Access denied. Admin only.");
-          await signOut(auth);
-          window.location.href = "login.html";
-        }
-      } catch (error) {
-        console.error("Admin check failed:", error);
-        alert("Error verifying admin access.");
-        await signOut(auth);
-        window.location.href = "login.html";
-      }
+    // Transaction History
+    const transactionTable = document.getElementById("transactionTableBody");
+    const transactionsRef = collection(db, "transactions");
+    onSnapshot(transactionsRef, (snapshot) => {
+      transactionTable.innerHTML = "";
+      snapshot.forEach(doc => {
+        const t = doc.data();
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${t.memberName}</td>
+          <td class="${t.type === 'buy' ? 'text-green-400' : 'text-red-400'}">${t.type}</td>
+          <td>${t.shares}</td>
+          <td>${t.date}</td>
+        `;
+        transactionTable.appendChild(row);
+      });
     });
   </script>
 </body>
