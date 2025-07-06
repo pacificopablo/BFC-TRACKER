@@ -10,20 +10,24 @@
   <!-- Header -->
   <header class="flex justify-between items-center mb-4">
     <h1 class="text-xl font-bold">🎲 Baccarat Fund Club - Admin</h1>
-    <button class="bg-red-600 text-white px-4 py-2 rounded">Logout</button>
+    <div>
+      <span id="userEmail" class="mr-4"></span>
+      <button onclick="logout()" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Logout</button>
+    </div>
   </header>
 
   <!-- Tab Buttons -->
   <div id="tabButtons" class="flex space-x-4 text-sm font-semibold mb-6">
-    <button onclick="showTab('members', this)" class="tab-btn px-3 py-1 rounded">👤 Members</button>
-    <button onclick="showTab('requests', this)" class="tab-btn px-3 py-1 rounded">💸 Cash Outs</button>
-    <button onclick="showTab('profits', this)" class="tab-btn px-3 py-1 rounded">📈 Profits</button>
-    <button onclick="showTab('settings', this)" class="tab-btn px-3 py-1 rounded">⚙️ Settings</button>
+    <button onclick="showTab('members', this)" class="tab-btn px-3 py-1 rounded hover:underline">👤 Members</button>
+    <button onclick="showTab('requests', this)" class="tab-btn px-3 py-1 rounded hover:underline">💸 Cash Outs</button>
+    <button onclick="showTab('profits', this)" class="tab-btn px-3 py-1 rounded hover:underline">📈 Profits</button>
+    <button onclick="showTab('settings', this)" class="tab-btn px-3 py-1 rounded hover:underline">⚙️ Settings</button>
   </div>
 
   <!-- 👤 Members Tab -->
   <section id="members" class="tab-content hidden">
     <h2 class="text-lg font-semibold mb-2">👤 Members</h2>
+    <button onclick="openAddMemberModal()" class="bg-green-600 text-white px-4 py-2 rounded mb-4 hover:bg-green-700">➕ Add Member</button>
     <table class="w-full text-left border-collapse">
       <thead>
         <tr class="bg-gray-800">
@@ -87,37 +91,98 @@
     </div>
   </section>
 
+  <!-- Add Member Modal -->
+  <div id="addMemberModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center">
+    <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md">
+      <h2 class="text-lg font-semibold mb-4">Add Member</h2>
+      <input type="text" id="addName" class="border p-2 w-full text-black mb-2" placeholder="Name" />
+      <input type="email" id="addEmail" class="border p-2 w-full text-black mb-2" placeholder="Email" />
+      <input type="number" id="addShares" class="border p-2 w-full text-black mb-2" placeholder="Shares" min="0" step="1" />
+      <p>Balance: ₱<span id="addBalanceDisplay">0.00</span></p>
+      <div class="flex justify-end mt-4">
+        <button onclick="closeAddMemberModal()" class="bg-gray-500 text-white px-4 py-2 rounded mr-2">Cancel</button>
+        <button onclick="addMember()" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Member Modal -->
+  <div id="editMemberModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center">
+    <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md">
+      <h2 class="text-lg font-semibold mb-4">Edit Member</h2>
+      <input type="text" id="editName" class="border p-2 w-full text-black mb-2" placeholder="Name" />
+      <input type="email" id="editEmail" class="border p-2 w-full text-black mb-2" placeholder="Email" />
+      <input type="number" id="editShares" class="border p-2 w-full text-black mb-2" placeholder="Shares" min="0" step="1" />
+      <p>Balance: ₱<span id="editBalanceDisplay">0.00</span></p>
+      <div class="flex justify-end mt-4">
+        <button onclick="closeEditMemberModal()" class="bg-gray-500 text-white px-4 py-2 rounded mr-2">Cancel</button>
+        <button onclick="saveMemberChanges()" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Firebase and Logic -->
   <script type="module">
-    import { db } from './firebase-config.js';
+    import { db, auth } from './firebase-config.js';
     import { 
-      doc, getDoc, updateDoc, collection, getDocs, deleteDoc 
+      doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, writeBatch 
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
     let conversionRate = 10;
+    let currentMemberId = null;
+
+    // Retry logic for Firestore operations
+    async function withRetry(fn, retries = 3, delay = 1000) {
+      for (let i = 0; i < retries; i++) {
+        try {
+          return await fn();
+        } catch (error) {
+          if (i === retries - 1) throw error;
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
 
     // Load conversion rate from Firestore
     async function loadConversionRate() {
-      const docRef = doc(db, "settings", "conversion");
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        conversionRate = snap.data().rate || 10;
-        document.getElementById("conversionRateInput").value = conversionRate;
+      const cachedRate = localStorage.getItem('conversionRate');
+      if (cachedRate) {
+        conversionRate = parseFloat(cachedRate);
+        document.getElementById('conversionRateInput').value = conversionRate;
+      }
+      try {
+        await withRetry(async () => {
+          const docRef = doc(db, "settings", "conversion");
+          const snap = await getDoc(docRef);
+          if (snap.exists()) {
+            conversionRate = snap.data().rate || 10;
+            localStorage.setItem('conversionRate', conversionRate);
+            document.getElementById('conversionRateInput').value = conversionRate;
+          }
+        });
+      } catch (error) {
+        console.error("Error loading conversion rate:", error);
       }
     }
 
     // Update conversion rate
     window.updateConversionRate = async () => {
       const newRate = parseFloat(document.getElementById("conversionRateInput").value);
-      if (isNaN(newRate) || newRate <= 0) return alert("Please enter a valid rate.");
-
+      if (isNaN(newRate) || newRate <= 0) {
+        alert("Please enter a valid rate.");
+        return;
+      }
       try {
-        await updateDoc(doc(db, "settings", "conversion"), { rate: newRate });
+        await withRetry(async () => {
+          await updateDoc(doc(db, "settings", "conversion"), { rate: newRate });
+        });
         conversionRate = newRate;
+        localStorage.setItem('conversionRate', conversionRate);
         alert(`✅ Conversion rate updated to ₱${newRate} per share.`);
         updateBalanceDisplays();
-        await loadMembers(); // Reload members to update balances
-        await loadCashOutRequests(); // Reload cash out requests to update shares
+        await loadMembers();
+        await loadCashOutRequests();
       } catch (error) {
         console.error("Error updating conversion rate:", error);
         alert("Failed to update conversion rate.");
@@ -128,34 +193,35 @@
     async function loadMembers() {
       const memberList = document.getElementById("memberList");
       memberList.innerHTML = '<tr><td colspan="5" class="p-2 text-center">Loading...</td></tr>';
-
       try {
-        const querySnapshot = await getDocs(collection(db, "members"));
-        memberList.innerHTML = ""; // Clear loading message
-        if (querySnapshot.empty) {
-          memberList.innerHTML = '<tr><td colspan="5" class="p-2 text-center">No members found.</td></tr>';
-          return;
-        }
-        querySnapshot.forEach((doc) => {
-          const member = doc.data();
-          const balance = (member.shares || 0) * conversionRate;
-          const row = `
-            <tr class="border-b border-gray-700">
-              <td class="p-2">${member.name || "N/A"}</td>
-              <td class="p-2">${member.email || "N/A"}</td>
-              <td class="p-2">${member.shares || 0}</td>
-              <td class="p-2">${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-              <td class="p-2">
-                <button onclick="editMember('${doc.id}')" class="bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">Edit</button>
-                <button onclick="deleteMember('${doc.id}')" class="bg-red-600 text-white px-2 py-1 rounded ml-1 hover:bg-red-700">Delete</button>
-              </td>
-            </tr>
-          `;
-          memberList.innerHTML += row;
+        await withRetry(async () => {
+          const querySnapshot = await getDocs(collection(db, "members"));
+          memberList.innerHTML = "";
+          if (querySnapshot.empty) {
+            memberList.innerHTML = '<tr><td colspan="5" class="p-2 text-center">No members found.</td></tr>';
+            return;
+          }
+          querySnapshot.forEach((doc) => {
+            const member = doc.data();
+            const balance = (member.shares || 0) * conversionRate;
+            const row = `
+              <tr class="border-b border-gray-700">
+                <td class="p-2">${member.name || "N/A"}</td>
+                <td class="p-2">${member.email || "N/A"}</td>
+                <td class="p-2">${member.shares || 0}</td>
+                <td class="p-2">${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                <td class="p-2">
+                  <button onclick="editMember('${doc.id}')" class="bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">Edit</button>
+                  <button onclick="deleteMember('${doc.id}')" class="bg-red-600 text-white px-2 py-1 rounded ml-1 hover:bg-red-700">Delete</button>
+                </td>
+              </tr>
+            `;
+            memberList.innerHTML += row;
+          });
         });
       } catch (error) {
         console.error("Error loading members:", error);
-        memberList.innerHTML = '<tr><td colspan="5" class="p-2 text-center text-red-500">Failed to load members. Please try again.</td></tr>';
+        memberList.innerHTML = '<tr><td colspan="5" class="p-2 text-center text-red-500">Failed to load members. <button onclick="loadMembers()" class="text-blue-400 underline">Retry</button></td></tr>';
       }
     }
 
@@ -163,96 +229,85 @@
     async function loadCashOutRequests() {
       const requestList = document.getElementById("requestList");
       requestList.innerHTML = '<tr><td colspan="8" class="p-2 text-center">Loading...</td></tr>';
-
       try {
-        const querySnapshot = await getDocs(collection(db, "cashouts"));
-        requestList.innerHTML = ""; // Clear loading message
-        if (querySnapshot.empty) {
-          requestList.innerHTML = '<tr><td colspan="8" class="p-2 text-center">No cash out requests found.</td></tr>';
-          return;
-        }
-
-        for (const doc of querySnapshot.docs) {
-          const request = doc.data();
-          // Fetch member details
-          const memberRef = doc(db, "members", request.memberId);
-          const memberSnap = await getDoc(memberRef);
-          const member = memberSnap.exists() ? memberSnap.data() : { name: "Unknown", email: "N/A", shares: 0 };
-
-          const shares = Math.ceil(request.amount / conversionRate); // Calculate shares
-          const requestedAt = request.requestedAt?.toDate ? request.requestedAt.toDate().toLocaleString() : "N/A";
-          const processedAt = request.processedAt?.toDate ? request.processedAt.toDate().toLocaleString() : "N/A";
-          const row = `
-            <tr class="border-b border-gray-700">
-              <td class="p-2">${member.name || "N/A"}</td>
-              <td class="p-2">${member.email || "N/A"}</td>
-              <td class="p-2">${request.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-              <td class="p-2">${shares}</td>
-              <td class="p-2">${request.status || "Pending"}</td>
-              <td class="p-2">${requestedAt}</td>
-              <td class="p-2">${processedAt}</td>
-              <td class="p-2">
-                ${request.status === "Pending" ? `
-                  <button onclick="processCashOut('${doc.id}', 'Approved', ${request.amount}, ${shares}, '${memberSnap.id}', ${member.shares})" 
-                          class="bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">Approve</button>
-                  <button onclick="processCashOut('${doc.id}', 'Rejected', ${request.amount}, ${shares}, '${memberSnap.id}', ${member.shares})" 
-                          class="bg-red-600 text-white px-2 py-1 rounded ml-1 hover:bg-red-700">Reject</button>
-                ` : `<span class="text-gray-500">${request.status}</span>`}
-              </td>
-            </tr>
-          `;
-          requestList.innerHTML += row;
-        }
+        await withRetry(async () => {
+          const querySnapshot = await getDocs(collection(db, "cashouts"));
+          requestList.innerHTML = "";
+          if (querySnapshot.empty) {
+            requestList.innerHTML = '<tr><td colspan="8" class="p-2 text-center">No cash out requests found.</td></tr>';
+            return;
+          }
+          for (const doc of querySnapshot.docs) {
+            const request = doc.data();
+            const memberRef = doc(db, "members", request.memberId);
+            const memberSnap = await getDoc(memberRef);
+            const member = memberSnap.exists() ? memberSnap.data() : { name: "Unknown", email: "N/A", shares: 0 };
+            const shares = Math.ceil(request.amount / conversionRate);
+            const requestedAt = request.requestedAt?.toDate ? request.requestedAt.toDate().toLocaleString() : "N/A";
+            const processedAt = request.processedAt?.toDate ? request.processedAt.toDate().toLocaleString() : "N/A";
+            const row = `
+              <tr class="border-b border-gray-700">
+                <td class="p-2">${member.name || "N/A"}</td>
+                <td class="p-2">${member.email || "N/A"}</td>
+                <td class="p-2">${request.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                <td class="p-2">${shares}</td>
+                <td class="p-2">${request.status || "Pending"}</td>
+                <td class="p-2">${requestedAt}</td>
+                <td class="p-2">${processedAt}</td>
+                <td class="p-2">
+                  ${request.status === "Pending" ? `
+                    <button onclick="processCashOut('${doc.id}', 'Approved', ${request.amount}, ${shares}, '${memberSnap.id}', ${member.shares})" 
+                            class="bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">Approve</button>
+                    <button onclick="processCashOut('${doc.id}', 'Rejected', ${request.amount}, ${shares}, '${memberSnap.id}', ${member.shares})" 
+                            class="bg-red-600 text-white px-2 py-1 rounded ml-1 hover:bg-red-700">Reject</button>
+                  ` : `<span class="text-gray-500">${request.status}</span>`}
+                </td>
+              </tr>
+            `;
+            requestList.innerHTML += row;
+          }
+        });
       } catch (error) {
         console.error("Error loading cash out requests:", error);
-        requestList.innerHTML = '<tr><td colspan="8" class="p-2 text-center text-red-500">Failed to load requests. Please try again.</td></tr>';
+        requestList.innerHTML = '<tr><td colspan="8" class="p-2 text-center text-red-500">Failed to load requests. <button onclick="loadCashOutRequests()" class="text-blue-400 underline">Retry</button></td></tr>';
       }
     }
 
-    // Process cash out request (Approve or Reject)
+    // Process cash out request
     window.processCashOut = async (requestId, status, amount, shares, memberId, currentShares) => {
-      const action = status.toLowerCase();
-      if (!confirm(`Are you sure you want to ${action} this cash out request for ₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}?`)) return;
-
+      if (!confirm(`Are you sure you want to ${status.toLowerCase()} this cash out request for ₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}?`)) return;
       try {
-        const requestRef = doc(db, "cashouts", requestId);
-        const requestSnap = await getDoc(requestRef);
-        if (!requestSnap.exists()) {
-          alert("Cash out request not found.");
-          return;
-        }
-
-        if (requestSnap.data().status !== "Pending") {
-          alert("This request has already been processed.");
-          await loadCashOutRequests();
-          return;
-        }
-
-        // Validate shares for approval
-        if (status === "Approved" && shares > currentShares) {
-          alert(`Cannot approve: Member has only ${currentShares} shares, but ${shares} shares are required.`);
-          return;
-        }
-
-        // Update request status
-        await updateDoc(requestRef, {
-          status,
-          processedAt: new Date()
+        await withRetry(async () => {
+          const requestRef = doc(db, "cashouts", requestId);
+          const requestSnap = await getDoc(requestRef);
+          if (!requestSnap.exists()) {
+            alert("Cash out request not found.");
+            return;
+          }
+          if (requestSnap.data().status !== "Pending") {
+            alert("This request has already been processed.");
+            await loadCashOutRequests();
+            return;
+          }
+          if (status === "Approved" && shares > currentShares) {
+            alert(`Cannot approve: Member has only ${currentShares} shares, but ${shares} shares are required.`);
+            return;
+          }
+          const batch = writeBatch(db);
+          batch.update(requestRef, { status, processedAt: new Date() });
+          if (status === "Approved") {
+            const memberRef = doc(db, "members", memberId);
+            const newShares = Math.max(0, currentShares - shares);
+            batch.update(memberRef, { shares: newShares });
+          }
+          await batch.commit();
         });
-
-        // If approved, deduct shares from member
-        if (status === "Approved") {
-          const memberRef = doc(db, "members", memberId);
-          const newShares = Math.max(0, currentShares - shares);
-          await updateDoc(memberRef, { shares: newShares });
-        }
-
-        alert(`Cash out request ${action} successfully.`);
-        await loadCashOutRequests(); // Reload cash out requests
-        await loadMembers(); // Reload members to reflect updated shares
+        alert(`Cash out request ${status.toLowerCase()} successfully.`);
+        await loadCashOutRequests();
+        await loadMembers();
       } catch (error) {
         console.error(`Error processing cash out (${status}):`, error);
-        alert(`Failed to ${action} cash out request. Please check the console for details.`);
+        alert(`Failed to ${status.toLowerCase()} cash out request.`);
       }
     };
 
@@ -262,7 +317,7 @@
       alert("Cash out requests refreshed.");
     };
 
-    // Update balance displays (for add/edit shares inputs, if they exist)
+    // Update balance displays
     function updateBalanceDisplays() {
       const addShares = parseInt(document.getElementById('addShares')?.value) || 0;
       const editShares = parseInt(document.getElementById('editShares')?.value) || 0;
@@ -270,47 +325,195 @@
       document.getElementById('editBalanceDisplay')?.textContent = (editShares * conversionRate).toLocaleString(undefined, { minimumFractionDigits: 2 });
     }
 
-    // Edit member (placeholder)
-    window.editMember = (memberId) => {
-      alert(`Edit member with ID: ${memberId}`);
-      // Implement a modal or form to edit member details
+    // Add member
+    window.openAddMemberModal = () => {
+      document.getElementById('addName').value = '';
+      document.getElementById('addEmail').value = '';
+      document.getElementById('addShares').value = '0';
+      document.getElementById('addBalanceDisplay').textContent = '0.00';
+      document.getElementById('addMemberModal').classList.remove('hidden');
+    };
+
+    window.closeAddMemberModal = () => {
+      document.getElementById('addMemberModal').classList.add('hidden');
+    };
+
+    window.addMember = async () => {
+      const name = document.getElementById('addName').value.trim();
+      const email = document.getElementById('addEmail').value.trim();
+      const shares = parseInt(document.getElementById('addShares').value) || 0;
+      if (!name || !email) {
+        alert('Name and email are required.');
+        return;
+      }
+      try {
+        await withRetry(async () => {
+          const memberRef = doc(collection(db, 'members'));
+          await setDoc(memberRef, { name, email, shares });
+        });
+        alert('Member added successfully.');
+        document.getElementById('addMemberModal').classList.add('hidden');
+        await loadMembers();
+      } catch (error) {
+        console.error('Error adding member:', error);
+        alert('Failed to add member.');
+      }
+    };
+
+    // Edit member
+    window.editMember = async (memberId) => {
+      currentMemberId = memberId;
+      try {
+        const memberRef = doc(db, 'members', memberId);
+        const memberSnap = await getDoc(memberRef);
+        if (memberSnap.exists()) {
+          const member = memberSnap.data();
+          document.getElementById('editName').value = member.name || '';
+          document.getElementById('editEmail').value = member.email || '';
+          document.getElementById('editShares').value = member.shares || 0;
+          document.getElementById('editBalanceDisplay').textContent = ((member.shares || 0) * conversionRate).toLocaleString(undefined, { minimumFractionDigits: 2 });
+          document.getElementById('editMemberModal').classList.remove('hidden');
+        } else {
+          alert('Member not found.');
+        }
+      } catch (error) {
+        console.error('Error loading member:', error);
+        alert('Failed to load member.');
+      }
+    };
+
+    window.closeEditMemberModal = () => {
+      document.getElementById('editMemberModal').classList.add('hidden');
+    };
+
+    window.saveMemberChanges = async () => {
+      const name = document.getElementById('editName').value.trim();
+      const email = document.getElementById('editEmail').value.trim();
+      const shares = parseInt(document.getElementById('editShares').value) || 0;
+      if (!name || !email) {
+        alert('Name and email are required.');
+        return;
+      }
+      try {
+        await withRetry(async () => {
+          await updateDoc(doc(db, 'members', currentMemberId), { name, email, shares });
+        });
+        alert('Member updated successfully.');
+        document.getElementById('editMemberModal').classList.add('hidden');
+        await loadMembers();
+      } catch (error) {
+        console.error('Error updating member:', error);
+        alert('Failed to update member.');
+      }
     };
 
     // Delete member
     window.deleteMember = async (memberId) => {
-      if (confirm("Are you sure you want to delete this member?")) {
-        try {
-          await deleteDoc(doc(db, "members", memberId));
-          alert("Member deleted successfully.");
-          await loadMembers(); // Reload the member list
-        } catch (error) {
-          console.error("Error deleting member:", error);
-          alert("Failed to delete member.");
-        }
+      if (!confirm('Are you sure you want to delete this member?')) return;
+      try {
+        await withRetry(async () => {
+          await deleteDoc(doc(db, 'members', memberId));
+        });
+        alert('Member deleted successfully.');
+        await loadMembers();
+      } catch (error) {
+        console.error('Error deleting member:', error);
+        alert('Failed to delete member.');
       }
     };
 
-    // Placeholder functions
-    window.exportToCSV = () => {
-      alert("CSV export not implemented yet.");
+    // Export to CSV
+    window.exportToCSV = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'members'));
+        const data = querySnapshot.docs.map(doc => {
+          const member = doc.data();
+          return {
+            Name: member.name || 'N/A',
+            Email: member.email || 'N/A',
+            Shares: member.shares || 0,
+            Balance: ((member.shares || 0) * conversionRate).toLocaleString(undefined, { minimumFractionDigits: 2 })
+          };
+        });
+        const csv = [
+          'Name,Email,Shares,Balance',
+          ...data.map(row => `${row.Name},${row.Email},${row.Shares},${row.Balance}`)
+        ].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'members_export.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+        alert('CSV exported successfully.');
+      } catch (error) {
+        console.error('Error exporting CSV:', error);
+        alert('Failed to export CSV.');
+      }
     };
 
-    window.cleanupOldPending = () => {
-      alert("Cleanup not implemented yet.");
+    // Cleanup old pending requests
+    window.cleanupOldPending = async () => {
+      if (!confirm('Are you sure you want to delete pending cash-out requests older than 30 days?')) return;
+      try {
+        await withRetry(async () => {
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          const querySnapshot = await getDocs(collection(db, 'cashouts'));
+          const batch = writeBatch(db);
+          querySnapshot.forEach((doc) => {
+            const request = doc.data();
+            if (request.status === 'Pending' && request.requestedAt.toDate() < thirtyDaysAgo) {
+              batch.delete(doc.ref);
+            }
+          });
+          await batch.commit();
+        });
+        alert('Old pending requests cleaned successfully.');
+        await loadCashOutRequests();
+      } catch (error) {
+        console.error('Error cleaning old pending requests:', error);
+        alert('Failed to clean old pending requests.');
+      }
+    };
+
+    // Logout
+    window.logout = async () => {
+      try {
+        await signOut(auth);
+        window.location.href = '/login.html';
+      } catch (error) {
+        console.error('Logout failed:', error);
+        alert('Failed to log out.');
+      }
     };
 
     // Initialize on page load
-    document.addEventListener("DOMContentLoaded", async () => {
-      await loadConversionRate();
-      await loadMembers();
-      await loadCashOutRequests(); // Load cash out requests
-      const defaultBtn = document.querySelector('#tabButtons .tab-btn');
-      if (defaultBtn) showTab('members', defaultBtn);
+    document.addEventListener('DOMContentLoaded', async () => {
+      onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          const idTokenResult = await user.getIdTokenResult();
+          if (idTokenResult.claims.admin) {
+            document.getElementById('userEmail').textContent = user.email;
+            await loadConversionRate();
+            await loadMembers();
+            await loadCashOutRequests();
+            const defaultBtn = document.querySelector('#tabButtons .tab-btn');
+            if (defaultBtn) showTab('members', defaultBtn);
+            // Bind input listeners for balance updates
+            document.getElementById('addShares')?.addEventListener('input', updateBalanceDisplays);
+            document.getElementById('editShares')?.addEventListener('input', updateBalanceDisplays);
+          } else {
+            alert('Access denied: Admin privileges required.');
+            window.location.href = '/login.html';
+          }
+        } else {
+          window.location.href = '/login.html';
+        }
+      });
     });
-  </script>
 
-  <!-- Tab Navigation -->
-  <script>
+    // Tab Navigation
     function showTab(tabId, button = null) {
       document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
       document.getElementById(tabId)?.classList.remove('hidden');
