@@ -131,8 +131,8 @@
       </div>
     </div>
     <script type="module">
-      // Import Firebase SDKs
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+      // Import Firebase SDKs (use the latest version available in 2025)
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
       import {
         getFirestore,
         collection,
@@ -146,8 +146,8 @@
         writeBatch,
         setDoc,
         serverTimestamp,
-      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-      import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+      } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+      import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
 
       // Firebase Configuration
       const firebaseConfig = {
@@ -157,7 +157,7 @@
         storageBucket: "bfc-tracker.firebasestorage.app",
         messagingSenderId: "127052459580",
         appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
-        measurementId: "G-PNYRCFJHYM"
+        measurementId: "G-PNYRCFJHYM",
       };
 
       // Initialize Firebase
@@ -166,9 +166,11 @@
         app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
+        console.log("Firebase initialized successfully");
       } catch (error) {
         console.error("Firebase initialization failed:", error);
         document.body.innerHTML = '<p class="text-red-500 p-4">Failed to initialize Firebase. Please check configuration.</p>';
+        return;
       }
 
       // DOM Elements
@@ -216,15 +218,19 @@
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
-      // Load Fund Balance (Sum of Members' Balances)
+      // Load Fund Balance (Sum of Members' balances)
       async function loadFundBalance() {
         try {
           const snapshot = await getDocs(collection(db, "users"));
+          console.log("Users snapshot:", snapshot.docs.map((doc) => doc.data()));
           allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
           const totalBalance = allMembers.reduce((sum, m) => sum + (m.balance || 0), 0);
+          console.log("Total balance:", totalBalance);
 
           const fundSnapshot = await getDocs(collection(db, "fund"));
+          console.log("Fund snapshot:", fundSnapshot.docs.map((doc) => doc.data()));
           if (fundSnapshot.empty) {
+            console.log("No fund data found, initializing...");
             await setDoc(doc(db, "fund", "main"), { balance: totalBalance });
           } else {
             const fundRef = doc(db, "fund", fundSnapshot.docs[0].id);
@@ -242,10 +248,12 @@
 
       // Authentication Check
       onAuthStateChanged(auth, (user) => {
+        console.log("Auth state:", user);
         if (!user) {
           showError(elements.profitError, "Hindi ka authenticated. Ire-redirect sa login...");
           setTimeout(() => (window.location.href = "https://pacificopablo.github.io/BFC-TRACKER/"), 2000);
         } else {
+          console.log("User authenticated:", user.uid);
           loadFundBalance().then(() => {
             loadMembers();
             listenForRequests();
@@ -256,14 +264,27 @@
 
       // Listen for Member Changes (Real-Time)
       function listenForMemberChanges() {
-        onSnapshot(collection(db, "users"), (snapshot) => {
-          allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          displayMembers(allMembers);
-          loadFundBalance();
-        }, (error) => {
-          console.error("Error listening for member changes:", error);
-          showError(elements.profitError, `Nabigo sa pag-monitor ng mga miyembro: ${error.message}`);
-        });
+        onSnapshot(
+          collection(db, "users"),
+          (snapshot) => {
+            if (snapshot.empty) {
+              console.log("No users found in Firestore");
+              elements.membersList.innerHTML = '<p class="text-gray-400">Walang miyembro na natagpuan.</p>';
+              elements.totalMembers.textContent = "0";
+              elements.totalShares.textContent = "0";
+              elements.totalBalance.textContent = formatCurrency(0);
+              return;
+            }
+            allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+            console.log("Member changes detected:", allMembers);
+            displayMembers(allMembers);
+            loadFundBalance();
+          },
+          (error) => {
+            console.error("Error listening for member changes:", error);
+            showError(elements.profitError, `Nabigo sa pag-monitor ng mga miyembro: ${error.message}`);
+          }
+        );
       }
 
       // Load Members
@@ -275,6 +296,15 @@
         elements.totalBalance.textContent = "Naglo-load...";
 
         try {
+          if (allMembers.length === 0) {
+            console.log("No members available, displaying empty state");
+            elements.membersList.innerHTML = '<p class="text-gray-400">Walang miyembro na natagpuan.</p>';
+            elements.totalMembers.textContent = "0";
+            elements.totalShares.textContent = "0";
+            elements.totalBalance.textContent = formatCurrency(0);
+            elements.topShareholders.innerHTML = '<p class="text-gray-400">Walang approved na shareholders.</p>';
+            return;
+          }
           displayMembers(allMembers);
           updateTopShareholders();
         } catch (error) {
@@ -289,10 +319,19 @@
 
       // Display Members
       function displayMembers(members) {
+        console.log("Displaying members:", members);
         let memberCount = 0,
           shareTotal = 0,
           balanceTotal = 0;
         elements.membersList.innerHTML = "";
+
+        if (members.length === 0) {
+          elements.membersList.innerHTML = '<p class="text-gray-400">Walang miyembro na natagpuan.</p>';
+          elements.totalMembers.textContent = "0";
+          elements.totalShares.textContent = "0";
+          elements.totalBalance.textContent = formatCurrency(0);
+          return;
+        }
 
         members.forEach((m) => {
           memberCount++;
@@ -326,7 +365,7 @@
         elements.totalMembers.textContent = memberCount;
         elements.totalShares.textContent = shareTotal;
         elements.totalBalance.textContent = formatCurrency(balanceTotal);
-        elements.fundBalance.textContent = formatCurrency balanceTotal);
+        elements.fundBalance.textContent = formatCurrency(balanceTotal);
       }
 
       // Update Top Shareholders
@@ -367,6 +406,7 @@
         onSnapshot(
           q,
           (snapshot) => {
+            console.log("Transactions snapshot:", snapshot.docs.map((doc) => doc.data()));
             elements.requestsList.innerHTML = "";
             const pendingRequests = snapshot.docs.filter((doc) => doc.data().status === "pending");
             if (pendingRequests.length === 0) {
@@ -414,7 +454,12 @@
 
         const currentTime = Date.now();
         if (currentTime - lastSubmissionTime < SUBMISSION_COOLDOWN) {
-          showError(elements.profitError, `Maghintay ng ${Math.ceil((SUBMISSION_COOLDOWN - (Date.now() - lastSubmissionTime)) / 1000)} segundo bago muling mag-submit.`);
+          showError(
+            elements.profitError,
+            `Maghintay ng ${Math.ceil(
+              (SUBMISSION_COOLDOWN - (Date.now() - lastSubmissionTime)) / 1000
+            )} segundo bago muling mag-submit.`
+          );
           return;
         }
         lastSubmissionTime = currentTime;
@@ -491,7 +536,12 @@
           );
         } catch (error) {
           console.error(`Error ${transactionType === "profit" ? "distributing profit" : "deducting loss"}:`, error);
-          showError(elements.profitError, `Nabigo ang ${transactionType === "profit" ? "pamimigay ng profit" : "pagbabawas ng loss"}: ${error.message}`);
+          showError(
+            elements.profitError,
+            `Nabigo ang ${transactionType === "profit" ? "pamimigay ng profit" : "pagbabawas ng loss"}: ${
+              error.message
+            }`
+          );
         } finally {
           elements.distributeBtn.disabled = false;
           elements.distributeBtn.textContent = "Submit Transaction";
@@ -575,9 +625,10 @@
         }
       });
 
-      // Initialize Chart
+      // Initialize Chart (Static data; consider fetching from Firestore for dynamic data)
       try {
         const ctx = document.getElementById("fundChart").getContext("2d");
+        console.log("Chart context:", ctx);
         new Chart(ctx, {
           type: "line",
           data: {
@@ -603,12 +654,26 @@
             },
           },
         });
-        console.log("Matagumpay na na-initialize ang chart");
+        console.log("Chart initialized successfully");
       } catch (error) {
-        console.error("Error sa pag-initialize ng chart:", error);
+        console.error("Chart initialization error:", error);
         document.getElementById("fundChart").parentElement.innerHTML =
           '<p class="text-red-500">Nabigo sa pag-load ng chart.</p>';
       }
+
+      // Optional: Mock data for testing if Firebase fails
+      /*
+      allMembers = [
+        { id: "1", name: "John Doe", email: "john@example.com", status: "approved", shares: 10, balance: 1000 },
+        { id: "2", name: "Jane Smith", email: "jane@example.com", status: "pending", shares: 5, balance: 500 },
+      ];
+      displayMembers(allMembers);
+      updateTopShareholders();
+      elements.fundBalance.textContent = formatCurrency(1500);
+      elements.totalMembers.textContent = allMembers.length;
+      elements.totalShares.textContent = allMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+      elements.totalBalance.textContent = formatCurrency(allMembers.reduce((sum, m) => sum + (m.balance || 0), 0));
+      */
     </script>
   </body>
 </html>
