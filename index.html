@@ -1,71 +1,189 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Baccarat Fund Admin Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baccarat Fund Club</title>
+    <meta name="description" content="Welcome to Baccarat Fund Club, your premier destination for investment and wealth-building opportunities.">
+    <meta name="keywords" content="Baccarat Fund Club, investment, finance, wealth management">
+    <meta name="author" content="Baccarat Fund Club">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+        /* Modal backdrop */
+        .modal {
+            display: none;
+        }
+        .modal.active {
+            display: flex;
+        }
+    </style>
 </head>
-<body class="bg-gray-900 text-white p-4">
+<body class="bg-gray-100 text-gray-900">
+    <!-- Header -->
+    <header class="bg-blue-900 text-white py-4 shadow-md">
+        <div class="container mx-auto px-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold">Baccarat Fund Club</h1>
+            <nav>
+                <ul class="flex space-x-6">
+                    <li><a href="#home" class="hover:text-blue-300">Home</a></li>
+                    <li><a href="#about" class="hover:text-blue-300">About</a></li>
+                    <li><a href="#services" class="hover:text-blue-300">Services</a></li>
+                    <li><a href="#contact" class="hover:text-blue-300">Contact</a></li>
+                    <li><button onclick="openModal('loginModal')" class="hover:text-blue-300">Login</button></li>
+                    <li><button onclick="openModal('createAccountModal')" class="hover:text-blue-300">Create Account</button></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
 
-  <!-- Login Modal -->
-  <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center">
-    <div class="bg-gray-800 p-6 rounded shadow-lg w-full max-w-sm text-center">
-      <h2 class="text-2xl font-bold mb-4">🔐 Admin Login with Google</h2>
-      <button id="googleSignInBtn" class="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center justify-center gap-2">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" class="w-5 h-5" />
-        Sign in with Google
-      </button>
+    <!-- Hero Section -->
+    <section id="home" class="bg-blue-800 text-white py-20 text-center">
+        <div class="container mx-auto px-4">
+            <h2 class="text-4xl font-bold mb-4">Welcome to Baccarat Fund Club</h2>
+            <p class="text-lg mb-6">Your trusted partner in wealth creation and financial success.</p>
+            <a href="#contact" class="bg-yellow-500 text-blue-900 px-6 py-3 rounded-full font-semibold hover:bg-yellow-400">Join Now</a>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="py-16">
+        <div class="container mx-auto px-4">
+            <h2 class="text-3xl font-bold text-center mb-8">About Us</h2>
+            <p class="text-lg text-center max-w-2xl mx-auto">
+                Baccarat Fund Club is dedicated to helping individuals achieve financial freedom through strategic investments and expert guidance.
+            </p>
+        </div>
+    </section>
+
+    <!-- Services Section -->
+    <section id="services" class="bg-white py-16">
+        <div class="container mx-auto px-4">
+            <h2 class="text-3xl font-bold text-center mb-8">Our Services</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="p-6 bg-gray-100 rounded-lg shadow-md text-center">
+                    <h3 class="text-xl font-semibold mb-4">Investment Management</h3>
+                    <p>Expert portfolio management to maximize your returns.</p>
+                </div>
+                <div class="p-6 bg-gray-100 rounded-lg shadow-md text-center">
+                    <h3 class="text-xl font-semibold mb-4">Financial Planning</h3>
+                    <p>Customized plans to secure your financial future.</p>
+                </div>
+                <div class="p-6 bg-gray-100 rounded-lg shadow-md text-center">
+                    <h3 class="text-xl font-semibold mb-4">Wealth Advisory</h3>
+                    <p>Personalized advice to grow and protect your wealth.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="py-16">
+        <div class="container mx-auto px-4">
+            <h2 class="text-3xl font-bold text-center mb-8">Contact Us</h2>
+            <form class="max-w-lg mx-auto">
+                <div class="mb-4">
+                    <label for="name" class="block text-sm font-medium">Name</label>
+                    <input type="text" id="name" class="w-full p-2 border rounded-md" required>
+                </div>
+                <div class="mb-4">
+                    <label for="email" class="block text-sm font-medium">Email</label>
+                    <input type="email" id="email" class="w-full p-2 border rounded-md" required>
+                </div>
+                <div class="mb-4">
+                    <label for="message" class="block text-sm font-medium">Message</label>
+                    <textarea id="message" class="w-full p-2 border rounded-md" rows="4" required></textarea>
+                </div>
+                <button type="submit" class="bg-blue-900 text-white px-6 py-3 rounded-full font-semibold hover:bg-blue-800">Send Message</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h2 class="text-2xl font-bold mb-4">Login</h2>
+            <form>
+                <div class="mb-4">
+                    <label for="loginEmail" class="block text-sm font-medium">Email</label>
+                    <input type="email" id="loginEmail" class="w-full p-2 border rounded-md" required>
+                </div>
+                <div class="mb-4">
+                    <label for="loginPassword" class="block text-sm font-medium">Password</label>
+                    <input type="password" id="loginPassword" class="w-full p-2 border rounded-md" required>
+                </div>
+                <div class="mb-4">
+                    <a href="#" onclick="openModal('forgotPasswordModal'); closeModal('loginModal')" class="text-blue-600 hover:underline">Forgot Password?</a>
+                </div>
+                <button type="submit" class="bg-blue-900 text-white px-6 py-3 rounded-full font-semibold hover:bg-blue-800 w-full">Login</button>
+            </form>
+            <button onclick="closeModal('loginModal')" class="mt-4 text-gray-600 hover:underline">Close</button>
+        </div>
     </div>
-  </div>
 
-  <!-- Main Dashboard -->
-  <div id="dashboard" class="hidden">
-    <h1 class="text-3xl font-bold mb-6">👑 Baccarat Fund Admin Dashboard</h1>
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      <div class="bg-gray-800 p-4 rounded shadow">
-        <p class="text-sm">Total Members</p>
-        <p class="text-2xl font-bold" id="totalMembers">0</p>
-      </div>
-      <div class="bg-gray-800 p-4 rounded shadow">
-        <p class="text-sm">Total Shares</p>
-        <p class="text-2xl font-bold" id="totalShares">0</p>
-      </div>
-      <div class="bg-gray-800 p-4 rounded shadow">
-        <p class="text-sm">Total Balance</p>
-        <p class="text-2xl font-bold">₱<span id="totalBalance">0.00</span></p>
-      </div>
+    <!-- Create Account Modal -->
+    <div id="createAccountModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h2 class="text-2xl font-bold mb-4">Create Account</h2>
+            <form>
+                <div class="mb-4">
+                    <label for="createName" class="block text-sm font-medium">Full Name</label>
+                    <input type="text" id="createName" class="w-full p-2 border rounded-md" required>
+                </div>
+                <div class="mb-4">
+                    <label for="createEmail" class="block text-sm font-medium">Email</label>
+                    <input type="email" id="createEmail" class="w-full p-2 border rounded-md" required>
+                </div>
+                <div class="mb-4">
+                    <label for="createPassword" class="block text-sm font-medium">Password</label>
+                    <input type="password" id="createPassword" class="w-full p-2 border rounded-md" required>
+                </div>
+                <button type="submit" class="bg-blue-900 text-white px-6 py-3 rounded-full font-semibold hover:bg-blue-800 w-full">Create Account</button>
+            </form>
+            <button onclick="closeModal('createAccountModal')" class="mt-4 text-gray-600 hover:underline">Close</button>
+        </div>
     </div>
 
-    <!-- Export Buttons -->
-    <div class="flex gap-4 mb-6">
-      <button id="exportMembers" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded">Export Members CSV</button>
-      <button id="exportTransactions" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded">Export Transactions CSV</button>
+    <!-- Forgot Password Modal -->
+    <div id="forgotPasswordModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h2 class="text-2xl font-bold mb-4">Forgot Password</h2>
+            <form>
+                <div class="mb-4">
+                    <label for="forgotEmail" class="block text-sm font-medium">Email</label>
+                    <input type="email" id="forgotEmail" class="w-full p-2 border rounded-md" required>
+                </div>
+                <button type="submit" class="bg-blue-900 text-white px-6 py-3 rounded-full font-semibold hover:bg-blue-800 w-full">Reset Password</button>
+            </form>
+            <button onclick="closeModal('forgotPasswordModal')" class="mt-4 text-gray-600 hover:underline">Close</button>
+        </div>
     </div>
 
-    <!-- Member List -->
-    <input type="text" id="searchInput" placeholder="Search by name, email, or status..." class="mb-4 p-2 w-full rounded bg-gray-700 text-white" />
-    <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    <!-- Footer -->
+    <footer class="bg-blue-900 text-white py-6">
+        <div class="container mx-auto px-4 text-center">
+            <p>© 2025 Baccarat Fund Club. All rights reserved.</p>
+            <div class="mt-4">
+                <a href="#" class="text-gray-300 hover:text-white mx-2">Privacy Policy</a>
+                <a href="#" class="text-gray-300 hover:text-white mx-2">Terms of Service</a>
+            </div>
+        </div>
+    </footer>
 
-    <!-- Top 5 Shareholders -->
-    <div class="bg-gray-800 p-4 mt-8 rounded shadow">
-      <h2 class="text-xl font-bold mb-2">🏆 Top 5 Shareholders</h2>
-      <ul id="topShareholders" class="list-disc list-inside text-sm"></ul>
-    </div>
+    <!-- JavaScript for Modal Toggling -->
+    <script>
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
 
-    <!-- Transaction Requests -->
-    <h2 class="text-2xl font-bold mt-10 mb-4">💰 Deposit & Cash Out Requests</h2>
-    <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>
-
-    <!-- Fund Chart -->
-    <div class="bg-gray-800 p-4 rounded shadow mt-6">
-      <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
-      <canvas id="fundChart" height="100"></canvas>
-    </div>
-  </div>
-
-  <script type="module" src="./dashboard.js"></script>
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+    </script>
 </body>
 </html>
