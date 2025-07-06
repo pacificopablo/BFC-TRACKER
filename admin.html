@@ -1,721 +1,527 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Baccarat Fund Admin Dashboard</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-      color: #f1f5f9;
-      min-height: 100vh;
-      margin: 0;
-      padding: 0;
-    }
-    header {
-      background: rgba(17, 24, 39, 0.95);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    .section-card {
-      background: rgba(31, 41, 55, 0.95);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 16px;
-      padding: 2rem;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .section-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-    }
-    h2 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #e2e8f0;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
-      letter-spacing: -0.025em;
-    }
-    table {
-      border-collapse: separate;
-      border-spacing: 0;
-      width: 100%;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    th, td {
-      padding: 1rem 1.5rem;
-      text-align: left;
-      font-size: 0.875rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    th {
-      background: rgba(255, 255, 255, 0.05);
-      color: #94a3b8;
-      font-weight: 600;
-      text-transform: uppercase;
-      font-size: 0.75rem;
-      letter-spacing: 0.05em;
-    }
-    @media (max-width: 640px) {
-      th, td {
-        padding: 0.75rem 1rem;
-      }
-    }
-    tr {
-      transition: background-color 0.2s ease;
-    }
-    tr:hover {
-      background-color: rgba(255, 255, 255, 0.08);
-    }
-    button {
-      transition: all 0.2s ease;
-      border-radius: 8px;
-      padding: 0.75rem 1.5rem;
-      font-weight: 600;
-      font-size: 0.875rem;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    }
-    button:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    input, select {
-      background-color: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: #f1f5f9;
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      font-size: 0.875rem;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-    input:focus, select:focus {
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-      outline: none;
-    }
-    input::placeholder {
-      color: #94a3b8;
-      opacity: 0.8;
-    }
-    .modal {
-      background: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(6px);
-      z-index: 100;
-    }
-    .modal-content {
-      background: #1f2937;
-      border-radius: 16px;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
-      padding: 2rem;
-      animation: slideIn 0.3s ease-out;
-      max-width: 28rem;
-      width: 100%;
-    }
-    @keyframes slideIn {
-      from { transform: translateY(-30px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-    .label {
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: #94a3b8;
-      margin-bottom: 0.5rem;
-      display: block;
-    }
-    .chart-container {
-      background: rgba(255, 255, 255, 0.03);
-      border-radius: 12px;
-      padding: 1.5rem;
-    }
-    .pagination {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      font-size: 0.875rem;
-    }
-    .status-badge {
-      padding: 0.25rem 0.75rem;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      font-weight: 500;
-    }
-    .status-badge.Approved {
-      background-color: #10b981;
-    }
-    .status-badge.Pending {
-      background-color: #f59e0b;
-    }
-  </style>
-</head>
-<body class="p-6 lg:p-8">
-  <!-- Header -->
-  <header class="p-4 flex justify-between items-center rounded-lg mb-8">
-    <div class="flex items-center gap-3">
-      <h1 class="text-2xl font-bold tracking-tight text-white">Baccarat Fund Admin</h1>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Baccarat Fund Admin Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  </head>
+  <body class="bg-gray-900 text-white p-4">
+    <!-- Header with Logout Button -->
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">👑 Baccarat Fund Admin Dashboard</h1>
+      <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded text-sm hover:bg-red-700">Logout</button>
     </div>
-    <div class="flex items-center gap-3">
-      <span class="text-sm text-gray-400">Admin</span>
-      <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2" aria-label="Logout">Logout</button>
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="bg-gray-800 p-4 rounded shadow">
+        <p class="text-sm">Total Members</p>
+        <p class="text-2xl font-bold" id="totalMembers">0</p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded shadow">
+        <p class="text-sm">Total Shares</p>
+        <p class="text-2xl font-bold" id="totalShares">0</p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded shadow">
+        <p class="text-sm">Total Balance</p>
+        <p class="text-2xl font-bold">₱<span id="totalBalance">0.00</span></p>
+      </div>
     </div>
-  </header>
-
-  <!-- Main -->
-  <main class="space-y-8 max-w-7xl mx-auto">
-    <!-- Member Overview -->
-    <section class="section-card">
-      <h2><span class="text-blue-400">📊</span> Member Overview</h2>
-      <div class="chart-container">
-        <canvas id="memberChart"></canvas>
-      </div>
-    </section>
-
-    <!-- Member List -->
-    <section class="section-card">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 space-y-4 md:space-y-0">
-        <h2><span class="text-blue-400">👥</span> Member List</h2>
-        <div class="flex flex-wrap items-center gap-3">
-          <button id="addMemberBtn" class="bg-green-600 hover:bg-green-700 text-white" aria-label="Add New Member">+ Add Member</button>
-          <button id="addTxnBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white" aria-label="Add New Transaction">+ Add Transaction</button>
-          <input type="text" id="searchInput" placeholder="Search name or email..." class="w-full md:w-64" aria-label="Search members" />
-          <select id="statusFilter" class="w-full md:w-32" aria-label="Filter by status">
-            <option value="all">All Statuses</option>
-            <option value="Approved">Approved</option>
-            <option value="Pending">Pending</option>
-          </select>
-          <button id="exportCSV" class="bg-blue-600 hover:bg-blue-700 text-white" aria-label="Export member data as CSV">Export CSV</button>
-        </div>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead>
-            <tr>
-              <th id="sortName" class="cursor-pointer hover:text-blue-400">Name</th>
-              <th>Email</th>
-              <th id="sortShares" class="cursor-pointer hover:text-blue-400">Shares</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="memberTableBody"></tbody>
-        </table>
-      </div>
-      <div class="pagination mt-6">
-        <button id="prevPage" class="bg-gray-700 hover:bg-gray-600 text-white disabled:opacity-50 px-4 py-2" aria-label="Previous page">Previous</button>
-        <span id="pageIndicator" class="text-sm font-medium"></span>
-        <button id="nextPage" class="bg-gray-700 hover:bg-gray-600 text-white disabled:opacity-50 px-4 py-2" aria-label="Next page">Next</button>
-      </div>
-    </section>
-
-    <!-- Withdrawal Requests -->
-    <section class="section-card">
-      <h2><span class="text-blue-400">📝</span> Withdrawal Requests</h2>
-      <div id="withdrawalRequestsContainer" class="space-y-4"></div>
-    </section>
-
-    <!-- Transaction History -->
-    <section class="section-card">
-      <h2><span class="text-blue-400">🔁</span> Share Transaction History</h2>
-      <div class="flex items-center gap-4 mb-6">
-        <label for="txnFilterMember" class="label">Filter by Member:</label>
-        <select id="txnFilterMember" class="w-full md:w-64" aria-label="Filter transactions by member">
-          <option value="all">All Members</option>
-        </select>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead>
-            <tr>
-              <th>Member</th>
-              <th>Type</th>
-              <th>Shares</th>
-              <th>Date</th>
-            </tr>
-          </thead>
-          <tbody id="transactionTableBody"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Profit Distribution -->
-    <section class="section-card">
-      <h2><span class="text-blue-400">💰</span> Profit Distribution</h2>
-      <div class="flex flex-col gap-4 mb-6">
+    <!-- Financial Chart -->
+    <div class="bg-gray-800 p-4 rounded shadow mb-6">
+      <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
+      <canvas id="fundChart" height="100"></canvas>
+    </div>
+    <!-- Distribute Profit Section -->
+    <div class="bg-gray-800 p-4 rounded shadow mb-6">
+      <h2 class="text-xl font-bold mb-4">💸 Distribute Profit</h2>
+      <form id="profitForm" class="flex flex-col space-y-4">
         <div>
-          <label for="totalProfit" class="label">Total Profit to Distribute</label>
-          <input id="totalProfit" type="number" step="0.01" class="w-full md:w-64" placeholder="Enter total profit amount" aria-label="Total profit to distribute" />
+          <label class="block text-sm mb-1">Total Profit to Distribute (₱)</label>
+          <input
+            type="number"
+            id="profitAmount"
+            class="w-full p-2 rounded bg-gray-700 text-white"
+            placeholder="Enter profit amount"
+            required
+            min="0"
+            step="0.01"
+          />
         </div>
-        <button id="calculateProfit" class="bg-blue-600 hover:bg-blue-700 text-white" aria-label="Calculate profit distribution">Calculate Distribution</button>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Shares</th>
-              <th>Percentage (%)</th>
-              <th>Profit Amount</th>
-            </tr>
-          </thead>
-          <tbody id="profitTableBody"></tbody>
-        </table>
-      </div>
-      <button id="exportProfitCSV" class="bg-blue-600 hover:bg-blue-700 text-white mt-4" aria-label="Export profit distribution as CSV">Export Profit Distribution CSV</button>
-    </section>
-  </main>
-
-  <!-- Modals -->
-  <!-- Edit Member Modal -->
-  <div id="editModal" class="modal fixed inset-0 flex justify-center items-center hidden">
-    <div class="modal-content space-y-6">
-      <h2 class="text-xl font-semibold text-white">Edit Member</h2>
-      <div>
-        <label for="editName" class="label">Name</label>
-        <input id="editName" class="w-full" placeholder="Enter name" aria-label="Member name" />
-      </div>
-      <div>
-        <label for="editEmail" class="label">Email</label>
-        <input id="editEmail" class="w-full" placeholder="Enter email" aria-label="Member email" />
-      </div>
-      <div>
-        <label for="editShares" class="label">Shares</label>
-        <input id="editShares" type="number" class="w-full" placeholder="Enter shares" aria-label="Member shares" />
-      </div>
-      <div>
-        <label for="editStatus" class="label">Status</label>
-        <select id="editStatus" class="w-full" aria-label="Member status">
-          <option value="Approved">Approved</option>
-          <option value="Pending">Pending</option>
-        </select>
-      </div>
-      <div class="flex justify-end gap-3">
-        <button id="closeModal" class="bg-gray-600 hover:bg-gray-500 text-white" aria-label="Cancel editing">Cancel</button>
-        <button id="saveChanges" class="bg-green-600 hover:bg-green-700 text-white" aria-label="Save member changes">Save Changes</button>
+        <button
+          type="submit"
+          id="distributeBtn"
+          class="bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
+        >
+          Distribute Profit
+        </button>
+      </form>
+      <p id="profitError" class="text-red-500 text-sm mt-2 hidden"></p>
+    </div>
+    <!-- Member Search -->
+    <input
+      type="text"
+      id="searchInput"
+      placeholder="Search by name, email, or status..."
+      class="mb-4 p-2 w-full rounded bg-gray-700 text-white"
+    />
+    <!-- Member List -->
+    <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    <!-- Top 5 Shareholders -->
+    <div class="bg-gray-800 p-4 mt-8 rounded shadow">
+      <h2 class="text-xl font-bold mb-2">🏆 Top 5 Shareholders</h2>
+      <ul id="topShareholders" class="list-disc list-inside text-sm"></ul>
+    </div>
+    <!-- Transaction Requests -->
+    <h2 class="text-2xl font-bold mt-10 mb-4">💰 Deposit & Cash Out Requests</h2>
+    <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>
+    <!-- Edit Member Modal -->
+    <div id="editModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center">
+      <div class="bg-gray-800 p-6 rounded shadow w-full max-w-md">
+        <h2 class="text-xl font-bold mb-4">Edit Member</h2>
+        <form id="editForm">
+          <input type="hidden" id="editMemberId" />
+          <div class="mb-4">
+            <label class="block text-sm">Name</label>
+            <input type="text" id="editName" class="w-full p-2 rounded bg-gray-700 text-white" required />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm">Email</label>
+            <input type="email" id="editEmail" class="w-full p-2 rounded bg-gray-700 text-white" required />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm">Status</label>
+            <select id="editStatus" class="w-full p-2 rounded bg-gray-700 text-white" required>
+              <option value="approved">Approved</option>
+              <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm">Shares</label>
+            <input type="number" id="editShares" class="w-full p-2 rounded bg-gray-700 text-white" required min="0" />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm">Balance</label>
+            <input
+              type="number"
+              id="editBalance"
+              class="w-full p-2 rounded bg-gray-700 text-white"
+              required
+              min="0"
+              step="0.01"
+            />
+          </div>
+          <div class="flex justify-end space-x-2">
+            <button type="button" id="cancelEdit" class="bg-gray-600 px-4 py-2 rounded">Cancel</button>
+            <button type="submit" class="bg-blue-600 px-4 py-2 rounded">Save</button>
+          </div>
+        </form>
       </div>
     </div>
-  </div>
+    <script type="module">
+      // Import Firebase SDKs
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+      import {
+        getFirestore,
+        collection,
+        getDocs,
+        doc,
+        updateDoc,
+        deleteDoc,
+        query,
+        orderBy,
+        onSnapshot,
+        writeBatch,
+        addDoc,
+        serverTimestamp,
+      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+      import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-  <!-- Add Member Modal -->
-  <div id="addModal" class="modal fixed inset-0 flex justify-center items-center hidden">
-    <div class="modal-content space-y-6">
-      <h2 class="text-xl font-semibold text-white">Add New Member</h2>
-      <div>
-        <label for="addName" class="label">Name</label>
-        <input id="addName" class="w-full" placeholder="Enter name" aria-label="New member name" />
-      </div>
-      <div>
-        <label for="addEmail" class="label">Email</label>
-        <input id="addEmail" class="w-full" placeholder="Enter email" aria-label="New member email" />
-      </div>
-      <div>
-        <label for="addShares" class="label">Shares</label>
-        <input id="addShares" type="number" class="w-full" placeholder="Enter shares (0)" aria-label="New member shares" />
-      </div>
-      <div>
-        <label for="addStatus" class="label">Status</label>
-        <select id="addStatus" class="w-full" aria-label="New member status">
-          <option value="Approved">Approved</option>
-          <option value="Pending">Pending</option>
-        </select>
-      </div>
-      <div class="flex justify-end gap-3">
-        <button id="closeAddModal" class="bg-gray-600 hover:bg-gray-500 text-white" aria-label="Cancel adding member">Cancel</button>
-        <button id="createMember" class="bg-blue-600 hover:bg-blue-700 text-white" aria-label="Create new member">Create Member</button>
-      </div>
-    </div>
-  </div>
+      // Firebase Configuration (Note: In production, use environment variables)
+      const firebaseConfig = {
+        // Replace with your actual Firebase config
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_AUTH_DOMAIN",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_STORAGE_BUCKET",
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+        appId: "YOUR_APP_ID",
+      };
 
-  <!-- Add Transaction Modal -->
-  <div id="addTxnModal" class="modal fixed inset-0 flex justify-center items-center hidden">
-    <div class="modal-content space-y-6">
-      <h2 class="text-xl font-semibold text-white">Add Transaction</h2>
-      <div>
-        <label for="txnMember" class="label">Select Member</label>
-        <select id="txnMember" class="w-full" aria-label="Select member for transaction">
-          <option value="" disabled selected>Select Member</option>
-        </select>
-      </div>
-      <div>
-        <label for="txnType" class="label">Type</label>
-        <select id="txnType" class="w-full" aria-label="Transaction type">
-          <option value="buy">Buy</option>
-          <option value="sell">Sell</option>
-        </select>
-      </div>
-      <div>
-        <label for="txnShares" class="label">Shares</label>
-        <input id="txnShares" type="number" class="w-full" placeholder="Enter shares" aria-label="Transaction shares" />
-      </div>
-      <div>
-        <label for="txnDate" class="label">Date</label>
-        <input id="txnDate" type="date" class="w-full" aria-label="Transaction date" />
-      </div>
-      <div class="flex justify-end gap-3">
-        <button id="closeTxnModal" class="bg-gray-600 hover:bg-gray-500 text-white" aria-label="Cancel adding transaction">Cancel</button>
-        <button id="createTxn" class="bg-indigo-600 hover:bg-indigo-700 text-white" aria-label="Save transaction">Save Transaction</button>
-      </div>
-    </div>
-  </div>
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      const auth = getAuth(app);
 
-  <!-- Firebase + Logic -->
-  <script type="module">
-    import { auth, db } from './firebase-config.js';
-    import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { collection, onSnapshot, doc, updateDoc, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+      // DOM Elements
+      const elements = {
+        totalMembers: document.getElementById("totalMembers"),
+        totalShares: document.getElementById("totalShares"),
+        totalBalance: document.getElementById("totalBalance"),
+        membersList: document.getElementById("membersList"),
+        topShareholders: document.getElementById("topShareholders"),
+        searchInput: document.getElementById("searchInput"),
+        requestsList: Extraordinary
+        editModal: document.getElementById("editModal"),
+        editForm: document.getElementById("editForm"),
+        editMemberId: document.getElementById("editMemberId"),
+        editName: document.getElementById("editName"),
+        editEmail: document.getElementById("editEmail"),
+        editStatus: document.getElementById("editStatus"),
+        editShares: document.getElementById("editShares"),
+        editBalance: document.getElementById("editBalance"),
+        cancelEdit: document.getElementById("cancelEdit"),
+        logoutBtn: document.getElementById("logoutBtn"),
+        profitForm: document.getElementById("profitForm"),
+        profitAmount: document.getElementById("profitAmount"),
+        distributeBtn: document.getElementById("distributeBtn"),
+        profitError: document.getElementById("profitError"),
+      };
 
-    let allMembers = [], allTxns = [], currentPage = 1, pageSize = 10;
-    let sortBy = null, sortAsc = true, editingDocId = null;
+      let allMembers = [];
+      let lastSubmissionTime = 0;
+      const SUBMISSION_COOLDOWN = 5000; // 5 seconds in milliseconds
 
-    const memberTable = document.getElementById("memberTableBody");
-    const txnTable = document.getElementById("transactionTableBody");
-    const txnFilter = document.getElementById("txnFilterMember");
-    const ctx = document.getElementById('memberChart').getContext('2d');
-    const chart = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: ['Approved', 'Pending'],
-        datasets: [{
-          data: [0, 0],
-          backgroundColor: ['#10b981', '#f59e0b'],
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { color: '#a0aec0', font: { size: 12 } }
+      // Utility Functions
+      const formatCurrency = (value) =>
+        parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+
+      const showError = (element, message) => {
+        element.textContent = message;
+        element.classList.remove("hidden");
+        setTimeout(() => element.classList.add("hidden"), 5000);
+      };
+
+      // Load Members
+      async function loadMembers() {
+        try {
+          const snapshot = await getDocs(collection(db, "members"));
+          allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          console.log("Members fetched:", allMembers);
+          displayMembers(allMembers);
+          updateTopShareholders();
+        } catch (error) {
+          console.error("Error loading members:", error);
+          elements.membersList.innerHTML = `<p class="text-red-500">Failed to load members: ${error.message}</p>`;
+        }
+      }
+
+      // Display Members
+      function displayMembers(members) {
+        let memberCount = 0,
+          shareTotal = 0,
+          balanceTotal = 0;
+        elements.membersList.innerHTML = "";
+
+        members.forEach((m) => {
+          memberCount++;
+          shareTotal += m.shares || 0;
+          balanceTotal += m.balance || 0;
+
+          const div = document.createElement("div");
+          div.className = "bg-gray-800 p-4 rounded shadow";
+          div.innerHTML = `
+            <p><strong>Name:</strong> ${m.name || "N/A"}</p>
+            <p><strong>Email:</strong> ${m.email || "N/A"}</p>
+            <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${
+              m.status === "approved"
+                ? "bg-green-600"
+                : m.status === "pending"
+                ? "bg-yellow-600"
+                : "bg-red-600"
+            }">${m.status || "N/A"}</span></p>
+            <p><strong>Shares:</strong> ${m.shares || 0}</p>
+            <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
+            <div class="flex space-x-2 mt-2">
+              <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm">Edit</button>
+              <button data-id="${m.id}" data-name="${
+                m.name || "Unknown"
+              }" class="delete-btn bg-red-600 px-3 py-1 rounded text-sm">Delete</button>
+            </div>
+          `;
+          elements.membersList.appendChild(div);
+        });
+
+        elements.totalMembers.textContent = memberCount;
+        elements.totalShares.textContent = shareTotal;
+        elements.totalBalance.textContent = formatCurrency(balanceTotal);
+      }
+
+      // Update Top Shareholders
+      function updateTopShareholders() {
+        const top = [...allMembers]
+          .filter((m) => m.status === "approved")
+          .sort((a, b) => (b.shares || 0) - (a.shares || 0))
+          .slice(0, 5);
+
+        elements.topShareholders.innerHTML = "";
+        top.forEach((m) => {
+          const li = document.createElement("li");
+          li.textContent = `${m.name || "N/A"} — ${m.shares || 0} shares`;
+          elements.topShareholders.appendChild(li);
+        });
+      }
+
+      // Search Members
+      elements.searchInput.addEventListener("input", () => {
+        const query = elements.searchInput.value.toLowerCase();
+        const filtered = allMembers.filter(
+          (m) =>
+            (m.name || "").toLowerCase().includes(query) ||
+            (m.email || "").toLowerCase().includes(query) ||
+            (m.status || "").toLowerCase().includes(query)
+        );
+        displayMembers(filtered);
+      });
+
+      // Listen for Transaction Requests
+      function listenForRequests() {
+        const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
+        onSnapshot(
+          q,
+          (snapshot) => {
+            elements.requestsList.innerHTML = "";
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data();
+              if (data.status === "pending") {
+                const div = document.createElement("div");
+                div.className = "bg-gray-700 p-4 rounded";
+                div.innerHTML = `
+                  <p><strong>Member:</strong> ${data.memberName || "N/A"}</p>
+                  <p><strong>Type:</strong> ${data.type || "N/A"}</p>
+                  <p><strong>Amount:</strong> ₱${formatCurrency(data.amount)}</p>
+                  <p><strong>Date:</strong> ${
+                    data.timestamp?.toDate().toLocaleString() || "N/A"
+                  }</p>
+                `;
+                elements.requestsList.appendChild(div);
+              }
+            });
+            if (elements.requestsList.innerHTML === "") {
+              elements.requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
+            }
+          },
+          (error) => {
+            console.error("Error listening for requests:", error);
+            elements.requestsList.innerHTML = `<p class="text-red-500">Failed to load requests: ${error.message}</p>`;
+          }
+        );
+      }
+
+      // Logout Functionality
+      elements.logoutBtn.addEventListener("click", async () => {
+        try {
+          await signOut(auth);
+          console.log("User logged out successfully");
+          window.location.href = "/login.html";
+        } catch (error) {
+          console.error("Error logging out:", error);
+          showError(elements.profitError, `Failed to log out: ${error.message}`);
+        }
+      });
+
+      // Distribute Profit Functionality
+      elements.profitForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        // Rate Limiting
+        const currentTime = Date.now();
+        if (currentTime - lastSubmissionTime < SUBMISSION_COOLDOWN) {
+          showError(elements.profitError, "Please wait a few seconds before submitting again.");
+          return;
+        }
+        lastSubmissionTime = currentTime;
+
+        // Disable button during processing
+        elements.distributeBtn.disabled = true;
+        elements.distributeBtn.textContent = "Processing...";
+
+        try {
+          const profit = parseFloat(elements.profitAmount.value);
+          if (isNaN(profit) || profit <= 0) {
+            showError(elements.profitError, "Please enter a valid profit amount greater than 0.");
+            return;
+          }
+
+          // Fetch fund balance (assuming a 'fund' collection with a 'balance' field)
+          const fundDoc = await getDocs(collection(db, "fund"));
+          const fundBalance = fundDoc.docs[0]?.data().balance || 0;
+          if (profit > fundBalance) {
+            showError(elements.profitError, "Insufficient fund balance for distribution.");
+            return;
+          }
+
+          // Filter approved members and calculate total shares
+          const approvedMembers = allMembers.filter((m) => m.status === "approved");
+          const totalShares = approvedMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+
+          if (totalShares === 0) {
+            showError(elements.profitError, "No approved members with shares to distribute profit.");
+            return;
+          }
+
+          // Calculate profit per share
+          const profitPerShare = profit / totalShares;
+
+          // Create batch for atomic updates
+          const batch = writeBatch(db);
+
+          // Update each approved member's balance
+          approvedMembers.forEach((member) => {
+            const profitShare = (member.shares || 0) * profitPerShare;
+            const newBalance = (member.balance || 0) + profitShare;
+            const memberRef = doc(db, "members", member.id);
+            batch.update(memberRef, { balance: newBalance });
+            console.log(
+              `Prepared to distribute ${formatCurrency(profitShare)} to ${
+                member.name || "N/A"
+              } (ID: ${member.id})`
+            );
+          });
+
+          // Update fund balance
+          const fundRef = doc(db, "fund", fundDoc.docs[0].id);
+          batch.update(fundRef, { balance: fundBalance - profit });
+
+          // Log distribution to audit trail
+          const auditRef = collection(db, "profit_distributions");
+          batch.set(doc(auditRef), {
+            amount: profit,
+            timestamp: serverTimestamp(),
+            adminId: auth.currentUser?.uid || "unknown",
+            memberCount: approvedMembers.length,
+            totalShares,
+          });
+
+          // Commit batch
+          await batch.commit();
+
+          // Reset form and reload data
+          elements.profitForm.reset();
+          await loadMembers();
+          alert(`Successfully distributed ₱${formatCurrency(profit)} to ${approvedMembers.length} members!`);
+        } catch (error) {
+          console.error("Error distributing profit:", error);
+          showError(elements.profitError, `Failed to distribute profit: ${error.message}`);
+        } finally {
+          elements.distributeBtn.disabled = false;
+          elements.distributeBtn.textContent = "Distribute Profit";
+        }
+      });
+
+      // Edit Member Functions
+      function openEditModal(member) {
+        if (!member || !member.id) {
+          console.error("Invalid member data:", member);
+          showError(elements.profitError, "Cannot edit: Member data is invalid.");
+          return;
+        }
+        elements.editMemberId.value = member.id;
+        elements.editName.value = member.name || "";
+        elements.editEmail.value = member.email || "";
+        elements.editStatus.value = member.status || "pending";
+        elements.editShares.value = member.shares || 0;
+        elements.editBalance.value = member.balance || 0;
+        elements.editModal.classList.remove("hidden");
+      }
+
+      elements.editForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = elements.editMemberId.value;
+        const shares = parseInt(elements.editShares.value);
+        const balance = parseFloat(elements.editBalance.value);
+        if (isNaN(shares) || shares < 0 || isNaN(balance) || balance < 0) {
+          showError(elements.profitError, "Shares and balance must be non-negative numbers.");
+          return;
+        }
+        const updatedData = {
+          name: elements.editName.value,
+          email: elements.editEmail.value,
+          status: elements.editStatus.value,
+          shares,
+          balance,
+        };
+        try {
+          await updateDoc(doc(db, "members", id), updatedData);
+          elements.editModal.classList.add("hidden");
+          await loadMembers();
+          alert("Member updated successfully!");
+        } catch (error) {
+          console.error("Error updating member:", error);
+          showError(elements.profitError, `Failed to update member: ${error.message}`);
+        }
+      });
+
+      elements.cancelEdit.addEventListener("click", () => {
+        elements.editModal.classList.add("hidden");
+      });
+
+      // Delete Member
+      async function deleteMember(id, name) {
+        if (confirm(`Are you sure you want to delete ${name || "this member"}?`)) {
+          try {
+            await deleteDoc(doc(db, "members", id));
+            await loadMembers();
+            alert("Member deleted successfully!");
+          } catch (error) {
+            console.error("Error deleting member:", error);
+            showError(elements.profitError, `Failed to delete member: ${error.message}`);
           }
         }
       }
-    });
 
-    // Close modals on overlay click
-    document.querySelectorAll('.modal').forEach(modal => {
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-          modal.classList.add('hidden');
+      // Event Delegation for Edit and Delete Buttons
+      elements.membersList.addEventListener("click", (e) => {
+        const target = e.target;
+        const id = target.dataset.id;
+        if (target.classList.contains("edit-btn") && id) {
+          const member = allMembers.find((m) => m.id === id);
+          if (member) openEditModal(member);
+          else showError(elements.profitError, "Member data not found.");
+        } else if (target.classList.contains("delete-btn") && id) {
+          const name = target.dataset.name;
+          deleteMember(id, name);
         }
       });
-    });
 
-    onAuthStateChanged(auth, user => {
-      if (!user) location.href = "index.html";
-    });
-
-    document.getElementById("logoutBtn").onclick = () => signOut(auth);
-    document.getElementById("searchInput").addEventListener("input", () => { currentPage = 1; renderMembers(); });
-    document.getElementById("statusFilter").addEventListener("change", () => { currentPage = 1; renderMembers(); });
-    document.getElementById("prevPage").onclick = () => { currentPage--; renderMembers(); };
-    document.getElementById("nextPage").onclick = () => { currentPage++; renderMembers(); };
-    document.getElementById("sortName").onclick = () => toggleSort("name");
-    document.getElementById("sortShares").onclick = () => toggleSort("shares");
-    document.getElementById("exportCSV").onclick = exportCSV;
-    document.getElementById("addMemberBtn").onclick = () => toggleModal("addModal", true);
-    document.getElementById("closeAddModal").onclick = () => toggleModal("addModal", false);
-    document.getElementById("createMember").onclick = createMember;
-    document.getElementById("addTxnBtn").onclick = () => { populateTxnMembers(); toggleModal("addTxnModal", true); };
-    document.getElementById("closeTxnModal").onclick = () => toggleModal("addTxnModal", false);
-    document.getElementById("createTxn").onclick = createTransaction;
-    document.getElementById("closeModal").onclick = () => toggleModal("editModal", false);
-    document.getElementById("saveChanges").onclick = saveEdit;
-    document.getElementById("txnFilterMember").addEventListener("change", renderTxns);
-    document.getElementById("calculateProfit").onclick = calculateProfitDistribution;
-    document.getElementById("exportProfitCSV").onclick = exportProfitCSV;
-
-    const membersRef = collection(db, "members");
-    const withdrawalsRef = collection(db, "withdrawals");
-    const transactionsRef = collection(db, "transactions");
-
-    onSnapshot(membersRef, snapshot => {
-      allMembers = [];
-      txnFilter.innerHTML = '<option value="all">All Members</option>';
-      snapshot.forEach(doc => {
-        const m = { id: doc.id, ...doc.data() };
-        allMembers.push(m);
-        const opt = document.createElement("option");
-        opt.value = m.id;
-        opt.textContent = m.name;
-        txnFilter.appendChild(opt);
-      });
-      renderMembers();
-      renderTxns();
-    });
-
-    onSnapshot(transactionsRef, snapshot => {
-      allTxns = [];
-      snapshot.forEach(doc => allTxns.push({ id: doc.id, ...doc.data() }));
-      renderTxns();
-    });
-
-    onSnapshot(withdrawalsRef, snapshot => {
-      const container = document.getElementById("withdrawalRequestsContainer");
-      container.innerHTML = "";
-      snapshot.forEach(doc => {
-        const r = doc.data();
-        if (r.status !== "Pending") return;
-        const div = document.createElement("div");
-        div.className = "bg-gray-700 p-3 rounded-lg flex justify-between items-center";
-        div.innerHTML = `
-          <div><strong>${r.name}</strong> requested <span class="text-green-400">$${r.amount}</span> on ${r.date}</div>
-          <div class="flex gap-2">
-            <button class="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-medium" onclick="approve('${doc.id}')" aria-label="Approve withdrawal for ${r.name}">Approve</button>
-            <button class="bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-xs font-medium" onclick="reject('${doc.id}')" aria-label="Reject withdrawal for ${r.name}">Reject</button>
-          </div>`;
-        container.appendChild(div);
-      });
-    });
-
-    window.approve = async id => {
+      // Initialize Chart
       try {
-        await updateDoc(doc(db, "withdrawals", id), { status: "Approved" });
-      } catch (error) {
-        console.error("Error approving withdrawal:", error);
-        alert("Failed to approve withdrawal. Please try again.");
-      }
-    };
-
-    window.reject = async id => {
-      try {
-        await updateDoc(doc(db, "withdrawals", id), { status: "Rejected" });
-      } catch (error) {
-        console.error("Error rejecting withdrawal:", error);
-        alert("Failed to reject withdrawal. Please try again.");
-      }
-    };
-
-    function toggleModal(id, show) {
-      document.getElementById(id).classList.toggle("hidden", !show);
-    }
-
-    function toggleSort(field) {
-      if (sortBy === field) sortAsc = !sortAsc;
-      else { sortBy = field; sortAsc = true; }
-      renderMembers();
-    }
-
-    function renderMembers() {
-      const kw = document.getElementById("searchInput").value.toLowerCase();
-      const st = document.getElementById("statusFilter").value;
-      let list = allMembers.filter(m => (m.name.toLowerCase().includes(kw) || m.email.toLowerCase().includes(kw)) && (st === "all" || m.status === st));
-      if (sortBy) {
-        list.sort((a, b) => sortBy === "shares" ? (sortAsc ? a.shares - b.shares : b.shares - a.shares) : (sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)));
-      }
-      const total = list.length;
-      const start = (currentPage - 1) * pageSize;
-      const page = list.slice(start, start + pageSize);
-
-      memberTable.innerHTML = "";
-      let appr = 0, pend = 0;
-      page.forEach(m => {
-        if (m.status === "Approved") appr++; else pend++;
-        const row = document.createElement("tr");
-        row.className = "hover:bg-gray-700 cursor-pointer";
-        row.innerHTML = `
-          <td class="py-2">${m.name}</td>
-          <td class="py-2">${m.email}</td>
-          <td class="py-2">${m.shares || 0}</td>
-          <td class="py-2"><span class="status-badge ${m.status}">${m.status}</span></td>`;
-        row.onclick = () => openEdit(m);
-        row.setAttribute('aria-label', `Edit member ${m.name}`);
-        memberTable.appendChild(row);
-      });
-      chart.data.datasets[0].data = [appr, pend];
-      chart.update();
-
-      const totalPages = Math.ceil(total / pageSize);
-      document.getElementById("pageIndicator").textContent = `Page ${currentPage} of ${totalPages}`;
-      document.getElementById("prevPage").disabled = currentPage <= 1;
-      document.getElementById("nextPage").disabled = currentPage >= totalPages;
-    }
-
-    function renderTxns() {
-      const selected = txnFilter.value;
-      const list = allTxns.filter(txn => selected === "all" || txn.memberId === selected);
-      const container = txnTable;
-      container.innerHTML = "";
-      list.forEach(t => {
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td class="py-2">${t.memberName}</td>
-          <td class="py-2 ${t.type === 'buy' ? 'text-green-400' : 'text-red-400'}">${t.type}</td>
-          <td class="py-2">${t.shares}</td>
-          <td class="py-2">${t.date}</td>`;
-        container.appendChild(row);
-      });
-    }
-
-    async function openEdit(m) {
-      editingDocId = m.id;
-      document.getElementById("editName").value = m.name;
-      document.getElementById("editEmail").value = m.email;
-      document.getElementById("editShares").value = m.shares;
-      document.getElementById("editStatus").value = m.status;
-      toggleModal("editModal", true);
-    }
-
-    async function saveEdit() {
-      try {
-        await updateDoc(doc(db, "members", editingDocId), {
-          name: document.getElementById("editName").value,
-          email: document.getElementById("editEmail").value,
-          shares: Number(document.getElementById("editShares").value),
-          status: document.getElementById("editStatus").value
+        const ctx = document.getElementById("fundChart").getContext("2d");
+        new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+            datasets: [
+              {
+                label: "Fund Balance",
+                data: [15000, 18000, 21000, 25000, 29000, 34000],
+                backgroundColor: "rgba(59, 130, 246, 0.2)",
+                borderColor: "rgba(59, 130, 246, 1)",
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { labels: { color: "white" } } },
+            scales: {
+              x: { ticks: { color: "white" } },
+              y: { ticks: { color: "white" }, beginAtZero: true },
+            },
+          },
         });
-        toggleModal("editModal", false);
+        console.log("Chart initialized successfully");
       } catch (error) {
-        console.error("Error saving member changes:", error);
-        alert("Failed to save changes. Please try again.");
-      }
-    }
-
-    async function createMember() {
-      try {
-        await addDoc(membersRef, {
-          name: document.getElementById("addName").value,
-          email: document.getElementById("addEmail").value,
-          shares: Number(document.getElementById("addShares").value) || 0,
-          status: document.getElementById("addStatus").value,
-          createdAt: new Date().toISOString()
-        });
-        toggleModal("addModal", false);
-      } catch (error) {
-        console.error("Error creating member:", error);
-        alert("Failed to create member. Please try again.");
-      }
-    }
-
-    function populateTxnMembers() {
-      const sel = document.getElementById("txnMember");
-      sel.innerHTML = '<option value="" disabled selected>Select Member</option>';
-      allMembers.forEach(m => {
-        const opt = document.createElement("option");
-        opt.value = m.id;
-        opt.textContent = m.name;
-        sel.appendChild(opt);
-      });
-      document.getElementById("txnDate").value = new Date().toISOString().slice(0, 10);
-    }
-
-    async function createTransaction() {
-      try {
-        const memberId = document.getElementById("txnMember").value;
-        const member = allMembers.find(m => m.id === memberId);
-        await addDoc(transactionsRef, {
-          memberId,
-          memberName: member.name,
-          type: document.getElementById("txnType").value,
-          shares: Number(document.getElementById("txnShares").value),
-          date: document.getElementById("txnDate").value
-        });
-        toggleModal("addTxnModal", false);
-      } catch (error) {
-        console.error("Error creating transaction:", error);
-        alert("Failed to create transaction. Please try again.");
-      }
-    }
-
-    async function exportCSV() {
-      try {
-        const snap = await getDocs(membersRef);
-        const rows = [["Name", "Email", "Shares", "Status"]];
-        snap.forEach(doc => {
-          const m = doc.data();
-          rows.push([m.name, m.email, m.shares || 0, m.status]);
-        });
-        const csv = rows.map(r => r.join(",")).join("\n");
-        const blob = new Blob([csv], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "members.csv";
-        a.click();
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        console.error("Error exporting CSV:", error);
-        alert("Failed to export CSV. Please try again.");
-      }
-    }
-
-    function calculateProfitDistribution() {
-      const totalProfit = Number(document.getElementById("totalProfit").value);
-      if (!totalProfit || totalProfit <= 0) {
-        alert("Please enter a valid total profit amount.");
-        return;
+        console.error("Error initializing chart:", error);
       }
 
-      const totalShares = allMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
-      if (totalShares === 0) {
-        alert("No shares available for distribution.");
-        return;
-      }
-
-      const profitTable = document.getElementById("profitTableBody");
-      profitTable.innerHTML = "";
-
-      allMembers.forEach(m => {
-        const shares = m.shares || 0;
-        const percentage = totalShares > 0 ? ((shares / totalShares) * 100).toFixed(2) : 0;
-        const profitAmount = totalShares > 0 ? ((shares / totalShares) * totalProfit).toFixed(2) : 0;
-
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td class="py-2">${m.name}</td>
-          <td class="py-2">${shares}</td>
-          <td class="py-2">${percentage}%</td>
-          <td class="py-2">$${profitAmount}</td>`;
-        profitTable.appendChild(row);
-      });
-    }
-
-    async function exportProfitCSV() {
-      try {
-        const totalProfit = Number(document.getElementById("totalProfit").value);
-        if (!totalProfit || totalProfit <= 0) {
-          alert("Please calculate profit distribution first.");
-          return;
-        }
-
-        const totalShares = allMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
-        const rows = [["Name", "Shares", "Percentage (%)", "Profit Amount"]];
-        allMembers.forEach(m => {
-          const shares = m.shares || 0;
-          const percentage = totalShares > 0 ? ((shares / totalShares) * 100).toFixed(2) : 0;
-          const profitAmount = totalShares > 0 ? ((shares / totalShares) * totalProfit).toFixed(2) : 0;
-          rows.push([m.name, shares, percentage, profitAmount]);
-        });
-
-        const csv = rows.map(r => r.join(",")).join("\n");
-        const blob = new Blob([csv], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "profit_distribution.csv";
-        a.click();
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        console.error("Error exporting profit CSV:", error);
-        alert("Failed to export profit distribution CSV. Please try again.");
-      }
-    }
-  </script>
-</body>
+      // Initialize
+      loadMembers();
+      listenForRequests();
+    </script>
+  </body>
 </html>
