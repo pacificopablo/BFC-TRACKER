@@ -26,20 +26,46 @@
   </div>
 
   <script type="module">
-    import { auth, db } from './firebase-config.js';
-    import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    const loginForm = document.getElementById('loginForm');
-    const errorMsg = document.getElementById('errorMsg');
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
+      authDomain: "bfc-tracker.firebaseapp.com",
+      databaseURL: "https://bfc-tracker-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "bfc-tracker",
+      storageBucket: "bfc-tracker.firebasestorage.app",
+      messagingSenderId: "127052459580",
+      appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
+      measurementId: "G-PNYRCFJHYM"
+    };
 
-    loginForm.addEventListener('submit', async (e) => {
+    // Initialize Firebase
+    let app, auth, db;
+    try {
+      app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+      db = getFirestore(app);
+    } catch (error) {
+      console.error("Firebase initialization error:", error);
+      document.getElementById("errorMsg").textContent = "Failed to initialize Firebase.";
+      document.getElementById("errorMsg").classList.remove("hidden");
+    }
+
+    const loginForm = document.getElementById("loginForm");
+    const errorMsg = document.getElementById("errorMsg");
+
+    loginForm.addEventListener("submit", async (e) => {
       e.preventDefault();
-      errorMsg.classList.add('hidden');
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
+      errorMsg.classList.add("hidden");
+
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
 
       try {
+        // Sign in with email and password
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
@@ -54,17 +80,15 @@
           } else if (role === "member") {
             window.location.href = "member-dashboard.html";
           } else {
-            errorMsg.textContent = "User role is invalid.";
-            errorMsg.classList.remove('hidden');
+            throw new Error("User role is invalid.");
           }
         } else {
-          errorMsg.textContent = "User data not found. Please contact support.";
-          errorMsg.classList.remove('hidden');
+          throw new Error("User data not found. Please contact support.");
         }
-
       } catch (error) {
+        console.error("Login error:", error);
         errorMsg.textContent = error.message;
-        errorMsg.classList.remove('hidden');
+        errorMsg.classList.remove("hidden");
       }
     });
   </script>
