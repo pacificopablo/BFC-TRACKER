@@ -2,64 +2,70 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Baccarat Fund Club - Login</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Baccarat Fund Admin Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white flex items-center justify-center h-screen">
-  <div class="bg-gray-800 p-8 rounded shadow-md w-full max-w-md">
-    <h1 class="text-3xl font-bold mb-6 text-center">🔐 Login</h1>
-    <form id="loginForm" class="space-y-4">
-      <input type="email" id="email" placeholder="Email" required class="w-full p-2 rounded text-black" />
-      <input type="password" id="password" placeholder="Password" required class="w-full p-2 rounded text-black" />
-      <button type="submit" class="w-full bg-green-600 hover:bg-green-700 py-2 rounded">Login</button>
-    </form>
-    <p id="loginError" class="text-red-400 mt-4 hidden">❌ Invalid credentials or not yet approved.</p>
-    <div class="mt-6 text-center">
-      <a href="register.html" class="text-blue-400 hover:underline">Create an account</a>
+<body class="bg-gray-900 text-white p-4">
+
+  <!-- Login Modal -->
+  <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center">
+    <div class="bg-gray-800 p-6 rounded shadow-lg w-full max-w-sm text-center">
+      <h2 class="text-2xl font-bold mb-4">🔐 Admin Login with Google</h2>
+      <button id="googleSignInBtn" class="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center justify-center gap-2">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" class="w-5 h-5" />
+        Sign in with Google
+      </button>
     </div>
   </div>
-  <script type="module">
-    import { auth, db } from './firebase-config.js';
-    import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    const form = document.getElementById('loginForm');
-    const loginError = document.getElementById('loginError');
+  <!-- Main Dashboard -->
+  <div id="dashboard" class="hidden">
+    <h1 class="text-3xl font-bold mb-6">👑 Baccarat Fund Admin Dashboard</h1>
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="bg-gray-800 p-4 rounded shadow">
+        <p class="text-sm">Total Members</p>
+        <p class="text-2xl font-bold" id="totalMembers">0</p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded shadow">
+        <p class="text-sm">Total Shares</p>
+        <p class="text-2xl font-bold" id="totalShares">0</p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded shadow">
+        <p class="text-sm">Total Balance</p>
+        <p class="text-2xl font-bold">₱<span id="totalBalance">0.00</span></p>
+      </div>
+    </div>
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const email = form.email.value.trim();
-      const password = form.password.value;
+    <!-- Export Buttons -->
+    <div class="flex gap-4 mb-6">
+      <button id="exportMembers" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded">Export Members CSV</button>
+      <button id="exportTransactions" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded">Export Transactions CSV</button>
+    </div>
 
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const uid = userCredential.user.uid;
-        const docRef = doc(db, "users", uid);
-        const docSnap = await getDoc(docRef);
+    <!-- Member List -->
+    <input type="text" id="searchInput" placeholder="Search by name, email, or status..." class="mb-4 p-2 w-full rounded bg-gray-700 text-white" />
+    <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
 
-        if (docSnap.exists()) {
-          const userData = docSnap.data();
-          if (userData.status === "approved") {
-            localStorage.setItem("userRole", userData.role);
-            localStorage.setItem("userName", userData.name);
-            localStorage.setItem("userEmail", email);
-            if (userData.role === "admin") {
-              window.location.href = "admin.html";
-            } else {
-              window.location.href = "member-dashboard.html";
-            }
-          } else {
-            loginError.classList.remove('hidden');
-          }
-        } else {
-          loginError.classList.remove('hidden');
-        }
-      } catch (error) {
-        console.error(error);
-        loginError.classList.remove('hidden');
-      }
-    });
-  </script>
+    <!-- Top 5 Shareholders -->
+    <div class="bg-gray-800 p-4 mt-8 rounded shadow">
+      <h2 class="text-xl font-bold mb-2">🏆 Top 5 Shareholders</h2>
+      <ul id="topShareholders" class="list-disc list-inside text-sm"></ul>
+    </div>
+
+    <!-- Transaction Requests -->
+    <h2 class="text-2xl font-bold mt-10 mb-4">💰 Deposit & Cash Out Requests</h2>
+    <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>
+
+    <!-- Fund Chart -->
+    <div class="bg-gray-800 p-4 rounded shadow mt-6">
+      <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
+      <canvas id="fundChart" height="100"></canvas>
+    </div>
+  </div>
+
+  <script type="module" src="./dashboard.js"></script>
 </body>
 </html>
