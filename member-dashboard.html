@@ -9,7 +9,7 @@
 <body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
   <div class="max-w-md w-full bg-gray-800 rounded-xl p-6 shadow-lg">
     <div class="flex items-center space-x-4 mb-4">
-      <img src="default-avatar.png" alt="Avatar" class="w-16 h-16 rounded-full border border-gray-600" />
+      <img src="default-avatar.png" alt="User avatar" class="w-16 h-16 rounded-full border border-gray-600" />
       <div>
         <h1 class="text-2xl font-bold">🎉 Welcome, <span id="userName">Member</span></h1>
         <p class="text-sm text-gray-400">Joined: <span id="joinDate">--</span></p>
@@ -19,18 +19,21 @@
     <p class="mb-2">📧 Email: <span id="userEmail">user@example.com</span></p>
     <p class="mb-2">📊 Shares: <span id="userShares">0</span></p>
     <p class="mb-2">💰 Balance: ₱<span id="userBalance">0.00</span></p>
-    <p id="loadingMessage" class="text-yellow-400 mt-2">Loading your data...</p>
+    <div id="loadingMessage" class="text-yellow-400 mt-2">Loading your data...</div>
 
     <button id="cashoutBtn" class="mt-4 w-full py-2 bg-yellow-500 hover:bg-yellow-600 text-black rounded">Request Cashout</button>
     <button id="logoutBtn" class="mt-2 w-full py-2 bg-red-600 hover:bg-red-700 rounded">Logout</button>
+
+    <!-- Transaction History -->
+    <div id="transactionHistory" class="bg-gray-800 p-4 rounded mt-4"></div>
   </div>
 
-  <!-- Modal -->
-  <div id="cashoutModal" class="fixed inset-0 bg-black bg-opacity-50 hidden justify-center items-center">
+  <!-- Cashout Modal -->
+  <div id="cashoutModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center" role="dialog" aria-labelledby="cashoutModalTitle">
     <div class="bg-white text-black rounded-xl p-6 w-full max-w-sm">
-      <h2 class="text-xl font-bold mb-4">Cashout Request</h2>
+      <h2 id="cashoutModalTitle" class="text-xl font-bold mb-4">Cashout Request</h2>
       <label for="cashoutAmount" class="block mb-2">Enter Amount:</label>
-      <input type="number" id="cashoutAmount" min="1" class="w-full p-2 border rounded mb-4" />
+      <input type="number" id="cashoutAmount" min="0.01" step="0.01" class="w-full p-2 border rounded mb-4" required />
       <div class="flex justify-end space-x-2">
         <button id="cancelCashout" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
         <button id="submitCashout" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Submit</button>
@@ -42,7 +45,7 @@
   <script type="module">
     import { auth, db } from './firebase-config.js';
     import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { doc, getDoc, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { doc, getDoc, collection, addDoc, onSnapshot, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const nameField = document.getElementById("userName");
     const emailField = document.getElementById("userEmail");
@@ -50,25 +53,54 @@
     const balanceField = document.getElementById("userBalance");
     const joinDateField = document.getElementById("joinDate");
     const loadingMessage = document.getElementById("loadingMessage");
+    const cashoutModal = document.getElementById("cashoutModal");
+    const cashoutBtn = document.getElementById("cashoutBtn");
+    const cancelBtn = document.getElementById("cancelCashout");
+    const submitBtn = document.getElementById("submitCashout");
+    const amountInput = document.getElementById("cashoutAmount");
+    const messageBox = document.getElementById("cashoutMessage");
+    const transactionHistory = document.getElementById("transactionHistory");
 
     let currentUser = null;
 
+    // Trap focus in modal for accessibility
+    function trapFocus(modal) {
+      const focusableElements = modal.querySelectorAll("button, input");
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      modal.addEventListener("keydown", (e) => {
+        if (e.key === "Tab") {
+          if (e.shiftKey && document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          } else if (!e.shiftKey && document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        } else if (e.key === "Escape") {
+          modal.classList.add("hidden");
+        }
+      });
+    }
+
+    // Load user data and check role
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         currentUser = user;
         try {
-          const uid = user.uid;
-          const docSnap = await getDoc(doc(db, "users", uid));
-          if (docSnap.exists()) {
-            const data = docSnap.data();
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists() && userDoc.data().role !== "admin") {
+            const data = userDoc.data();
             nameField.textContent = data.name || "Member";
             emailField.textContent = data.email || user.email;
             sharesField.textContent = Number(data.shares || 0).toLocaleString();
             balanceField.textContent = Number(data.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
             joinDateField.textContent = new Date(user.metadata.creationTime).toLocaleDateString();
             loadingMessage.style.display = "none";
+            loadTransactionHistory();
           } else {
-            loadingMessage.textContent = "⚠️ Member data not found.";
+            alert("Unauthorized access. Members only.");
+            window.location.href = "index.html";
           }
         } catch (error) {
           loadingMessage.textContent = "⚠️ Error loading data.";
@@ -79,6 +111,26 @@
       }
     });
 
+    // Load transaction history
+    function loadTransactionHistory() {
+      const q = query(collection(db, "transactions"), where("memberId", "==", currentUser.uid), orderBy("timestamp", "desc"));
+      onSnapshot(q, (snapshot) => {
+        transactionHistory.innerHTML = "<h2 class='text-xl font-bold mb-2'>Transaction History</h2>";
+        if (snapshot.empty) {
+          transactionHistory.innerHTML += "<p class='text-gray-400'>No transactions found.</p>";
+          return;
+        }
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          transactionHistory.innerHTML += `
+            <p><strong>${data.type.charAt(0).toUpperCase() + data.type.slice(1)}:</strong> ₱${Number(data.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            - ${data.status} on ${data.timestamp?.toDate().toLocaleString()}</p>
+          `;
+        });
+      });
+    }
+
+    // Logout
     document.getElementById("logoutBtn").addEventListener("click", () => {
       signOut(auth).then(() => {
         window.location.href = "index.html";
@@ -89,47 +141,57 @@
     });
 
     // Cashout modal logic
-    const modal = document.getElementById("cashoutModal");
-    const cashoutBtn = document.getElementById("cashoutBtn");
-    const cancelBtn = document.getElementById("cancelCashout");
-    const submitBtn = document.getElementById("submitCashout");
-    const amountInput = document.getElementById("cashoutAmount");
-    const messageBox = document.getElementById("cashoutMessage");
-
     cashoutBtn.addEventListener("click", () => {
-      modal.classList.remove("hidden");
+      cashoutModal.classList.remove("hidden");
       amountInput.value = "";
       messageBox.textContent = "";
+      amountInput.focus();
+      trapFocus(cashoutModal);
     });
 
     cancelBtn.addEventListener("click", () => {
-      modal.classList.add("hidden");
+      cashoutModal.classList.add("hidden");
     });
 
     submitBtn.addEventListener("click", async () => {
       const amount = parseFloat(amountInput.value);
-      if (!amount || amount <= 0) {
-        messageBox.textContent = "⚠️ Please enter a valid amount.";
+      const userBalance = parseFloat(balanceField.textContent.replace(/,/g, ""));
+      if (!amount || amount <= 0 || amount > userBalance || amount > 9999999) {
+        messageBox.textContent = "⚠️ Please enter a valid amount (0.01 - 9,999,999) within your balance.";
         messageBox.classList.add("text-red-500");
         return;
       }
 
+      submitBtn.disabled = true;
       try {
-        await addDoc(collection(db, "withdrawalRequests"), {
-          uid: currentUser.uid,
-          email: currentUser.email,
+        await addDoc(collection(db, "transactions"), {
+          memberId: currentUser.uid,
+          memberName: nameField.textContent,
+          type: "cashout",
           amount,
+          shares: 0,
           status: "pending",
-          createdAt: serverTimestamp()
+          timestamp: serverTimestamp()
         });
-        messageBox.textContent = "✅ Request submitted!";
+        messageBox.textContent = "✅ Cashout request submitted!";
         messageBox.classList.remove("text-red-500");
         messageBox.classList.add("text-green-600");
-        setTimeout(() => modal.classList.add("hidden"), 1500);
+        setTimeout(() => {
+          cashoutModal.classList.add("hidden");
+          submitBtn.disabled = false;
+        }, 1500);
       } catch (err) {
         console.error(err);
         messageBox.textContent = "❌ Failed to submit request.";
         messageBox.classList.add("text-red-500");
+        submitBtn.disabled = false;
+      }
+    });
+
+    // Real-time balance updates
+    onSnapshot(doc(db, "users", currentUser?.uid), (doc) => {
+      if (doc.exists()) {
+        balanceField.textContent = Number(doc.data().balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
       }
     });
   </script>
