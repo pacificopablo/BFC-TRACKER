@@ -13,20 +13,24 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-gray-900 text-white min-h-screen p-4">
+  <!-- LOADING INDICATOR -->
+  <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <p class="text-xl">Loading...</p>
+  </div>
 
   <!-- HEADER -->
   <header class="flex justify-between items-center mb-4">
     <h1 class="text-xl font-bold">🎲 Baccarat Fund Club - Admin</h1>
-    <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded">Logout</button>
+    <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
   </header>
 
   <!-- TABS -->
   <div id="tabButtons" class="flex space-x-4 text-sm font-semibold mb-6">
-    <button onclick="showTab('members', this)" class="tab-btn px-3 py-1 rounded">👤 Members</button>
-    <button onclick="showTab('requests', this)" class="tab-btn px-3 py-1 rounded">💸 Cash Outs</button>
-    <button onclick="showTab('profits', this)" class="tab-btn px-3 py-1 rounded">📈 Profits</button>
-    <button onclick="showTab('settings', this)" class="tab-btn px-3 py-1 rounded">⚙️ Settings</button>
-    <button onclick="showTab('charts', this)" class="tab-btn px-3 py-1 rounded">📊 Charts</button>
+    <button onclick="showTab('members', this)" class="tab-btn px-3 py-1 rounded hover:underline" aria-label="View Members Tab">👤 Members</button>
+    <button onclick="showTab('requests', this)" class="tab-btn px-3 py-1 rounded hover:underline" aria-label="View Cash Outs Tab">💸 Cash Outs</button>
+    <button onclick="showTab('profits', this)" class="tab-btn px-3 py-1 rounded hover:underline" aria-label="View Profits Tab">📈 Profits</button>
+    <button onclick="showTab('settings', this)" class="tab-btn px-3 py-1 rounded hover:underline" aria-label="View Settings Tab">⚙️ Settings</button>
+    <button onclick="showTab('charts', this)" class="tab-btn px-3 py-1 rounded hover:underline" aria-label="View Charts Tab">📊 Charts</button>
   </div>
 
   <!-- MEMBERS TAB -->
@@ -51,7 +55,7 @@
   <!-- CASH OUTS TAB -->
   <section id="requests" class="tab-content hidden">
     <h2 class="text-lg font-semibold mb-2">💸 Cash Out Requests</h2>
-    <div id="requestList"><p>Coming soon…</p></div>
+    <div id="requestList" class="space-y-2 max-h-[400px] overflow-y-auto"></div>
   </section>
 
   <!-- PROFITS TAB -->
@@ -115,12 +119,13 @@
 
   <!-- SCRIPTS -->
   <script type="module">
-    import { db } from './firebase-config.js';
+    import { db, auth } from './firebase-config.js';
     import {
-      doc, getDoc, updateDoc,
+      doc, getDoc, updateDoc, setDoc,
       collection, getDocs, query, where, deleteDoc,
-      Timestamp
+      onSnapshot, Timestamp
     } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
     import Chart from 'https://cdn.jsdelivr.net/npm/chart.js';
 
     let conversionRate = 10;
@@ -129,30 +134,90 @@
     let sortSharesAsc = true;
     let currentSearchTerm = '';
     let sharesChart;
+    let debounceTimeout;
 
-    // Load conversion rate
-    async function loadConversionRate() {
-      const snap = await getDoc(doc(db, 'settings', 'conversion'));
-      if (snap.exists()) {
-        conversionRate = snap.data().rate || 10;
+    // Authentication check
+    onAuthStateChanged(auth, user => {
+      if (!user) {
+        window.location.href = '/login.html';
+      } else {
+        user.getIdTokenResult().then(idTokenResult => {
+          if (!idTokenResult.claims.admin) {
+            alert('Access denied: Admins only.');
+            window.location.href = '/login.html';
+          }
+        });
+      }
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').onclick = async () => {
+      try {
+        await signOut(auth);
+        window.location.href = '/login.html';
+      } catch (error) {
+        console.error('Logout error:', error);
+        alert('Failed to log out.');
+      }
+    };
+
+    // Initialize settings
+    async function initializeSettings() {
+      try {
+        const settingsRef = doc(db, 'settings', 'conversion');
+        const snap = await getDoc(settingsRef);
+        if (!snap.exists()) {
+          await setDoc(settingsRef, { rate: 10 });
+          conversionRate = 10;
+        } else {
+          conversionRate = snap.data().rate || 10;
+        }
         document.getElementById('conversionRateInput').value = conversionRate;
+      } catch (error) {
+        console.error('Error initializing settings:', error);
+        alert('Failed to load settings.');
       }
     }
 
     // Update conversion rate
     window.updateConversionRate = async () => {
       const newRate = parseFloat(document.getElementById('conversionRateInput').value);
-      if (isNaN(newRate) || newRate <= 0) return alert('Enter valid rate.');
-      await updateDoc(doc(db, 'settings', 'conversion'), { rate: newRate });
-      conversionRate = newRate;
-      alert(`✅ Rate set to ₱${newRate}/share.`);
-      loadAndRenderMembers();
+      if (isNaN(newRate) || newRate <= 0) {
+        alert('Enter a valid rate.');
+        return;
+      }
+      try {
+        document.getElementById('loading').classList.remove('hidden');
+        await updateDoc(doc(db, 'settings', 'conversion'), { rate: newRate });
+        conversionRate = newRate;
+        alert(`✅ Rate set to ₱${newRate}/share.`);
+        applyFiltersAndSort();
+      } catch (error) {
+        console.error('Error updating conversion rate:', error);
+        alert('Failed to update rate.');
+      } finally {
+        document.getElementById('loading').classList.add('hidden');
+      }
     };
 
-    // Load members from Firestore
-    async function loadMembers() {
-      const snap = await getDocs(collection(db, 'members'));
-      allMembers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Load members (real-time)
+    function listenForMembers() {
+      try {
+        document.getElementById('loading').classList.remove('hidden');
+        onSnapshot(collection(db, 'members'), snap => {
+          allMembers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          applyFiltersAndSort();
+          document.getElementById('loading').classList.add('hidden');
+        }, error => {
+          console.error('Error listening for members:', error);
+          document.getElementById('memberList').innerHTML = '<p>Error loading members.</p>';
+          document.getElementById('loading').classList.add('hidden');
+        });
+      } catch (error) {
+        console.error('Error setting up member listener:', error);
+        document.getElementById('memberList').innerHTML = '<p>Error loading members.</p>';
+        document.getElementById('loading').classList.add('hidden');
+      }
     }
 
     // Render member list
@@ -173,7 +238,7 @@
             <div class="font-semibold text-lg">${m.name || 'Unnamed'}</div>
             <div>Email: ${m.email || '-'}</div>
             <div>Shares: ${shares}</div>
-            <div>Balance: ₱${balance.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+            <div>Balance: ₱${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
           </div>
           <button class="edit-btn bg-blue-600 px-3 py-1 rounded hover:bg-blue-700 text-sm">Edit</button>
         `;
@@ -187,29 +252,26 @@
     function applyFiltersAndSort() {
       let filtered = allMembers.filter(m => {
         const term = currentSearchTerm.toLowerCase();
-        return (m.name||'').toLowerCase().includes(term) || (m.email||'').toLowerCase().includes(term);
+        return (m.name || '').toLowerCase().includes(term) || (m.email || '').toLowerCase().includes(term);
       });
       if (sortSharesAsc !== null) {
-        filtered.sort((a,b) => sortSharesAsc ? (a.shares||0)-(b.shares||0) : (b.shares||0)-(a.shares||0));
+        filtered.sort((a, b) => sortSharesAsc ? (a.shares || 0) - (b.shares || 0) : (b.shares || 0) - (a.shares || 0));
       } else {
-        filtered.sort((a,b) => {
-          const A=(a.name||'').toLowerCase(), B=(b.name||'').toLowerCase();
+        filtered.sort((a, b) => {
+          const A = (a.name || '').toLowerCase(), B = (b.name || '').toLowerCase();
           return sortNameAsc ? A.localeCompare(B) : B.localeCompare(A);
         });
       }
       renderMemberList(filtered);
     }
 
-    // Combined load + render
-    async function loadAndRenderMembers() {
-      await loadMembers();
-      applyFiltersAndSort();
-    }
-
-    // Search input
+    // Search input with debounce
     document.getElementById('searchInput').oninput = e => {
-      currentSearchTerm = e.target.value;
-      applyFiltersAndSort();
+      clearTimeout(debounceTimeout);
+      debounceTimeout = setTimeout(() => {
+        currentSearchTerm = e.target.value;
+        applyFiltersAndSort();
+      }, 300);
     };
 
     // Sort buttons
@@ -231,9 +293,9 @@
     // Edit modal
     function openEditModal(m) {
       document.getElementById('editMemberId').value = m.id;
-      document.getElementById('editName').value    = m.name || '';
-      document.getElementById('editEmail').value   = m.email || '';
-      document.getElementById('editShares').value  = m.shares || 0;
+      document.getElementById('editName').value = m.name || '';
+      document.getElementById('editEmail').value = m.email || '';
+      document.getElementById('editShares').value = m.shares || 0;
       document.getElementById('editModal').classList.remove('hidden');
     }
     function closeEditModal() {
@@ -244,85 +306,180 @@
     document.getElementById('editForm').onsubmit = async e => {
       e.preventDefault();
       const id = document.getElementById('editMemberId').value;
-      const name  = document.getElementById('editName').value.trim();
+      const name = document.getElementById('editName').value.trim();
       const email = document.getElementById('editEmail').value.trim();
-      const shares= parseInt(document.getElementById('editShares').value);
-      if (!name||!email||isNaN(shares)) return alert('Fill all fields.');
-      await updateDoc(doc(db,'members',id), { name, email, shares });
-      alert('✅ Member updated.');
-      closeEditModal();
-      loadAndRenderMembers();
+      const shares = parseInt(document.getElementById('editShares').value);
+      if (!name || !email || isNaN(shares) || shares < 0) {
+        alert('Please fill all fields with valid data.');
+        return;
+      }
+      try {
+        document.getElementById('loading').classList.remove('hidden');
+        await updateDoc(doc(db, 'members', id), { name, email, shares });
+        alert('✅ Member updated.');
+        closeEditModal();
+      } catch (error) {
+        console.error('Error updating member:', error);
+        alert('Failed to update member.');
+      } finally {
+        document.getElementById('loading').classList.add('hidden');
+      }
     };
 
     // CSV export
     document.getElementById('exportCsvBtn').onclick = () => {
-      if (!allMembers.length) return alert('No members to export.');
-      const hdr = ['Name','Email','Shares','Balance(₱)'];
+      if (!allMembers.length) {
+        alert('No members to export.');
+        return;
+      }
+      const hdr = ['Name', 'Email', 'Shares', 'Balance(₱)'];
       const rows = allMembers.map(m => {
-        const bal = (m.shares||0)*conversionRate;
-        return [`"${m.name||''}"`,`"${m.email||''}"`,m.shares||0,bal.toFixed(2)].join(',');
+        const name = (m.name || '').replace(/"/g, '""');
+        const email = (m.email || '').replace(/"/g, '""');
+        const shares = m.shares || 0;
+        const bal = shares * conversionRate;
+        return [`"${name}"`, `"${email}"`, shares, bal.toFixed(2)].join(',');
       });
-      const csv = [hdr.join(','),...rows].join('\n');
-      const blob = new Blob([csv], {type:'text/csv'});
+      const csv = [hdr.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `members_${new Date().toISOString().slice(0,10)}.csv`;
-      a.click(); URL.revokeObjectURL(url);
+      a.href = url;
+      a.download = `members_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
     };
 
     // Cleanup pending
     async function cleanupOldPending() {
-      if (!confirm('Delete pending >7 days?')) return;
-      const cutoff = new Date(Date.now() - 7*24*60*60*1000);
-      const qSnap = await getDocs(query(collection(db,'members'), where('status','==','pending')));
-      let del=0;
-      for (const d of qSnap.docs) {
-        const ts = d.data().createdAt;
-        if (ts instanceof Timestamp && ts.toDate() < cutoff) {
-          await deleteDoc(doc(db,'members',d.id));
-          del++;
+      if (!confirm('Delete pending members older than 7 days?')) return;
+      try {
+        document.getElementById('loading').classList.remove('hidden');
+        const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const qSnap = await getDocs(query(collection(db, 'members'), where('status', '==', 'pending')));
+        let del = 0;
+        for (const d of qSnap.docs) {
+          const ts = d.data().createdAt;
+          if (ts instanceof Timestamp && ts.toDate() < cutoff) {
+            await deleteDoc(doc(db, 'members', d.id));
+            del++;
+          }
         }
+        alert(`Deleted ${del} old pending members.`);
+      } catch (error) {
+        console.error('Error cleaning up pending members:', error);
+        alert('Failed to clean up pending members.');
+      } finally {
+        document.getElementById('loading').classList.add('hidden');
       }
-      alert(`Deleted ${del} old pending.`);
-      loadAndRenderMembers();
     }
     window.cleanupOldPending = cleanupOldPending;
 
-    // Charts
-    function getRandomColor() {
-      return '#' + Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0');
+    // Load cash outs
+    async function loadCashOuts() {
+      try {
+        document.getElementById('loading').classList.remove('hidden');
+        const snap = await getDocs(collection(db, 'cashouts'));
+        const list = document.getElementById('requestList');
+        list.innerHTML = '';
+        if (snap.empty) {
+          list.innerHTML = '<p>No cash out requests.</p>';
+          return;
+        }
+        snap.forEach(d => {
+          const req = d.data();
+          const div = document.createElement('div');
+          div.className = 'bg-gray-800 p-4 rounded shadow flex justify-between items-center';
+          div.innerHTML = `
+            <div>
+              <div class="font-semibold">Member: ${req.memberName || 'Unknown'}</div>
+              <div>Amount: ₱${(req.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+              <div>Status: ${req.status || 'pending'}</div>
+              <div>Requested: ${req.createdAt?.toDate().toLocaleDateString() || '-'}</div>
+            </div>
+            <div class="space-x-2">
+              <button class="approve-btn bg-green-600 px-3 py-1 rounded hover:bg-green-700 text-sm" data-id="${d.id}" ${req.status !== 'pending' ? 'disabled' : ''}>Approve</button>
+              <button class="deny-btn bg-red-600 px-3 py-1 rounded hover:bg-red-700 text-sm" data-id="${d.id}" ${req.status !== 'pending' ? 'disabled' : ''}>Deny</button>
+            </div>
+          `;
+          list.appendChild(div);
+        });
+        document.querySelectorAll('.approve-btn').forEach(btn => {
+          btn.onclick = async () => {
+            try {
+              document.getElementById('loading').classList.remove('hidden');
+              await updateDoc(doc(db, 'cashouts', btn.dataset.id), { status: 'approved', updatedAt: Timestamp.now() });
+              loadCashOuts();
+            } catch (error) {
+              console.error('Error approving cash out:', error);
+              alert('Failed to approve cash out.');
+            } finally {
+              document.getElementById('loading').classList.add('hidden');
+            }
+          };
+        });
+        document.querySelectorAll('.deny-btn').forEach(btn => {
+          btn.onclick = async () => {
+            try {
+              document.getElementById('loading').classList.remove('hidden');
+              await updateDoc(doc(db, 'cashouts', btn.dataset.id), { status: 'denied', updatedAt: Timestamp.now() });
+              loadCashOuts();
+            } catch (error) {
+              console.error('Error denying cash out:', error);
+              alert('Failed to deny cash out.');
+            } finally {
+              document.getElementById('loading').classList.add('hidden');
+            }
+          };
+        });
+      } catch (error) {
+        console.error('Error loading cash outs:', error);
+        document.getElementById('requestList').innerHTML = '<p>Error loading requests.</p>';
+      } finally {
+        document.getElementById('loading').classList.add('hidden');
+      }
     }
+
+    // Charts
+    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFE66D'];
     function renderSharesChart(members) {
       const ctx = document.getElementById('sharesChart').getContext('2d');
       const labels = members.map(m => m.name || 'Unnamed');
-      const data   = members.map(m => m.shares || 0);
+      const data = members.map(m => m.shares || 0);
       if (sharesChart) sharesChart.destroy();
       sharesChart = new Chart(ctx, {
         type: 'pie',
-        data: { labels, datasets:[{ data, backgroundColor: labels.map(getRandomColor) }] },
-        options:{ responsive:true, plugins:{ legend:{ position:'bottom' } } }
+        data: {
+          labels,
+          datasets: [{ data, backgroundColor: labels.map((_, i) => colors[i % colors.length]) }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: 'bottom' } }
+        }
       });
     }
 
     // Tab navigation
-    function showTab(id,btn) {
-      document.querySelectorAll('.tab-content').forEach(s=>s.classList.add('hidden'));
+    function showTab(id, btn) {
+      document.querySelectorAll('.tab-content').forEach(s => s.classList.add('hidden'));
       document.getElementById(id).classList.remove('hidden');
-      document.querySelectorAll('#tabButtons .tab-btn').forEach(b=>{
-        b.classList.remove('bg-white','text-black');
+      document.querySelectorAll('#tabButtons .tab-btn').forEach(b => {
+        b.classList.remove('bg-white', 'text-black');
         b.classList.add('hover:underline');
       });
       if (btn) {
         btn.classList.remove('hover:underline');
-        btn.classList.add('bg-white','text-black');
+        btn.classList.add('bg-white', 'text-black');
       }
+      if (id === 'requests') loadCashOuts();
     }
     window.showTab = showTab;
 
     // Init
     document.addEventListener('DOMContentLoaded', async () => {
-      await loadConversionRate();
-      await loadAndRenderMembers();
+      await initializeSettings();
+      listenForMembers();
       const first = document.querySelector('#tabButtons .tab-btn');
       if (first) showTab('members', first);
     });
