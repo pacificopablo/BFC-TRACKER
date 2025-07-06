@@ -8,7 +8,7 @@ const firebaseConfig = {
   authDomain: "bfc-tracker.firebaseapp.com",
   databaseURL: "https://bfc-tracker-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "bfc-tracker",
-  storageBucket: "bfc-tracker.firebasestorage.app",
+  storageBucket: "bfc-tracker.appspot.com",
   messagingSenderId: "127052459580",
   appId: "1:127052459580:web:ee9af6545f841d171cdd39",
   measurementId: "G-TJEMF05CH7"
