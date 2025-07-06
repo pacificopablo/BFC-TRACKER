@@ -16,7 +16,7 @@
       <p class="text-sm">Total Members</p>
       <p class="text-2xl font-bold" id="totalMembers">0</p>
     </div>
-    <div class="bg-gray-800 p-4 rounded shadow">
+    <div class="bg-gray-800 p-2 p-4 rounded shadow">
       <p class="text-sm">Total Shares</p>
       <p class="text-2xl font-bold" id="totalShares">0</p>
     </div>
@@ -57,7 +57,7 @@
       </div>
       <div>
         <label for="distributionValue" class="block text-sm">Value</label>
-        <input type="number" id="distributionValue" min="0" step="0.01" class="p-2 w-full rounded bg-gray-700 text-white" placeholder="Enter percentage or amount" required />
+        <input type="number" id="distributionValue" min="0.01" step="0.01" class="p-2 w-full rounded bg-gray-700 text-white" placeholder="Enter percentage or amount" required />
       </div>
       <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Distribute Profit</button>
     </form>
@@ -86,9 +86,9 @@
   <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>
 
   <!-- Member Details Modal -->
-  <div id="memberModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center">
+  <div id="memberModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center" role="dialog" aria-labelledby="modalTitle">
     <div class="bg-gray-800 p-6 rounded shadow-lg w-full max-w-md">
-      <h2 class="text-xl font-bold mb-4">Edit Member Details</h2>
+      <h2 id="modalTitle" class="text-xl font-bold mb-4">Edit Member Details</h2>
       <form id="memberDetailsForm" class="space-y-4">
         <input type="hidden" id="memberId" />
         <div>
@@ -124,27 +124,12 @@
   </div>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { auth, db, analytics } from './firebase-config.js';
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { 
-      getFirestore, collection, getDocs, doc, updateDoc, addDoc, getDoc,
+      collection, getDocs, doc, updateDoc, addDoc, getDoc,
       query, orderBy, onSnapshot 
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
-      authDomain: "bfc-tracker.firebaseapp.com",
-      databaseURL: "https://bfc-tracker-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "bfc-tracker",
-      storageBucket: "bfc-tracker.firebasestorage.app",
-      messagingSenderId: "127052459580",
-      appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
-      measurementId: "G-PNYRCFJHYM"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const analytics = getAnalytics(app);
 
     const totalMembers = document.getElementById("totalMembers");
     const totalShares = document.getElementById("totalShares");
@@ -162,9 +147,47 @@
     let allMembers = [];
     let fundChartInstance;
 
+    // Format currency
     function formatCurrency(value) {
       return parseFloat(value).toLocaleString("en-PH", { minimumFractionDigits: 2 });
     }
+
+    // Trap focus in modal for accessibility
+    function trapFocus(modal) {
+      const focusableElements = modal.querySelectorAll("button, input, select");
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      modal.addEventListener("keydown", (e) => {
+        if (e.key === "Tab") {
+          if (e.shiftKey && document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          } else if (!e.shiftKey && document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        } else if (e.key === "Escape") {
+          modal.classList.add("hidden");
+        }
+      });
+    }
+
+    // Check admin access
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists() && userDoc.data().role === "admin") {
+          loadMembers();
+          listenForRequests();
+          initializeFundChart();
+        } else {
+          alert("Unauthorized access. Admins only.");
+          window.location.href = "index.html";
+        }
+      } else {
+        window.location.href = "index.html";
+      }
+    });
 
     // Populate member select dropdown
     async function populateMemberSelect() {
@@ -186,44 +209,41 @@
       const q = query(collection(db, "users"));
       onSnapshot(q, (snapshot) => {
         allMembers = [];
+        let memberCount = 0, shareTotal = 0, balanceTotal = 0;
+        membersList.innerHTML = '<div class="animate-spin h-5 w-5 border-2 border-white rounded-full mx-auto"></div>';
+
         snapshot.forEach(docSnap => {
           const data = docSnap.data();
           allMembers.push({ id: docSnap.id, ...data });
+          memberCount++;
+          shareTotal += data.shares || 0;
+          balanceTotal += data.balance || 0;
+
+          const div = document.createElement("div");
+          div.className = "bg-gray-800 p-4 rounded shadow";
+          div.innerHTML = `
+            <p><strong>Name:</strong> ${data.name}</p>
+            <p><strong>Email:</strong> ${data.email}</p>
+            <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${data.status === 'approved' ? 'bg-green-600' : data.status === 'pending' ? 'bg-yellow-600' : 'bg-red-600'}">${data.status}</span></p>
+            <p><strong>Shares:</strong> ${data.shares || 0}</p>
+            <p><strong>Balance:</strong> ₱${formatCurrency(data.balance || 0)}</p>
+            <button class="edit-member bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded mt-2" data-id="${docSnap.id}">Edit</button>
+          `;
+          membersList.appendChild(div);
         });
-        displayMembers(allMembers);
+
+        totalMembers.textContent = memberCount;
+        totalShares.textContent = shareTotal;
+        totalBalance.textContent = formatCurrency(balanceTotal);
         updateTopShareholders();
-        updateFundChart();
         populateMemberSelect();
+      }, (error) => {
+        membersList.innerHTML = '<p class="text-red-500">Error loading members.</p>';
+        console.error(error);
       });
     }
 
-    function displayMembers(members) {
-      let memberCount = 0, shareTotal = 0, balanceTotal = 0;
-      membersList.innerHTML = "";
-
-      members.forEach(m => {
-        memberCount++;
-        shareTotal += m.shares || 0;
-        balanceTotal += m.balance || 0;
-
-        const div = document.createElement("div");
-        div.className = "bg-gray-800 p-4 rounded shadow";
-        div.innerHTML = `
-          <p><strong>Name:</strong> ${m.name}</p>
-          <p><strong>Email:</strong> ${m.email}</p>
-          <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${m.status === 'approved' ? 'bg-green-600' : m.status === 'pending' ? 'bg-yellow-600' : 'bg-red-600'}">${m.status}</span></p>
-          <p><strong>Shares:</strong> ${m.shares || 0}</p>
-          <p><strong>Balance:</strong> ₱${formatCurrency(m.balance || 0)}</p>
-          <button class="edit-member bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded mt-2" data-id="${m.id}">Edit</button>
-        `;
-        membersList.appendChild(div);
-      });
-
-      totalMembers.textContent = memberCount;
-      totalShares.textContent = shareTotal;
-      totalBalance.textContent = formatCurrency(balanceTotal);
-    }
-
+    // Update top shareholders
     function updateTopShareholders() {
       const top = [...allMembers]
         .filter(m => m.status === 'approved')
@@ -231,47 +251,72 @@
         .slice(0, 5);
 
       topShareholders.innerHTML = "";
-      top.forEach((m, i) => {
+      top.forEach((m) => {
         const li = document.createElement("li");
         li.textContent = `${m.name} — ${m.shares || 0} shares`;
         topShareholders.appendChild(li);
       });
     }
 
+    // Search members
+    let searchTimeout;
     searchInput.addEventListener("input", () => {
-      const query = searchInput.value.toLowerCase();
-      const filtered = allMembers.filter(m =>
-        m.name.toLowerCase().includes(query) ||
-        m.email.toLowerCase().includes(query) ||
-        m.status.toLowerCase().includes(query)
-      );
-      displayMembers(filtered);
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        const query = searchInput.value.toLowerCase();
+        const filtered = allMembers.filter(m =>
+          m.name.toLowerCase().includes(query) ||
+          m.email.toLowerCase().includes(query) ||
+          m.status.toLowerCase().includes(query)
+        );
+        membersList.innerHTML = "";
+        filtered.forEach(m => {
+          const div = document.createElement("div");
+          div.className = "bg-gray-800 p-4 rounded shadow";
+          div.innerHTML = `
+            <p><strong>Name:</strong> ${m.name}</p>
+            <p><strong>Email:</strong> ${m.email}</p>
+            <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${m.status === 'approved' ? 'bg-green-600' : m.status === 'pending' ? 'bg-yellow-600' : 'bg-red-600'}">${m.status}</span></p>
+            <p><strong>Shares:</strong> ${m.shares || 0}</p>
+            <p><strong>Balance:</strong> ₱${formatCurrency(m.balance || 0)}</p>
+            <button class="edit-member bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded mt-2" data-id="${m.id}">Edit</button>
+          `;
+          membersList.appendChild(div);
+        });
+        if (filtered.length === 0) {
+          membersList.innerHTML = '<p class="text-gray-400">No members found.</p>';
+        }
+      }, 300);
     });
 
+    // Handle transaction requests
     function listenForRequests() {
-      const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
+      const q = query(collection(db, "transactions"), where("status", "==", "pending"), orderBy("timestamp", "desc"));
       onSnapshot(q, (snapshot) => {
+        requestsList.innerHTML = '<div class="animate-spin h-5 w-5 border-2 border-white rounded-full mx-auto"></div>';
+        if (snapshot.empty) {
+          requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
+          return;
+        }
         requestsList.innerHTML = "";
         snapshot.forEach(docSnap => {
           const data = docSnap.data();
-          if (data.status === "pending") {
-            const div = document.createElement("div");
-            div.className = "bg-gray-700 p-4 rounded";
-            div.innerHTML = `
-              <p><strong>Member:</strong> ${data.memberName}</p>
-              <p><strong>Type:</strong> ${data.type}</p>
-              <p><strong>Amount:</strong> ₱${formatCurrency(data.amount)}</p>
-              <p><strong>Shares:</strong> ${data.shares || 0}</p>
-              <p><strong>Date:</strong> ${data.timestamp?.toDate().toLocaleString() || "N/A"}</p>
-              <button class="approve-btn bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded mt-2" data-id="${docSnap.id}" data-member-id="${data.memberId}">Approve</button>
-              <button class="reject-btn bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded mt-2" data-id="${docSnap.id}">Reject</button>
-            `;
-            requestsList.appendChild(div);
-          }
+          const div = document.createElement("div");
+          div.className = "bg-gray-700 p-4 rounded";
+          div.innerHTML = `
+            <p><strong>Member:</strong> ${data.memberName}</p>
+            <p><strong>Type:</strong> ${data.type}</p>
+            <p><strong>Amount:</strong> ₱${formatCurrency(data.amount)}</p>
+            <p><strong>Shares:</strong> ${data.shares || 0}</p>
+            <p><strong>Date:</strong> ${data.timestamp?.toDate().toLocaleString() || "N/A"}</p>
+            <button class="approve-btn bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded mt-2" data-id="${docSnap.id}" data-member-id="${data.memberId}">Approve</button>
+            <button class="reject-btn bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded mt-2" data-id="${docSnap.id}">Reject</button>
+          `;
+          requestsList.appendChild(div);
         });
-        if (requestsList.innerHTML === "") {
-          requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
-        }
+      }, (error) => {
+        requestsList.innerHTML = '<p class="text-red-500">Error loading requests.</p>';
+        console.error(error);
       });
     }
 
@@ -284,28 +329,34 @@
         const memberId = e.target.dataset.memberId;
 
         try {
+          const transactionSnap = await getDoc(transactionRef);
+          const transactionData = transactionSnap.data();
+          const memberRef = doc(db, "users", memberId);
+          const memberSnap = await getDoc(memberRef);
+          const memberData = memberSnap.data();
+
           if (isApprove) {
-            const transactionSnap = await getDoc(transactionRef);
-            const transactionData = transactionSnap.data();
             if (transactionData.type === "deposit") {
-              const memberRef = doc(db, "users", memberId);
-              const memberSnap = await getDoc(memberRef);
-              const memberData = memberSnap.data();
               const newShares = (memberData.shares || 0) + (transactionData.shares || 0);
               const newBalance = (memberData.balance || 0) + (transactionData.amount || 0);
-
-              await updateDoc(memberRef, {
-                shares: newShares,
-                balance: newBalance
-              });
+              await updateDoc(memberRef, { shares: newShares, balance: newBalance });
+            } else if (transactionData.type === "cashout") {
+              const newBalance = (memberData.balance || 0) - (transactionData.amount || 0);
+              if (newBalance < 0) {
+                alert("Cannot approve: Insufficient balance.");
+                return;
+              }
+              await updateDoc(memberRef, { balance: newBalance });
             }
-            await updateDoc(transactionRef, { status: "approved" });
+            await updateDoc(transactionRef, { status: "approved", updatedAt: serverTimestamp() });
+            alert("Transaction approved successfully.");
           } else {
-            await updateDoc(transactionRef, { status: "rejected" });
+            await updateDoc(transactionRef, { status: "rejected", updatedAt: serverTimestamp() });
+            alert("Transaction rejected successfully.");
           }
         } catch (error) {
           console.error("Error processing transaction:", error);
-          alert("Failed to process transaction. Please try again.");
+          alert(`Failed to ${isApprove ? "approve" : "reject"} transaction: ${error.message}`);
         }
       }
     });
@@ -317,8 +368,8 @@
       const shares = parseInt(document.getElementById("sharesInput").value);
       const amount = shares * 10; // 1 share = 10 pesos
 
-      if (!memberId || shares <= 0) {
-        alert("Please select a member and enter a valid number of shares.");
+      if (!memberId || shares <= 0 || shares > 999999) {
+        alert("Please select a member and enter a valid number of shares (1 - 999,999).");
         return;
       }
 
@@ -330,7 +381,7 @@
           amount,
           shares,
           status: "pending",
-          timestamp: new Date()
+          timestamp: serverTimestamp()
         });
         alert(`Successfully submitted ${shares} shares (₱${formatCurrency(amount)}) for approval.`);
         placeSharesForm.reset();
@@ -353,6 +404,8 @@
           document.getElementById("memberShares").value = member.shares || 0;
           document.getElementById("memberBalance").value = member.balance || 0;
           memberModal.classList.remove("hidden");
+          document.getElementById("memberName").focus();
+          trapFocus(memberModal);
         }
       }
     });
@@ -373,7 +426,8 @@
       const shares = parseInt(document.getElementById("memberShares").value);
       const balance = parseFloat(document.getElementById("memberBalance").value);
 
-      if (!name || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || shares < 0 || balance < 0) {
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!name || !email || !emailRegex.test(email) || shares < 0 || balance < 0) {
         alert("Please enter valid details (name, valid email, non-negative shares and balance).");
         return;
       }
@@ -394,7 +448,7 @@
           amount: balance,
           shares,
           status: "approved",
-          timestamp: new Date(),
+          timestamp: serverTimestamp(),
           description: "Updated member details"
         });
         alert("Member details updated successfully.");
@@ -412,8 +466,8 @@
       const distributionType = document.getElementById("distributionType").value;
       const distributionValue = parseFloat(document.getElementById("distributionValue").value);
 
-      if (isNaN(distributionValue) || distributionValue <= 0) {
-        alert("Please enter a valid positive value for distribution.");
+      if (isNaN(distributionValue) || distributionValue <= 0 || (distributionType === "percent" && distributionValue > 100)) {
+        alert("Please enter a valid value (positive, ≤100% for percentage).");
         return;
       }
 
@@ -435,10 +489,8 @@
         for (const member of approvedMembers) {
           let profit;
           if (distributionType === "percent") {
-            // Calculate profit as a percentage of share value (1 share = 10 pesos)
             profit = (member.shares || 0) * 10 * (distributionValue / 100);
           } else {
-            // Distribute fixed amount equally among approved members
             profit = distributionValue;
           }
           const newBalance = (member.balance || 0) + profit;
@@ -454,7 +506,7 @@
             amount: profit,
             shares: 0,
             status: "approved",
-            timestamp: new Date(),
+            timestamp: serverTimestamp(),
             description: distributionType === "percent" 
               ? `${distributionValue}% profit distribution`
               : `Fixed amount profit distribution of ₱${formatCurrency(distributionValue)}`
@@ -506,10 +558,14 @@
 
       snapshot.forEach(docSnap => {
         const data = docSnap.data();
-        if (data.status === "approved" && (data.type === "deposit" || data.type === "update" || data.type === "profit")) {
-          runningBalance += data.amount || 0;
+        if (data.status === "approved") {
+          if (data.type === "deposit" || data.type === "profit") {
+            runningBalance += data.amount || 0;
+          } else if (data.type === "cashout") {
+            runningBalance -= data.amount || 0;
+          }
           labels.push(data.timestamp?.toDate().toLocaleString('default', { month: 'short', year: 'numeric' }) || 'Unknown');
-          balances.push(runningBalance);
+          balances.push(Math.max(0, runningBalance));
         }
       });
 
@@ -520,10 +576,15 @@
       }
     }
 
-    // Initialize
-    loadMembers();
-    listenForRequests();
-    initializeFundChart();
+    // Logout
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      signOut(auth).then(() => {
+        window.location.href = "index.html";
+      }).catch(error => {
+        alert("Logout failed.");
+        console.error(error);
+      });
+    });
   </script>
 </body>
 </html>
