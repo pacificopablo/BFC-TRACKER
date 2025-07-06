@@ -54,9 +54,7 @@
       <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Distribute</button>
     </form>
     <div id="profitLogs" class="mt-4 space-y-2 text-sm text-gray-300">
-      <div class="bg-gray-800 p-2 rounded">
-        📢 July 6 – ₱12,000 profit distributed across 6 members.
-      </div>
+      <!-- Logs will appear here -->
     </div>
   </section>
 
@@ -67,29 +65,104 @@
       <button onclick="exportToCSV()" class="bg-green-600 text-white px-4 py-2 rounded">📥 Export CSV</button>
       <button onclick="cleanupOldPending()" class="bg-yellow-500 text-white px-4 py-2 rounded ml-2">🧹 Clean Old Pending</button>
     </div>
-
-    <h3 class="text-md font-semibold mt-4">👤 Manage Members</h3>
-    <div id="settingsMemberList" class="mt-2 space-y-2">
-      <div class="bg-white text-black p-3 rounded shadow">
-        <p><strong>Maria Santos</strong> – Active – 120 shares</p>
-        <button class="bg-blue-500 text-white px-2 py-1 rounded">Edit</button>
-      </div>
-    </div>
-
-    <h3 class="text-md font-semibold mt-6">🧾 Admin Audit Logs</h3>
-    <div id="adminLogList" class="text-sm text-gray-300 mt-2 space-y-1">
-      <div class="bg-gray-800 p-2 rounded">
-        📝 July 6 – Admin approved ₱3,000 cash out for Juan Dela Cruz
-      </div>
-    </div>
   </section>
 
-  <!-- Tab Navigation Script -->
+  <!-- Firebase Logic -->
+  <script type="module">
+    import { db } from './firebase-config.js';
+    import {
+      collection, getDocs, updateDoc, doc, addDoc,
+      serverTimestamp, query, orderBy
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const profitForm = document.getElementById('profitForm');
+    const profitLogs = document.getElementById('profitLogs');
+
+    async function loadProfitLogs() {
+      profitLogs.innerHTML = '';
+      const q = query(collection(db, "profit_logs"), orderBy("date", "desc"));
+      const snapshot = await getDocs(q);
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const logDiv = document.createElement("div");
+        logDiv.className = "bg-gray-800 p-2 rounded";
+        logDiv.textContent = data.message;
+        profitLogs.appendChild(logDiv);
+      });
+    }
+
+    await loadProfitLogs();
+
+    profitForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const totalProfit = parseFloat(document.getElementById('totalProfit').value);
+      if (isNaN(totalProfit) || totalProfit <= 0) {
+        alert("Enter a valid profit amount.");
+        return;
+      }
+
+      const membersSnapshot = await getDocs(collection(db, "members"));
+      const members = [];
+      let totalShares = 0;
+
+      membersSnapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.status === "active" && data.shares > 0) {
+          members.push({ id: docSnap.id, ...data });
+          totalShares += data.shares;
+        }
+      });
+
+      if (totalShares === 0) {
+        alert("No active members with shares.");
+        return;
+      }
+
+      const updates = members.map(async (member) => {
+        const ratio = member.shares / totalShares;
+        const profitShare = parseFloat((totalProfit * ratio).toFixed(2));
+        const newBalance = (member.balance || 0) + profitShare;
+
+        await updateDoc(doc(db, "members", member.id), {
+          balance: newBalance
+        });
+      });
+
+      await Promise.all(updates);
+
+      const dateStr = new Date().toLocaleDateString("en-PH", { month: 'long', day: 'numeric' });
+      const logMsg = `📢 ${dateStr} – ₱${totalProfit.toLocaleString()} profit distributed across ${members.length} members.`;
+
+      const logDiv = document.createElement("div");
+      logDiv.className = "bg-gray-800 p-2 rounded";
+      logDiv.textContent = logMsg;
+      profitLogs.prepend(logDiv);
+
+      await addDoc(collection(db, "profit_logs"), {
+        date: serverTimestamp(),
+        message: logMsg,
+        totalProfit,
+        totalMembers: members.length,
+      });
+
+      alert("Profit distributed and logged.");
+      profitForm.reset();
+    });
+
+    // Optional stub functions
+    window.exportToCSV = function () {
+      alert("Export to CSV not implemented.");
+    };
+    window.cleanupOldPending = function () {
+      alert("Auto cleanup not implemented.");
+    };
+  </script>
+
+  <!-- Tab Navigation -->
   <script>
     function showTab(tabId, button = null) {
       const tabs = document.querySelectorAll('.tab-content');
       tabs.forEach(tab => tab.classList.add('hidden'));
-
       const target = document.getElementById(tabId);
       if (target) target.classList.remove('hidden');
 
@@ -105,12 +178,10 @@
       }
     }
 
-    // Default to Members tab
     document.addEventListener("DOMContentLoaded", () => {
       const defaultBtn = document.querySelector('#tabButtons .tab-btn');
       if (defaultBtn) showTab('members', defaultBtn);
     });
   </script>
-
 </body>
 </html>
