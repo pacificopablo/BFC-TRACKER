@@ -33,10 +33,37 @@
       <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
       <canvas id="fundChart" height="100"></canvas>
     </div>
+    <!-- Settings Section -->
+    <div class="bg-gray-800 p-4 rounded shadow mb-6">
+      <h2 class="text-xl font-bold mb-4">⚙️ Settings</h2>
+      <form id="settingsForm" class="flex flex-col space-y-4">
+        <div>
+          <label class="block text-sm mb-1">Share-to-Profit Conversion Rate (₱ per share)</label>
+          <input
+            type="number"
+            id="conversionRate"
+            class="w-full p-2 rounded bg-gray-700 text-white"
+            placeholder="Enter conversion rate (e.g., 100)"
+            required
+            min="0"
+            step="0.01"
+          />
+        </div>
+        <button type="submit" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700">Save Settings</button>
+      </form>
+      <p class="text-sm mt-2">Current Rate: ₱<span id="currentRate">0.00</span> per share</p>
+    </div>
     <!-- Distribute Profit Section -->
     <div class="bg-gray-800 p-4 rounded shadow mb-6">
       <h2 class="text-xl font-bold mb-4">💸 Distribute Profit</h2>
       <form id="profitForm" class="flex flex-col space-y-4">
+        <div>
+          <label class="block text-sm mb-1">Distribution Mode</label>
+          <select id="distributionMode" class="w-full p-2 rounded bg-gray-700 text-white" required>
+            <option value="amount">By Amount (₱ per share)</option>
+            <option value="percentage">By Percentage</option>
+          </select>
+        </div>
         <div>
           <label class="block text-sm mb-1">Total Profit to Distribute (₱)</label>
           <input
@@ -106,12 +133,12 @@
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
       import {
         getFirestore, collection, getDocs, doc, updateDoc, deleteDoc,
-        query, orderBy, onSnapshot
+        query, orderBy, onSnapshot, setDoc, getDoc
       } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
       import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
       const firebaseConfig = {
-        apiKey: "AIzaSyCNstwoaWh_13lF0ON25otUpeH3OGINQ",
+        apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
         authDomain: "bfc-tracker.firebaseapp.com",
         projectId: "bfc-tracker",
         storageBucket: "bfc-tracker.appspot.com",
@@ -144,12 +171,57 @@
       const logoutBtn = document.getElementById("logoutBtn");
       const profitForm = document.getElementById("profitForm");
       const profitAmount = document.getElementById("profitAmount");
+      const distributionMode = document.getElementById("distributionMode");
+      const settingsForm = document.getElementById("settingsForm");
+      const conversionRateInput = document.getElementById("conversionRate");
+      const currentRateDisplay = document.getElementById("currentRate");
 
       let allMembers = [];
+      let conversionRate = 0; // Default conversion rate
 
       function formatCurrency(value) {
         return parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
       }
+
+      // Load Conversion Rate from Firestore
+      async function loadConversionRate() {
+        try {
+          const rateDoc = await getDoc(doc(db, "settings", "profitRate"));
+          if (rateDoc.exists()) {
+            conversionRate = rateDoc.data().rate || 0;
+            currentRateDisplay.textContent = formatCurrency(conversionRate);
+          } else {
+            conversionRate = 0;
+            currentRateDisplay.textContent = formatCurrency(0);
+          }
+          console.log("Conversion rate loaded:", conversionRate);
+        } catch (error) {
+          console.error("Error loading conversion rate:", error);
+          currentRateDisplay.textContent = "Error";
+        }
+      }
+
+      // Save Conversion Rate to Firestore
+      settingsForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const newRate = parseFloat(conversionRateInput.value);
+        if (isNaN(newRate) || newRate < 0) {
+          console.error("Invalid conversion rate:", newRate);
+          alert("Please enter a valid conversion rate (non-negative number).");
+          return;
+        }
+
+        try {
+          await setDoc(doc(db, "settings", "profitRate"), { rate: newRate });
+          conversionRate = newRate;
+          currentRateDisplay.textContent = formatCurrency(newRate);
+          settingsForm.reset();
+          alert("Conversion rate updated successfully!");
+        } catch (error) {
+          console.error("Error saving conversion rate:", error);
+          alert(`Failed to save conversion rate: ${error.message}`);
+        }
+      });
 
       async function loadMembers() {
         try {
@@ -207,232 +279,137 @@
         topShareholders.innerHTML = "";
         top.forEach((m) => {
           const li = document.createElement("li");
-          li.textContent = `${m.name || 'N/A'} — ${m.shares || 0} shares`;
-          topShareholders.appendChild(li);
-        });
+          li.textContent = relying on the conversion rate set in the settings section (e.g., ₱100 per share). For example, if the total shares of approved members are 80 and the conversion rate is ₱100/share, the required profit is ₱8000, and the admin must input at least this amount.
+- **Percentage Mode**: The admin inputs a total profit amount, which is then distributed proportionally based on each member’s share percentage. For example, if a member has 50 shares out of 100 total shares (50%), they receive 50% of the input profit.
+- **Settings Section**: The conversion rate (₱ per share) is used only in Amount mode and remains stored in Firestore (`settings/profitRate`).
+- **UI Changes**:
+  - Added a dropdown to select the distribution mode:
+    ```html
+    <select id="distributionMode" class="w-full p-2 rounded bg-gray-700 text-white" required>
+      <option value="amount">By Amount (₱ per share)</option>
+      <option value="percentage">By Percentage</option>
+    </select>
+    ```
+  - The profit input field remains the same, but its validation and usage depend on the selected mode.
+
+- **JavaScript Modifications**:
+  - Added a DOM reference for the distribution mode dropdown:
+    ```javascript
+    const distributionMode = document.getElementById("distributionMode");
+    ```
+  - Updated the profit distribution logic to handle both modes:
+    ```javascript
+    profitForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const profit = parseFloat(profitAmount.value);
+      const mode = distributionMode.value;
+
+      if (isNaN(profit) || profit <= 0) {
+        console.error("Invalid profit amount:", profit);
+        alert("Please enter a valid profit amount greater than 0.");
+        return;
       }
 
-      searchInput.addEventListener("input", () => {
-        const query = searchInput.value.toLowerCase();
-        const filtered = allMembers.filter(m =>
-          (m.name || '').toLowerCase().includes(query) ||
-          (m.email || '').toLowerCase().includes(query) ||
-          (m.status || '').toLowerCase().includes(query)
-        );
-        displayMembers(filtered);
-      });
-
-      function listenForRequests() {
-        const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
-        onSnapshot(q, (snapshot) => {
-          requestsList.innerHTML = "";
-          snapshot.forEach(docSnap => {
-            const data = docSnap.data();
-            if (data.status === "pending") {
-              const div = document.createElement("div");
-              div.className = "bg-gray-700 p-4 rounded";
-              div.innerHTML = `
-                <p><strong>Member:</strong> ${data.memberName || 'N/A'}</p>
-                <p><strong>Type:</strong> ${data.type || 'N/A'}</p>
-                <p><strong>Amount:</strong> ₱${formatCurrency(data.amount)}</p>
-                <p><strong>Date:</strong> ${data.timestamp?.toDate().toLocaleString() || "N/A"}</p>
-              `;
-              requestsList.appendChild(div);
-            }
-          });
-          if (requestsList.innerHTML === "") {
-            requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
-          }
-        }, (error) => {
-          console.error("Error listening for requests:", error);
-          requestsList.innerHTML = '<p class="text-red-500">Failed to load requests: ' + error.message + '</p>';
-        });
-      }
-
-      // Logout Functionality
-      logoutBtn.addEventListener("click", async () => {
-        try {
-          await signOut(auth);
-          console.log("User logged out successfully");
-          window.location.href = "/login.html"; // Redirect to login page
-        } catch (error) {
-          console.error("Error logging out:", error);
-          alert(`Failed to log out: ${error.message}`);
-        }
-      });
-
-      // Distribute Profit Functionality
-      profitForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const profit = parseFloat(profitAmount.value);
-        if (isNaN(profit) || profit <= 0) {
-          console.error("Invalid profit amount:", profit);
-          alert("Please enter a valid profit amount greater than 0.");
+      try {
+        // Filter approved members
+        const approvedMembers = allMembers.filter(m => m.status === 'approved');
+        if (approvedMembers.length === 0) {
+          console.error("No approved members to distribute profit.");
+          alert("No approved members to distribute profit.");
           return;
         }
 
-        try {
-          // Calculate total shares of approved members
-          const approvedMembers = allMembers.filter(m => m.status === 'approved');
-          const totalShares = approvedMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+        const totalShares = approvedMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+        if (totalShares === 0) {
+          console.error("No shares available for distribution.");
+          alert("No shares available for distribution among approved members.");
+          return;
+        }
 
-          if (totalShares === 0) {
-            console.error("No approved members with shares to distribute profit.");
-            alert("No approved members with shares to distribute profit.");
+        let totalDistributed = 0;
+
+        if (mode === "amount") {
+          // Amount Mode: Use conversion rate
+          if (conversionRate <= 0) {
+            console.error("Invalid conversion rate:", conversionRate);
+            alert("Please set a valid conversion rate in settings before distributing profit.");
             return;
           }
 
-          // Calculate profit per share
-          const profitPerShare = profit / totalShares;
+          const requiredProfit = totalShares * conversionRate;
+          if (profit < requiredProfit) {
+            console.error("Profit too low:", profit, "required:", requiredProfit);
+            alert(`Profit amount (₱${formatCurrency(profit)}) is less than required (₱${formatCurrency(requiredProfit)}) for ${totalShares} shares at ₱${formatCurrency(conversionRate)} per share.`);
+            return;
+          }
 
-          // Update each approved member's balance
+          // Distribute profit based on conversion rate
           for (const member of approvedMembers) {
-            const profitShare = (member.shares || 0) * profitPerShare;
+            const profitShare = (member.shares || 0) * conversionRate;
             const newBalance = (member.balance || 0) + profitShare;
+            totalDistributed += profitShare;
 
             await updateDoc(doc(db, "members", member.id), {
               balance: newBalance
             });
             console.log(`Distributed ${formatCurrency(profitShare)} to ${member.name || 'N/A'} (ID: ${member.id})`);
           }
-
-          // Reset form and reload members
-          profitForm.reset();
-          await loadMembers();
-          alert(`Successfully distributed ₱${formatCurrency(profit)} to approved members!`);
-        } catch (error) {
-          console.error("Error distributing profit:", error);
-          alert(`Failed to distribute profit: ${error.message}`);
-        }
-      });
-
-      // Event Delegation for Edit and Delete Buttons
-      membersList.addEventListener("click", (e) => {
-        const target = e.target;
-        const id = target.dataset.id;
-        console.log("Click detected on element:", target, "with ID:", id);
-        if (target.classList.contains("edit-btn") && id) {
-          console.log("Edit button clicked for member ID:", id);
-          const member = allMembers.find(m => m.id === id);
-          if (member) {
-            openEditModal(member);
-          } else {
-            console.error("Member not found for ID:", id);
-            alert("Member data not found.");
-          }
-        } else if (target.classList.contains("delete-btn") && id) {
-          console.log("Delete button clicked for member ID:", id);
-          const name = target.dataset.name;
-          deleteMember(id, name);
         } else {
-          console.log("No action taken: Not an edit or delete button");
-        }
-      });
+          // Percentage Mode: Distribute profit proportionally
+          for (const member of approvedMembers) {
+            const sharePercentage = (member.shares || 0) / totalShares;
+            const profitShare = profit * sharePercentage;
+            const newBalance = (member.balance || 0) + profitShare;
+            totalDistributed += profitShare;
 
-      // Edit Member Functions
-      function openEditModal(member) {
-        if (!member || !member.id) {
-          console.error("Invalid member data for editing:", member);
-          alert("Cannot edit: Member data is invalid.");
-          return;
-        }
-        console.log("Opening edit modal for member:", member);
-        editMemberId.value = member.id;
-        editName.value = member.name || '';
-        editEmail.value = member.email || '';
-        editStatus.value = member.status || 'pending';
-        editShares.value = member.shares || 0;
-        editBalance.value = member.balance || 0;
-        editModal.classList.remove("hidden");
-      }
-
-      editForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const id = editMemberId.value;
-        const shares = parseInt(editShares.value);
-        const balance = parseFloat(editBalance.value);
-        if (isNaN(shares) || shares < 0 || isNaN(balance) || balance < 0) {
-          console.error("Invalid input: Shares or balance is invalid", { shares, balance });
-          alert("Shares and balance must be non-negative numbers.");
-          return;
-        }
-        const updatedData = {
-          name: editName.value,
-          email: editEmail.value,
-          status: editStatus.value,
-          shares: shares,
-          balance: balance
-        };
-        try {
-          console.log("Updating member ID:", id, "with data:", updatedData);
-          await updateDoc(doc(db, "members", id), updatedData);
-          editModal.classList.add("hidden");
-          loadMembers();
-          alert("Member updated successfully!");
-        } catch (error) {
-          console.error("Error updating member:", error);
-          alert(`Failed to update member: ${error.message}`);
-        }
-      });
-
-      cancelEdit.addEventListener("click", () => {
-        console.log("Cancel edit clicked");
-        editModal.classList.add("hidden");
-      });
-
-      // Delete Member Function
-      async function deleteMember(id, name) {
-        if (confirm(`Are you sure you want to delete ${name || 'this member'}?`)) {
-          try {
-            console.log("Deleting member ID:", id);
-            await deleteDoc(doc(db, "members", id));
-            loadMembers();
-            alert("Member deleted successfully!");
-          } catch (error) {
-            console.error("Error deleting member:", error);
-            alert(`Failed to delete member: ${error.message}`);
+            await updateDoc(doc(db, "members", member.id), {
+              balance: newBalance
+            });
+            console.log(`Distributed ${formatCurrency(profitShare)} to ${member.name || 'N/A'} (ID: ${member.id})`);
           }
-        } else {
-          console.log("Delete cancelled for member ID:", id);
         }
-      }
 
-      // Initialize
-      loadMembers();
-      listenForRequests();
-
-      // Static chart for demo
-      try {
-        const ctx = document.getElementById('fundChart').getContext('2d');
-        new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-            datasets: [{
-              label: 'Fund Balance',
-              data: [15000, 18000, 21000, 25000, 29000, 34000],
-              backgroundColor: 'rgba(59, 130, 246, 0.2)',
-              borderColor: 'rgba(59, 130, 246, 1)',
-              borderWidth: 2,
-              fill: true,
-              tension: 0.3
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: { labels: { color: 'white' } },
-            },
-            scales: {
-              x: { ticks: { color: 'white' } },
-              y: { ticks: { color: 'white' }, beginAtZero: true }
-            }
-          }
-        });
-        console.log("Chart initialized successfully");
+        // Reset form and reload members
+        profitForm.reset();
+        await loadMembers();
+        alert(`Successfully distributed ₱${formatCurrency(totalDistributed)} to ${approvedMembers.length} approved members!`);
       } catch (error) {
-        console.error("Error initializing chart:", error);
+        console.error("Error distributing profit:", error);
+        alert(`Failed to distribute profit: ${error.message}`);
       }
-    </script>
-  </body>
-</html>
+    });
+    ```
+  - **Logic Explained**:
+    - Validates the input profit amount (must be positive).
+    - Filters approved members and calculates total shares. Checks if there are shares to distribute.
+    - **Amount Mode**:
+      - Ensures the conversion rate is valid (> 0).
+      - Calculates the required profit (`totalShares * conversionRate`).
+      - Validates that the input profit meets or exceeds the required amount.
+      - Distributes profit as `member.shares * conversionRate`.
+    - **Percentage Mode**:
+      - Calculates each member’s share percentage (`member.shares / totalShares`).
+      - Distributes the input profit proportionally (`profit * sharePercentage`).
+    - Tracks the total distributed amount for the success message.
+    - Updates member balances in Firestore and reloads the member list.
+    - Resets the form and shows a success or error message.
+
+#### 3. **Security and Firestore Rules**
+- **Firestore Rules**: The existing rules are sufficient, as they secure the `settings` and `members` collections for admin access:
+  ```javascript
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      match /members/{memberId} {
+        allow read, write: if request.auth != null && request.auth.token.admin == true;
+      }
+      match /transactions/{transactionId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.token.admin == true;
+      }
+      match /settings/{settingId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.token.admin == true;
+      }
+    }
+  }
