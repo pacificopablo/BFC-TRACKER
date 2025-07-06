@@ -22,6 +22,18 @@
     <button onclick="showTab('settings', this)" class="tab-btn px-3 py-1 rounded">⚙️ Settings</button>
   </div>
 
+  <!-- 👤 Members Tab -->
+  <section id="members" class="tab-content hidden">
+    <h2 class="text-lg font-semibold mb-2">👥 Member List</h2>
+    <div id="memberList" class="space-y-2"></div>
+  </section>
+
+  <!-- 💸 Requests Tab -->
+  <section id="requests" class="tab-content hidden"><p>Cash out requests section goes here...</p></section>
+
+  <!-- 📈 Profits Tab -->
+  <section id="profits" class="tab-content hidden"><p>Profit distribution section goes here...</p></section>
+
   <!-- ⚙️ Settings Tab -->
   <section id="settings" class="tab-content hidden">
     <h2 class="text-lg font-semibold mb-2">⚙️ Settings</h2>
@@ -38,16 +50,11 @@
     </div>
   </section>
 
-  <!-- Placeholder for other tabs -->
-  <section id="members" class="tab-content hidden"><p>Members section goes here...</p></section>
-  <section id="requests" class="tab-content hidden"><p>Cash out requests section goes here...</p></section>
-  <section id="profits" class="tab-content hidden"><p>Profit distribution section goes here...</p></section>
-
-  <!-- Firebase and Conversion Rate Logic -->
+  <!-- Firebase and Member Logic -->
   <script type="module">
     import { db } from './firebase-config.js';
     import {
-      doc, getDoc, updateDoc
+      doc, getDoc, updateDoc, collection, getDocs
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     let conversionRate = 10;
@@ -64,22 +71,44 @@
     window.updateConversionRate = async () => {
       const newRate = parseFloat(document.getElementById("conversionRateInput").value);
       if (isNaN(newRate) || newRate <= 0) return alert("Please enter a valid rate.");
-
       await updateDoc(doc(db, "settings", "conversion"), { rate: newRate });
       conversionRate = newRate;
       alert(`✅ Conversion rate updated to ₱${newRate} per share.`);
-      updateBalanceDisplays();
+      loadMembers(); // Refresh balances
     };
 
-    function updateBalanceDisplays() {
-      const addShares = parseInt(document.getElementById('addShares')?.value) || 0;
-      const editShares = parseInt(document.getElementById('editShares')?.value) || 0;
-      document.getElementById('addBalanceDisplay')?.textContent = (addShares * conversionRate).toLocaleString(undefined, { minimumFractionDigits: 2 });
-      document.getElementById('editBalanceDisplay')?.textContent = (editShares * conversionRate).toLocaleString(undefined, { minimumFractionDigits: 2 });
+    async function loadMembers() {
+      const memberList = document.getElementById("memberList");
+      memberList.innerHTML = '<p>Loading...</p>';
+
+      const querySnapshot = await getDocs(collection(db, "members"));
+      memberList.innerHTML = ""; // Clear loading
+
+      if (querySnapshot.empty) {
+        memberList.innerHTML = "<p>No members found.</p>";
+        return;
+      }
+
+      querySnapshot.forEach(doc => {
+        const data = doc.data();
+        const shares = data.shares || 0;
+        const balance = shares * conversionRate;
+
+        const div = document.createElement("div");
+        div.className = "bg-gray-800 p-4 rounded shadow";
+        div.innerHTML = `
+          <div class="font-semibold text-lg">${data.name || 'Unnamed Member'}</div>
+          <div>Email: ${data.email || '-'}</div>
+          <div>Shares: ${shares}</div>
+          <div>Balance: ₱${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+        `;
+        memberList.appendChild(div);
+      });
     }
 
     document.addEventListener("DOMContentLoaded", async () => {
       await loadConversionRate();
+      await loadMembers();
     });
   </script>
 
@@ -103,10 +132,10 @@
       if (defaultBtn) showTab('members', defaultBtn);
     });
 
-    // Placeholder functions
     function exportToCSV() {
       alert("CSV export not implemented yet.");
     }
+
     function cleanupOldPending() {
       alert("Cleanup not implemented yet.");
     }
