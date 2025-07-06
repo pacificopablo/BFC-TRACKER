@@ -6,36 +6,68 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white p-4">
-  <h1 class="text-3xl font-bold mb-4">🎉 Welcome, <span id="userName">Member</span></h1>
-  <p class="mb-2">Email: <span id="userEmail">user@example.com</span></p>
-  <p class="mb-2">Shares: <span id="userShares">0</span></p>
-  <p class="mb-2">Balance: ₱<span id="userBalance">0.00</span></p>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
+  <div class="max-w-md w-full bg-gray-800 rounded-xl p-6 shadow-lg">
+    <div class="flex items-center space-x-4 mb-4">
+      <img src="default-avatar.png" alt="Avatar" class="w-16 h-16 rounded-full border border-gray-600" />
+      <div>
+        <h1 class="text-2xl font-bold">🎉 Welcome, <span id="userName">Member</span></h1>
+        <p class="text-sm text-gray-400">Joined: <span id="joinDate">--</span></p>
+      </div>
+    </div>
+
+    <p class="mb-2">📧 Email: <span id="userEmail">user@example.com</span></p>
+    <p class="mb-2">📊 Shares: <span id="userShares">0</span></p>
+    <p class="mb-2">💰 Balance: ₱<span id="userBalance">0.00</span></p>
+    <p id="loadingMessage" class="text-yellow-400 mt-2">Loading your data...</p>
+
+    <button id="logoutBtn" class="mt-6 w-full py-2 bg-red-600 hover:bg-red-700 rounded">Logout</button>
+  </div>
 
   <script type="module">
     import { auth, db } from './firebase-config.js';
-    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const nameField = document.getElementById("userName");
     const emailField = document.getElementById("userEmail");
     const sharesField = document.getElementById("userShares");
     const balanceField = document.getElementById("userBalance");
+    const joinDateField = document.getElementById("joinDate");
+    const loadingMessage = document.getElementById("loadingMessage");
 
     onAuthStateChanged(auth, async (user) => {
       if (user) {
-        const uid = user.uid;
-        const docSnap = await getDoc(doc(db, "users", uid));
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          nameField.textContent = data.name;
-          emailField.textContent = data.email;
-          sharesField.textContent = data.shares;
-          balanceField.textContent = data.balance.toFixed(2);
+        try {
+          const uid = user.uid;
+          const docSnap = await getDoc(doc(db, "users", uid));
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            nameField.textContent = data.name || "Member";
+            emailField.textContent = data.email || user.email;
+            sharesField.textContent = Number(data.shares || 0).toLocaleString();
+            balanceField.textContent = Number(data.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+            joinDateField.textContent = new Date(user.metadata.creationTime).toLocaleDateString();
+            loadingMessage.style.display = "none";
+          } else {
+            loadingMessage.textContent = "⚠️ Member data not found.";
+          }
+        } catch (error) {
+          loadingMessage.textContent = "⚠️ Error loading data.";
+          console.error(error);
         }
       } else {
         window.location.href = "index.html";
       }
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      signOut(auth).then(() => {
+        window.location.href = "index.html";
+      }).catch(error => {
+        alert("Logout failed.");
+        console.error(error);
+      });
     });
   </script>
 </body>
