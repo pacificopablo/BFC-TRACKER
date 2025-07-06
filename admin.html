@@ -252,6 +252,32 @@
         </table>
       </div>
     </section>
+
+    <!-- Profit Distribution -->
+    <section class="section-card">
+      <h2><span class="text-blue-400">💰</span> Profit Distribution</h2>
+      <div class="flex flex-col gap-4 mb-6">
+        <div>
+          <label for="totalProfit" class="label">Total Profit to Distribute</label>
+          <input id="totalProfit" type="number" step="0.01" class="w-full md:w-64" placeholder="Enter total profit amount" aria-label="Total profit to distribute" />
+        </div>
+        <button id="calculateProfit" class="bg-blue-600 hover:bg-blue-700 text-white" aria-label="Calculate profit distribution">Calculate Distribution</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Shares</th>
+              <th>Percentage (%)</th>
+              <th>Profit Amount</th>
+            </tr>
+          </thead>
+          <tbody id="profitTableBody"></tbody>
+        </table>
+      </div>
+      <button id="exportProfitCSV" class="bg-blue-600 hover:bg-blue-700 text-white mt-4" aria-label="Export profit distribution as CSV">Export Profit Distribution CSV</button>
+    </section>
   </main>
 
   <!-- Modals -->
@@ -412,6 +438,8 @@
     document.getElementById("closeModal").onclick = () => toggleModal("editModal", false);
     document.getElementById("saveChanges").onclick = saveEdit;
     document.getElementById("txnFilterMember").addEventListener("change", renderTxns);
+    document.getElementById("calculateProfit").onclick = calculateProfitDistribution;
+    document.getElementById("exportProfitCSV").onclick = exportProfitCSV;
 
     const membersRef = collection(db, "members");
     const withdrawalsRef = collection(db, "withdrawals");
@@ -624,6 +652,68 @@
       } catch (error) {
         console.error("Error exporting CSV:", error);
         alert("Failed to export CSV. Please try again.");
+      }
+    }
+
+    function calculateProfitDistribution() {
+      const totalProfit = Number(document.getElementById("totalProfit").value);
+      if (!totalProfit || totalProfit <= 0) {
+        alert("Please enter a valid total profit amount.");
+        return;
+      }
+
+      const totalShares = allMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+      if (totalShares === 0) {
+        alert("No shares available for distribution.");
+        return;
+      }
+
+      const profitTable = document.getElementById("profitTableBody");
+      profitTable.innerHTML = "";
+
+      allMembers.forEach(m => {
+        const shares = m.shares || 0;
+        const percentage = totalShares > 0 ? ((shares / totalShares) * 100).toFixed(2) : 0;
+        const profitAmount = totalShares > 0 ? ((shares / totalShares) * totalProfit).toFixed(2) : 0;
+
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td class="py-2">${m.name}</td>
+          <td class="py-2">${shares}</td>
+          <td class="py-2">${percentage}%</td>
+          <td class="py-2">$${profitAmount}</td>`;
+        profitTable.appendChild(row);
+      });
+    }
+
+    async function exportProfitCSV() {
+      try {
+        const totalProfit = Number(document.getElementById("totalProfit").value);
+        if (!totalProfit || totalProfit <= 0) {
+          alert("Please calculate profit distribution first.");
+          return;
+        }
+
+        const totalShares = allMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+        const rows = [["Name", "Shares", "Percentage (%)", "Profit Amount"]];
+        allMembers.forEach(m => {
+          const shares = m.shares || 0;
+          const percentage = totalShares > 0 ? ((shares / totalShares) * 100).toFixed(2) : 0;
+          const profitAmount = totalShares > 0 ? ((shares / totalShares) * totalProfit).toFixed(2) : 0;
+          rows.push([m.name, shares, percentage, profitAmount]);
+        });
+
+        const csv = rows.map(r => r.join(",")).join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "profit_distribution.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error("Error exporting profit CSV:", error);
+        alert("Failed to export profit distribution CSV. Please try again.");
       }
     }
   </script>
