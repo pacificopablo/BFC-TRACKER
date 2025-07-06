@@ -17,15 +17,15 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
       <div class="bg-gray-800 p-4 rounded shadow">
         <p class="text-sm">Total Members</p>
-        <p class="text-2xl font-bold" id="totalMembers">0</p>
+        <p class="text-2xl font-bold" id="totalMembers">Loading...</p>
       </div>
       <div class="bg-gray-800 p-4 rounded shadow">
         <p class="text-sm">Total Shares</p>
-        <p class="text-2xl font-bold" id="totalShares">0</p>
+        <p class="text-2xl font-bold" id="totalShares">Loading...</p>
       </div>
       <div class="bg-gray-800 p-4 rounded shadow">
         <p class="text-sm">Total Balance</p>
-        <p class="text-2xl font-bold">₱<span id="totalBalance">0.00</span></p>
+        <p class="text-2xl font-bold">₱<span id="totalBalance">Loading...</span></p>
       </div>
     </div>
     <!-- Financial Chart -->
@@ -67,15 +67,17 @@
       class="mb-4 p-2 w-full rounded bg-gray-700 text-white"
     />
     <!-- Member List -->
-    <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">Loading members...</div>
     <!-- Top 5 Shareholders -->
     <div class="bg-gray-800 p-4 mt-8 rounded shadow">
       <h2 class="text-xl font-bold mb-2">🏆 Top 5 Shareholders</h2>
-      <ul id="topShareholders" class="list-disc list-inside text-sm"></ul>
+      <ul id="topShareholders" class="list-disc list-inside text-sm">Loading...</ul>
     </div>
     <!-- Transaction Requests -->
     <h2 class="text-2xl font-bold mt-10 mb-4">💰 Deposit & Cash Out Requests</h2>
-    <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>
+    <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded">
+      Loading requests...
+    </div>
     <!-- Edit Member Modal -->
     <div id="editModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center">
       <div class="bg-gray-800 p-6 rounded shadow w-full max-w-md">
@@ -137,11 +139,10 @@
         addDoc,
         serverTimestamp,
       } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-      import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+      import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-      // Firebase Configuration (Note: In production, use environment variables)
+      // Firebase Configuration (Replace with your actual config)
       const firebaseConfig = {
-        // Replace with your actual Firebase config
         apiKey: "YOUR_API_KEY",
         authDomain: "YOUR_AUTH_DOMAIN",
         projectId: "YOUR_PROJECT_ID",
@@ -151,9 +152,15 @@
       };
 
       // Initialize Firebase
-      const app = initializeApp(firebaseConfig);
-      const db = getFirestore(app);
-      const auth = getAuth(app);
+      let app, db, auth;
+      try {
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+      } catch (error) {
+        console.error("Firebase initialization failed:", error);
+        document.body.innerHTML = '<p class="text-red-500 p-4">Failed to initialize Firebase. Please check configuration.</p>';
+      }
 
       // DOM Elements
       const elements = {
@@ -163,7 +170,7 @@
         membersList: document.getElementById("membersList"),
         topShareholders: document.getElementById("topShareholders"),
         searchInput: document.getElementById("searchInput"),
-        requestsList: Extraordinary
+        requestsList: document.getElementById("requestsList"),
         editModal: document.getElementById("editModal"),
         editForm: document.getElementById("editForm"),
         editMemberId: document.getElementById("editMemberId"),
@@ -182,7 +189,7 @@
 
       let allMembers = [];
       let lastSubmissionTime = 0;
-      const SUBMISSION_COOLDOWN = 5000; // 5 seconds in milliseconds
+      const SUBMISSION_COOLDOWN = 5000; // 5 seconds
 
       // Utility Functions
       const formatCurrency = (value) =>
@@ -194,17 +201,50 @@
         setTimeout(() => element.classList.add("hidden"), 5000);
       };
 
+      const showLoading = (element, message = "Loading...") => {
+        element.innerHTML = `<p class="text-gray-400">${message}</p>`;
+      };
+
+      // Authentication Check
+      onAuthStateChanged(auth, (user) => {
+        if (!user) {
+          showError(elements.profitError, "You are not authenticated. Redirecting to login...");
+          setTimeout(() => (window.location.href = "/login.html"), 2000);
+        } else {
+          loadMembers();
+          listenForRequests();
+        }
+      });
+
       // Load Members
       async function loadMembers() {
+        showLoading(elements.membersList, "Loading members...");
+        showLoading(elements.topShareholders, "Loading shareholders...");
+        elements.totalMembers.textContent = "Loading...";
+        elements.totalShares.textContent = "Loading...";
+        elements.totalBalance.textContent = "Loading...";
+
         try {
           const snapshot = await getDocs(collection(db, "members"));
           allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          console.log("Members fetched:", allMembers);
-          displayMembers(allMembers);
-          updateTopShareholders();
+          if (allMembers.length === 0) {
+            elements.membersList.innerHTML = '<p class="text-gray-400">No members found.</p>';
+            elements.topShareholders.innerHTML = '<p class="text-gray-400">No shareholders.</p>';
+            elements.totalMembers.textContent = "0";
+            elements.totalShares.textContent = "0";
+            elements.totalBalance.textContent = formatCurrency(0);
+          } else {
+            console.log("Members fetched:", allMembers);
+            displayMembers(allMembers);
+            updateTopShareholders();
+          }
         } catch (error) {
           console.error("Error loading members:", error);
-          elements.membersList.innerHTML = `<p class="text-red-500">Failed to load members: ${error.message}</p>`;
+          showError(elements.profitError, `Failed to load members: ${error.message}`);
+          elements.membersList.innerHTML = '<p class="text-red-500">Failed to load members.</p>';
+          elements.totalMembers.textContent = "0";
+          elements.totalShares.textContent = "0";
+          elements.totalBalance.textContent = formatCurrency(0);
         }
       }
 
@@ -257,11 +297,15 @@
           .slice(0, 5);
 
         elements.topShareholders.innerHTML = "";
-        top.forEach((m) => {
-          const li = document.createElement("li");
-          li.textContent = `${m.name || "N/A"} — ${m.shares || 0} shares`;
-          elements.topShareholders.appendChild(li);
-        });
+        if (top.length === 0) {
+          elements.topShareholders.innerHTML = '<p class="text-gray-400">No approved shareholders.</p>';
+        } else {
+          top.forEach((m) => {
+            const li = document.createElement("li");
+            li.textContent = `${m.name || "N/A"} — ${m.shares || 0} shares`;
+            elements.topShareholders.appendChild(li);
+          });
+        }
       }
 
       // Search Members
@@ -278,14 +322,18 @@
 
       // Listen for Transaction Requests
       function listenForRequests() {
+        showLoading(elements.requestsList, "Loading requests...");
         const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
         onSnapshot(
           q,
           (snapshot) => {
             elements.requestsList.innerHTML = "";
-            snapshot.forEach((docSnap) => {
-              const data = docSnap.data();
-              if (data.status === "pending") {
+            const pendingRequests = snapshot.docs.filter((doc) => doc.data().status === "pending");
+            if (pendingRequests.length === 0) {
+              elements.requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
+            } else {
+              pendingRequests.forEach((docSnap) => {
+                const data = docSnap.data();
                 const div = document.createElement("div");
                 div.className = "bg-gray-700 p-4 rounded";
                 div.innerHTML = `
@@ -297,15 +345,13 @@
                   }</p>
                 `;
                 elements.requestsList.appendChild(div);
-              }
-            });
-            if (elements.requestsList.innerHTML === "") {
-              elements.requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
+              });
             }
           },
           (error) => {
             console.error("Error listening for requests:", error);
-            elements.requestsList.innerHTML = `<p class="text-red-500">Failed to load requests: ${error.message}</p>`;
+            showError(elements.profitError, `Failed to load requests: ${error.message}`);
+            elements.requestsList.innerHTML = '<p class="text-red-500">Failed to load requests.</p>';
           }
         );
       }
@@ -334,7 +380,7 @@
         }
         lastSubmissionTime = currentTime;
 
-        // Disable button during processing
+        // Show loading state
         elements.distributeBtn.disabled = true;
         elements.distributeBtn.textContent = "Processing...";
 
@@ -345,9 +391,14 @@
             return;
           }
 
-          // Fetch fund balance (assuming a 'fund' collection with a 'balance' field)
-          const fundDoc = await getDocs(collection(db, "fund"));
-          const fundBalance = fundDoc.docs[0]?.data().balance || 0;
+          // Fetch fund balance
+          const fundSnapshot = await getDocs(collection(db, "fund"));
+          if (fundSnapshot.empty) {
+            showError(elements.profitError, "Fund data not found. Please initialize fund balance.");
+            return;
+          }
+          const fundDoc = fundSnapshot.docs[0];
+          const fundBalance = fundDoc.data().balance || 0;
           if (profit > fundBalance) {
             showError(elements.profitError, "Insufficient fund balance for distribution.");
             return;
@@ -368,7 +419,7 @@
           // Create batch for atomic updates
           const batch = writeBatch(db);
 
-          // Update each approved member's balance
+          // Update member balances
           approvedMembers.forEach((member) => {
             const profitShare = (member.shares || 0) * profitPerShare;
             const newBalance = (member.balance || 0) + profitShare;
@@ -382,7 +433,7 @@
           });
 
           // Update fund balance
-          const fundRef = doc(db, "fund", fundDoc.docs[0].id);
+          const fundRef = doc(db, "fund", fundDoc.id);
           batch.update(fundRef, { balance: fundBalance - profit });
 
           // Log distribution to audit trail
@@ -517,11 +568,9 @@
         console.log("Chart initialized successfully");
       } catch (error) {
         console.error("Error initializing chart:", error);
+        document.getElementById("fundChart").parentElement.innerHTML =
+          '<p class="text-red-500">Failed to load chart.</p>';
       }
-
-      // Initialize
-      loadMembers();
-      listenForRequests();
     </script>
   </body>
 </html>
