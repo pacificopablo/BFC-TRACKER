@@ -147,7 +147,7 @@
       query, orderBy, onSnapshot 
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
     // Firebase configuration
     const firebaseConfig = {
@@ -181,12 +181,12 @@
     async function makeUserAdmin(uid) {
       const userRef = doc(db, "users", uid);
       try {
-        await setDoc(userRef, { isAdmin: true }, { merge: true });
+        await setDoc(userRef, { role: "admin" }, { merge: true });
         alert(`User ${uid} is now an admin.`);
         makeAdminBtn.style.display = "none";
       } catch (error) {
-        console.error("Error setting admin flag:", error);
-        alert("Error setting admin flag: " + error.message);
+        console.error("Error setting admin role:", error);
+        alert("Error setting admin role: " + error.message);
       }
     }
 
@@ -194,7 +194,7 @@
     async function isAdmin(uid) {
       const userRef = doc(db, "users", uid);
       const userDoc = await getDoc(userRef);
-      return userDoc.exists() && userDoc.data().isAdmin === true;
+      return userDoc.exists() && userDoc.data().role === "admin";
     }
 
     // Populate member select dropdown
@@ -538,11 +538,12 @@
           listenForRequests();
         } else {
           alert("Access denied. You are not an admin.");
-          auth.signOut();
+          await signOut(auth);
+          window.location.href = "login.html";
         }
       } else {
         alert("Please sign in to access the dashboard.");
-        // Redirect to login page if needed
+        window.location.href = "login.html";
       }
     });
 
