@@ -2,69 +2,181 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Member Dashboard</title>
+  <title>Baccarat Fund - Member Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-gray-900 text-white p-4">
-  <h1 class="text-3xl font-bold mb-6">Member Dashboard</h1>
-  <div id="memberInfo" class="bg-gray-800 p-4 rounded shadow mb-6"></div>
-  <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">Logout</button>
+<body class="bg-gray-100 min-h-screen">
 
+  <!-- Header -->
+  <header class="bg-indigo-700 text-white p-4 flex justify-between items-center">
+    <h1 class="text-xl font-bold">🎲 Baccarat Fund - Member</h1>
+    <button id="logoutBtn" class="bg-red-500 px-3 py-1 rounded">Logout</button>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-4xl mx-auto p-4 space-y-6">
+
+    <!-- Profile Section -->
+    <section class="bg-white shadow rounded p-4">
+      <h2 class="text-lg font-semibold mb-2">👤 My Profile</h2>
+      <p><strong>Email:</strong> <span id="userEmail">Loading...</span></p>
+      <p><strong>Member Since:</strong> <span id="memberSince">Loading...</span></p>
+    </section>
+
+    <!-- Shares Info -->
+    <section class="bg-white shadow rounded p-4">
+      <h2 class="text-lg font-semibold mb-2">📈 My Shares</h2>
+      <p><strong>Total Shares:</strong> <span id="totalShares">0</span></p>
+      <p><strong>Total Invested:</strong> ₱<span id="totalInvested">0.00</span></p>
+    </section>
+
+    <!-- Share Transactions -->
+    <section class="bg-white shadow rounded p-4 overflow-x-auto">
+      <h2 class="text-lg font-semibold mb-2">📋 Share Transactions</h2>
+      <table class="w-full table-auto border">
+        <thead>
+          <tr class="bg-gray-200 text-sm">
+            <th class="p-2">Date</th>
+            <th class="p-2">Type</th>
+            <th class="p-2">Shares</th>
+            <th class="p-2">Amount (₱)</th>
+          </tr>
+        </thead>
+        <tbody id="transactionList">
+          <tr><td colspan="4" class="text-center p-4 text-gray-500">Loading...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Withdrawal Request -->
+    <section class="bg-white shadow rounded p-4">
+      <h2 class="text-lg font-semibold mb-2">💸 Request Cash Out</h2>
+      <form id="withdrawForm" class="space-y-2">
+        <input type="number" id="withdrawShares" class="w-full border p-2 rounded" placeholder="Number of shares" min="1" required />
+        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded">Submit Request</button>
+        <p id="withdrawMessage" class="text-sm text-gray-600"></p>
+        <p id="loadingIndicator" class="hidden text-blue-600">Submitting request...</p>
+      </form>
+    </section>
+
+  </main>
+
+  <!-- Firebase + Script -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { auth, db } from './firebase-config.js';
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { doc, getDoc, collection, query, where, getDocs, addDoc, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    // Firebase configuration
-    const firebaseConfig = {
-      apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
-      authDomain: "bfc-tracker.firebaseapp.com",
-      databaseURL: "https://bfc-tracker-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "bfc-tracker",
-      storageBucket: "bfc-tracker.firebasestorage.app",
-      messagingSenderId: "127052459580",
-      appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
-      measurementId: "G-PNYRCFJHYM"
-    };
-
-    // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+    const userEmail = document.getElementById("userEmail");
+    const memberSince = document.getElementById("memberSince");
+    const totalShares = document.getElementById("totalShares");
+    const totalInvested = document.getElementById("totalInvested");
+    const transactionList = document.getElementById("transactionList");
+    const withdrawForm = document.getElementById("withdrawForm");
+    const withdrawShares = document.getElementById("withdrawShares");
+    const withdrawMessage = document.getElementById("withdrawMessage");
+    const loadingIndicator = document.getElementById("loadingIndicator");
+    const logoutBtn = document.getElementById("logoutBtn");
 
     onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists() && userDoc.data().role === "member") {
-          const memberRef = doc(db, "members", user.uid);
-          const memberDoc = await getDoc(memberRef);
-          if (memberDoc.exists()) {
-            const member = memberDoc.data();
-            document.getElementById("memberInfo").innerHTML = `
-              <p><strong>Name:</strong> ${member.name}</p>
-              <p><strong>Email:</strong> ${member.email}</p>
-              <p><strong>Status:</strong> ${member.status}</p>
-              <p><strong>Shares:</strong> ${member.shares}</p>
-              <p><strong>Balance:</strong> ₱${member.balance.toFixed(2)}</p>
-            `;
-          } else {
-            document.getElementById("memberInfo").innerHTML = "<p>No member data found.</p>";
-          }
-        } else {
-          alert("Access denied. You are not a member.");
-          await signOut(auth);
-          window.location.href = "login.html";
-        }
-      } else {
+      if (!user) {
         window.location.href = "login.html";
+        return;
+      }
+
+      userEmail.textContent = user.email;
+      memberSince.textContent = new Date(user.metadata.creationTime).toLocaleDateString();
+
+      try {
+        const memberDoc = await getDoc(doc(db, "members", user.uid));
+        if (memberDoc.exists()) {
+          const data = memberDoc.data();
+          totalShares.textContent = data.shares || 0;
+          totalInvested.textContent = (data.totalInvested || 0).toFixed(2);
+        } else {
+          totalShares.textContent = "0";
+          totalInvested.textContent = "0.00";
+        }
+      } catch (err) {
+        console.error("Error loading member data:", err);
+      }
+
+      // Load transactions
+      try {
+        const q = query(collection(db, "transactions"), where("uid", "==", user.uid), orderBy("date", "desc"));
+        const snap = await getDocs(q);
+
+        if (snap.empty) {
+          transactionList.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-gray-500">No transactions found.</td></tr>`;
+        } else {
+          transactionList.innerHTML = "";
+          snap.forEach(doc => {
+            const d = doc.data();
+            const dateStr = d.date?.seconds ? new Date(d.date.seconds * 1000).toLocaleDateString() : "Unknown";
+            transactionList.innerHTML += `
+              <tr class="text-sm text-center">
+                <td class="p-2">${dateStr}</td>
+                <td class="p-2">${d.type}</td>
+                <td class="p-2">${d.shares}</td>
+                <td class="p-2">₱${d.amount.toFixed(2)}</td>
+              </tr>`;
+          });
+        }
+      } catch (err) {
+        console.error("Error loading transactions:", err);
+        transactionList.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-red-600">Failed to load transactions.</td></tr>`;
       }
     });
 
-    document.getElementById("logoutBtn").addEventListener("click", async () => {
-      await signOut(auth);
-      window.location.href = "login.html";
+    withdrawForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      withdrawMessage.textContent = "";
+      withdrawMessage.classList.remove("text-red-600");
+      loadingIndicator.classList.remove("hidden");
+
+      const sharesToWithdraw = parseInt(withdrawShares.value);
+      const user = auth.currentUser;
+      if (!user || isNaN(sharesToWithdraw) || sharesToWithdraw <= 0) {
+        withdrawMessage.textContent = "⚠️ Please enter a valid number of shares.";
+        withdrawMessage.classList.add("text-red-600");
+        loadingIndicator.classList.add("hidden");
+        return;
+      }
+
+      try {
+        const memberDoc = await getDoc(doc(db, "members", user.uid));
+        const currentShares = memberDoc.exists() ? memberDoc.data().shares || 0 : 0;
+
+        if (sharesToWithdraw > currentShares) {
+          withdrawMessage.textContent = "⚠️ You cannot withdraw more shares than you own.";
+          withdrawMessage.classList.add("text-red-600");
+          loadingIndicator.classList.add("hidden");
+          return;
+        }
+
+        await addDoc(collection(db, "withdrawals"), {
+          uid: user.uid,
+          email: user.email,
+          shares: sharesToWithdraw,
+          status: "Pending",
+          createdAt: serverTimestamp()
+        });
+
+        withdrawMessage.textContent = "✅ Withdrawal request submitted.";
+        withdrawMessage.classList.remove("text-red-600");
+        withdrawForm.reset();
+      } catch (err) {
+        console.error("Error submitting withdrawal:", err);
+        withdrawMessage.textContent = "❌ Failed to submit withdrawal request.";
+        withdrawMessage.classList.add("text-red-600");
+      } finally {
+        loadingIndicator.classList.add("hidden");
+      }
+    });
+
+    logoutBtn.addEventListener("click", () => {
+      signOut(auth).then(() => window.location.href = "login.html");
     });
   </script>
 </body>
