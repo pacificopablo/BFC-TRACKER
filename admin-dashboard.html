@@ -33,17 +33,7 @@
   <!-- 💸 Cash Out Requests Tab -->
   <section id="requests" class="tab-content hidden">
     <h2 class="text-lg font-semibold mb-2">💸 Cash Out Requests</h2>
-    <div id="requestList" class="space-y-2">
-      <div class="bg-white text-black p-4 rounded shadow">
-        <p><strong>Name:</strong> Juan Dela Cruz</p>
-        <p><strong>Amount:</strong> ₱5,000</p>
-        <p><strong>Date:</strong> July 6, 2025</p>
-        <div class="mt-2">
-          <button class="bg-green-500 text-white px-3 py-1 rounded mr-2">Approve</button>
-          <button class="bg-red-500 text-white px-3 py-1 rounded">Reject</button>
-        </div>
-      </div>
-    </div>
+    <div id="requestList" class="space-y-2"></div>
   </section>
 
   <!-- 📈 Profit Distribution Tab -->
@@ -53,9 +43,7 @@
       <input type="number" id="totalProfit" class="border p-2 w-full text-black" placeholder="Enter total profit (PHP)" required />
       <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Distribute</button>
     </form>
-    <div id="profitLogs" class="mt-4 space-y-2 text-sm text-gray-300">
-      <!-- Logs will appear here -->
-    </div>
+    <div id="profitLogs" class="mt-4 space-y-2 text-sm text-gray-300"></div>
   </section>
 
   <!-- ⚙️ Settings Tab -->
@@ -71,13 +59,15 @@
   <script type="module">
     import { db } from './firebase-config.js';
     import {
-      collection, getDocs, updateDoc, doc, addDoc,
-      serverTimestamp, query, orderBy
+      collection, getDocs, getDoc, updateDoc, doc, addDoc, serverTimestamp,
+      query, orderBy
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const profitForm = document.getElementById('profitForm');
     const profitLogs = document.getElementById('profitLogs');
+    const requestList = document.getElementById('requestList');
 
+    // Load Profit Logs
     async function loadProfitLogs() {
       profitLogs.innerHTML = '';
       const q = query(collection(db, "profit_logs"), orderBy("date", "desc"));
@@ -91,8 +81,7 @@
       });
     }
 
-    await loadProfitLogs();
-
+    // Profit Distribution
     profitForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const totalProfit = parseFloat(document.getElementById('totalProfit').value);
@@ -133,11 +122,6 @@
       const dateStr = new Date().toLocaleDateString("en-PH", { month: 'long', day: 'numeric' });
       const logMsg = `📢 ${dateStr} – ₱${totalProfit.toLocaleString()} profit distributed across ${members.length} members.`;
 
-      const logDiv = document.createElement("div");
-      logDiv.className = "bg-gray-800 p-2 rounded";
-      logDiv.textContent = logMsg;
-      profitLogs.prepend(logDiv);
-
       await addDoc(collection(db, "profit_logs"), {
         date: serverTimestamp(),
         message: logMsg,
@@ -145,17 +129,78 @@
         totalMembers: members.length,
       });
 
-      alert("Profit distributed and logged.");
+      alert("Profit distributed.");
       profitForm.reset();
+      loadProfitLogs();
     });
 
-    // Optional stub functions
-    window.exportToCSV = function () {
-      alert("Export to CSV not implemented.");
-    };
-    window.cleanupOldPending = function () {
-      alert("Auto cleanup not implemented.");
-    };
+    // Cash Out Requests
+    async function loadCashOutRequests() {
+      requestList.innerHTML = '';
+      const snapshot = await getDocs(collection(db, "cash_out_requests"));
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.status === "pending") {
+          const div = document.createElement("div");
+          div.className = "bg-white text-black p-4 rounded shadow";
+          div.innerHTML = `
+            <p><strong>Name:</strong> ${data.name}</p>
+            <p><strong>Amount:</strong> ₱${data.amount.toLocaleString()}</p>
+            <p><strong>Date:</strong> ${data.date?.toDate().toLocaleDateString()}</p>
+            <div class="mt-2">
+              <button class="bg-green-500 text-white px-3 py-1 rounded mr-2" data-id="${docSnap.id}" data-member="${data.memberId}" data-amount="${data.amount}">Approve</button>
+              <button class="bg-red-500 text-white px-3 py-1 rounded">Reject</button>
+            </div>
+          `;
+          requestList.appendChild(div);
+        }
+      });
+      setupApproveButtons();
+    }
+
+    async function setupApproveButtons() {
+      const approveButtons = requestList.querySelectorAll('button.bg-green-500');
+      approveButtons.forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const requestId = btn.dataset.id;
+          const memberId = btn.dataset.member;
+          const amount = parseFloat(btn.dataset.amount);
+
+          const memberRef = doc(db, "members", memberId);
+          const memberSnap = await getDoc(memberRef);
+          if (!memberSnap.exists()) return alert("Member not found.");
+
+          const memberData = memberSnap.data();
+          if ((memberData.balance || 0) < amount) {
+            return alert("Insufficient balance.");
+          }
+
+          await updateDoc(memberRef, {
+            balance: memberData.balance - amount
+          });
+
+          await updateDoc(doc(db, "cash_out_requests", requestId), {
+            status: "approved"
+          });
+
+          await addDoc(collection(db, "admin_logs"), {
+            action: `Approved ₱${amount} cash out for ${memberData.name}`,
+            timestamp: serverTimestamp()
+          });
+
+          alert(`₱${amount} deducted from ${memberData.name}'s balance.`);
+          loadCashOutRequests();
+        });
+      });
+    }
+
+    // Initial Load
+    await loadProfitLogs();
+    await loadCashOutRequests();
+
+    // Placeholder functions
+    window.exportToCSV = () => alert("Export CSV not implemented.");
+    window.cleanupOldPending = () => alert("Cleanup not implemented.");
   </script>
 
   <!-- Tab Navigation -->
