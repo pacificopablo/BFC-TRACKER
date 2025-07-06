@@ -41,10 +41,47 @@
     <!-- Transaction Requests -->
     <h2 class="text-2xl font-bold mt-10 mb-4">💰 Deposit & Cash Out Requests</h2>
     <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded"></div>
+    <!-- Edit Member Modal -->
+    <div id="editModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center">
+      <div class="bg-gray-800 p-6 rounded shadow w-full max-w-md">
+        <h2 class="text-xl font-bold mb-4">Edit Member</h2>
+        <form id="editForm">
+          <input type="hidden" id="editMemberId" />
+          <div class="mb-4">
+            <label class="block text-sm">Name</label>
+            <input type="text" id="editName" class="w-full p-2 rounded bg-gray-700 text-white" required />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm">Email</label>
+            <input type="email" id="editEmail" class="w-full p-2 rounded bg-gray-700 text-white" required />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm">Status</label>
+            <select id="editStatus" class="w-full p-2 rounded bg-gray-700 text-white" required>
+              <option value="approved">Approved</option>
+              <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm">Shares</label>
+            <input type="number" id="editShares" class="w-full p-2 rounded bg-gray-700 text-white" required min="0" />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm">Balance</label>
+            <input type="number" id="editBalance" class="w-full p-2 rounded bg-gray-700 text-white" required min="0" step="0.01" />
+          </div>
+          <div class="flex justify-end space-x-2">
+            <button type="button" id="cancelEdit" class="bg-gray-600 px-4 py-2 rounded">Cancel</button>
+            <button type="submit" class="bg-blue-600 px-4 py-2 rounded">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
       import {
-        getFirestore, collection, getDocs, doc, updateDoc,
+        getFirestore, collection, getDocs, doc, updateDoc, deleteDoc,
         query, orderBy, onSnapshot
       } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -67,6 +104,15 @@
       const topShareholders = document.getElementById("topShareholders");
       const searchInput = document.getElementById("searchInput");
       const requestsList = document.getElementById("requestsList");
+      const editModal = document.getElementById("editModal");
+      const editForm = document.getElementById("editForm");
+      const editMemberId = document.getElementById("editMemberId");
+      const editName = document.getElementById("editName");
+      const editEmail = document.getElementById("editEmail");
+      const editStatus = document.getElementById("editStatus");
+      const editShares = document.getElementById("editShares");
+      const editBalance = document.getElementById("editBalance");
+      const cancelEdit = document.getElementById("cancelEdit");
 
       let allMembers = [];
 
@@ -107,6 +153,10 @@
             <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${m.status === 'approved' ? 'bg-green-600' : m.status === 'pending' ? 'bg-yellow-600' : 'bg-red-600'}">${m.status}</span></p>
             <p><strong>Shares:</strong> ${m.shares}</p>
             <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
+            <div class="flex space-x-2 mt-2">
+              <button onclick="openEditModal('${m.id}', '${m.name}', '${m.email}', '${m.status}', ${m.shares}, ${m.balance})" class="bg-blue-600 px-3 py-1 rounded text-sm">Edit</button>
+              <button onclick="deleteMember('${m.id}', '${m.name}')" class="bg-red-600 px-3 py-1 rounded text-sm">Delete</button>
+            </div>
           `;
           membersList.appendChild(div);
         });
@@ -165,6 +215,56 @@
           console.error("Error listening for requests:", error);
           requestsList.innerHTML = '<p class="text-red-500">Failed to load requests.</p>';
         });
+      }
+
+      // Edit Member Functions
+      function openEditModal(id, name, email, status, shares, balance) {
+        editMemberId.value = id;
+        editName.value = name;
+        editEmail.value = email;
+        editStatus.value = status;
+        editShares.value = shares;
+        editBalance.value = balance;
+        editModal.classList.remove("hidden");
+      }
+
+      editForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = editMemberId.value;
+        const updatedData = {
+          name: editName.value,
+          email: editEmail.value,
+          status: editStatus.value,
+          shares: parseInt(editShares.value),
+          balance: parseFloat(editBalance.value)
+        };
+        try {
+          await updateDoc(doc(db, "members", id), updatedData);
+          editModal.classList.add("hidden");
+          loadMembers(); // Refresh member list
+          alert("Member updated successfully!");
+        } catch (error) {
+          console.error("Error updating member:", error);
+          alert("Failed to update member.");
+        }
+      });
+
+      cancelEdit.addEventListener("click", () => {
+        editModal.classList.add("hidden");
+      });
+
+      // Delete Member Function
+      async function deleteMember(id, name) {
+        if (confirm(`Are you sure you want to delete ${name}?`)) {
+          try {
+            await deleteDoc(doc(db, "members", id));
+            loadMembers(); // Refresh member list
+            alert("Member deleted successfully!");
+          } catch (error) {
+            console.error("Error deleting member:", error);
+            alert("Failed to delete member.");
+          }
+        }
       }
 
       loadMembers();
