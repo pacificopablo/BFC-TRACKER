@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Baccarat Fund Admin Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-900">
+
+  <!-- Header -->
+  <header class="bg-white shadow p-4 flex justify-between items-center">
+    <h1 class="text-xl font-bold">🎲 Baccarat Fund Club - Admin</h1>
+    <button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded">Logout</button>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav class="bg-gray-200 flex gap-4 p-4 text-sm font-medium">
+    <button onclick="showTab('members')" class="tab-btn" id="tab-members">👤 Members</button>
+    <button onclick="showTab('requests')" class="tab-btn" id="tab-requests">💸 Cash Outs</button>
+    <button onclick="showTab('profits')" class="tab-btn" id="tab-profits">📈 Profits</button>
+    <button onclick="showTab('settings')" class="tab-btn" id="tab-settings">⚙️ Settings</button>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="p-4">
+    <section id="members" class="tab-content">
+      <h2 class="text-lg font-semibold mb-2">👥 Member List</h2>
+      <div id="memberList" class="space-y-2"></div>
+    </section>
+
+    <section id="requests" class="tab-content hidden">
+      <h2 class="text-lg font-semibold mb-2">💸 Cash Out Requests</h2>
+      <div id="requestList" class="space-y-2"></div>
+    </section>
+
+    <section id="profits" class="tab-content hidden">
+      <h2 class="text-lg font-semibold mb-2">📊 Distribute Profits</h2>
+      <form id="profitForm" class="space-y-2">
+        <input type="number" id="totalProfit" class="border p-2 w-full" placeholder="Enter total profit (PHP)" required />
+        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Distribute</button>
+      </form>
+      <div id="profitLogs" class="mt-4 space-y-2 text-sm text-gray-700"></div>
+    </section>
+
+    <section id="settings" class="tab-content hidden">
+      <h2 class="text-lg font-semibold mb-2">⚙️ Settings</h2>
+      <button onclick="exportToCSV()" class="bg-green-600 text-white px-4 py-2 rounded">📥 Export CSV</button>
+      <button onclick="cleanupOldPending()" class="bg-yellow-500 text-white px-4 py-2 rounded ml-2">🧹 Clean Old Pending</button>
+    </section>
+  </main>
+
+  <!-- Admin Dashboard Script -->
+  <script type="module">
+    import { auth, db } from './firebase-config.js';
+    import {
+      onAuthStateChanged,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+    import {
+      collection, doc, getDocs, updateDoc, addDoc, deleteDoc,
+      query, where, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const adminUID = "Sr1vh8YU16dX3NvsDacLHJWpSC13";
+
+    const memberList = document.getElementById('memberList');
+    const requestList = document.getElementById('requestList');
+    const profitForm = document.getElementById('profitForm');
+    const profitLogs = document.getElementById('profitLogs');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    function showTab(id) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('bg-white', 'border'));
+      document.getElementById(`tab-${id}`).classList.add('bg-white', 'border', 'border-gray-400');
+    }
+
+    showTab('members');
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user || user.uid !== adminUID) {
+        alert("Access denied.");
+        window.location.href = "index.html";
+      } else {
+        loadMembers();
+        loadRequests();
+        loadProfits();
+      }
+    });
+
+    logoutBtn.onclick = () => signOut(auth).then(() => window.location.href = "index.html");
+
+    async function loadMembers() {
+      memberList.innerHTML = "";
+      const snap = await getDocs(collection(db, "members"));
+      snap.forEach(docSnap => {
+        const d = docSnap.data();
+        memberList.innerHTML += `
+          <div class="bg-white p-3 rounded shadow">
+            <strong>${d.name || "Unnamed"}</strong> (${d.email})<br>
+            Shares: ${d.shares || 0}, Balance: ₱${d.balance || 0}<br>
+            Status: ${d.status}
+          </div>
+        `;
+      });
+    }
+
+    async function loadRequests() {
+      requestList.innerHTML = "";
+      const q = query(collection(db, "withdrawalRequests"), where("status", "==", "pending"));
+      const snap = await getDocs(q);
+      snap.forEach(docSnap => {
+        const d = docSnap.data();
+        requestList.innerHTML += `
+          <div class="bg-white p-3 rounded shadow">
+            <strong>${d.memberName}</strong> requests ₱${d.amount}<br>
+            <button class="bg-green-500 text-white px-2 py-1 rounded" onclick="approveRequest('${docSnap.id}')">Approve</button>
+            <button class="bg-red-500 text-white px-2 py-1 rounded ml-2" onclick="rejectRequest('${docSnap.id}')">Reject</button>
+          </div>
+        `;
+      });
+    }
+
+    window.approveRequest = async (id) => {
+      await updateDoc(doc(db, "withdrawalRequests", id), { status: "approved" });
+      loadRequests();
+    };
+    window.rejectRequest = async (id) => {
+      await updateDoc(doc(db, "withdrawalRequests", id), { status: "rejected" });
+      loadRequests();
+    };
+
+    profitForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const total = parseFloat(document.getElementById("totalProfit").value);
+      const members = await getDocs(collection(db, "members"));
+      const count = members.size;
+      const perShare = total / count;
+
+      for (const docSnap of members.docs) {
+        const ref = doc(db, "members", docSnap.id);
+        const data = docSnap.data();
+        const bonus = (data.shares || 0) * perShare;
+        await updateDoc(ref, {
+          balance: (data.balance || 0) + bonus
+        });
+      }
+
+      await addDoc(collection(db, "profitDistributions"), {
+        amount: total,
+        date: serverTimestamp()
+      });
+
+      profitLogs.innerHTML += `<div>Distributed ₱${total} to ${count} members.</div>`;
+      loadMembers();
+    });
+
+    async function loadProfits() {
+      profitLogs.innerHTML = "";
+      const snap = await getDocs(collection(db, "profitDistributions"));
+      snap.forEach(docSnap => {
+        const d = docSnap.data();
+        profitLogs.innerHTML += `<div>₱${d.amount} on ${new Date(d.date?.seconds * 1000).toLocaleString()}</div>`;
+      });
+    }
+
+    window.exportToCSV = () => alert("📥 Exporting to CSV soon...");
+
+    window.cleanupOldPending = async () => {
+      const now = Date.now();
+      const snap = await getDocs(collection(db, "members"));
+      for (const docSnap of snap.docs) {
+        const data = docSnap.data();
+        const createdAt = data.createdAt?.seconds * 1000 || 0;
+        if (data.status === 'pending' && now - createdAt > 7 * 24 * 60 * 60 * 1000) {
+          await deleteDoc(doc(db, "members", docSnap.id));
+        }
+      }
+      loadMembers();
+    };
+  </script>
+
+</body>
+</html>
