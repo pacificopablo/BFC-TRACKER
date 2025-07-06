@@ -8,7 +8,11 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   </head>
   <body class="bg-gray-900 text-white p-4">
-    <h1 class="text-3xl font-bold mb-6">👑 Baccarat Fund Admin Dashboard</h1>
+    <!-- Header with Logout Button -->
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">👑 Baccarat Fund Admin Dashboard</h1>
+      <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded text-sm hover:bg-red-700">Logout</button>
+    </div>
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
       <div class="bg-gray-800 p-4 rounded shadow">
@@ -28,6 +32,25 @@
     <div class="bg-gray-800 p-4 rounded shadow mb-6">
       <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
       <canvas id="fundChart" height="100"></canvas>
+    </div>
+    <!-- Distribute Profit Section -->
+    <div class="bg-gray-800 p-4 rounded shadow mb-6">
+      <h2 class="text-xl font-bold mb-4">💸 Distribute Profit</h2>
+      <form id="profitForm" class="flex flex-col space-y-4">
+        <div>
+          <label class="block text-sm mb-1">Total Profit to Distribute (₱)</label>
+          <input
+            type="number"
+            id="profitAmount"
+            class="w-full p-2 rounded bg-gray-700 text-white"
+            placeholder="Enter profit amount"
+            required
+            min="0"
+            step="0.01"
+          />
+        </div>
+        <button type="submit" class="bg-green-600 px-4 py-2 rounded hover:bg-green-700">Distribute Profit</button>
+      </form>
     </div>
     <!-- Member Search -->
     <input type="text" id="searchInput" placeholder="Search by name, email, or status..." class="mb-4 p-2 w-full rounded bg-gray-700 text-white" />
@@ -79,14 +102,16 @@
       </div>
     </div>
     <script type="module">
+      // Import Firebase SDKs
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
       import {
         getFirestore, collection, getDocs, doc, updateDoc, deleteDoc,
         query, orderBy, onSnapshot
       } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+      import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
       const firebaseConfig = {
-        apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
+        apiKey: "AIzaSyCNstwoaWh_13lF0ON25otUpeH3OGINQ",
         authDomain: "bfc-tracker.firebaseapp.com",
         projectId: "bfc-tracker",
         storageBucket: "bfc-tracker.appspot.com",
@@ -94,9 +119,12 @@
         appId: "1:127052459580:web:c3d5caa9302238c11cdd39"
       };
 
+      // Initialize Firebase
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
+      const auth = getAuth(app);
 
+      // DOM Elements
       const totalMembers = document.getElementById("totalMembers");
       const totalShares = document.getElementById("totalShares");
       const totalBalance = document.getElementById("totalBalance");
@@ -113,6 +141,9 @@
       const editShares = document.getElementById("editShares");
       const editBalance = document.getElementById("editBalance");
       const cancelEdit = document.getElementById("cancelEdit");
+      const logoutBtn = document.getElementById("logoutBtn");
+      const profitForm = document.getElementById("profitForm");
+      const profitAmount = document.getElementById("profitAmount");
 
       let allMembers = [];
 
@@ -218,6 +249,63 @@
         });
       }
 
+      // Logout Functionality
+      logoutBtn.addEventListener("click", async () => {
+        try {
+          await signOut(auth);
+          console.log("User logged out successfully");
+          window.location.href = "/login.html"; // Redirect to login page
+        } catch (error) {
+          console.error("Error logging out:", error);
+          alert(`Failed to log out: ${error.message}`);
+        }
+      });
+
+      // Distribute Profit Functionality
+      profitForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const profit = parseFloat(profitAmount.value);
+        if (isNaN(profit) || profit <= 0) {
+          console.error("Invalid profit amount:", profit);
+          alert("Please enter a valid profit amount greater than 0.");
+          return;
+        }
+
+        try {
+          // Calculate total shares of approved members
+          const approvedMembers = allMembers.filter(m => m.status === 'approved');
+          const totalShares = approvedMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+
+          if (totalShares === 0) {
+            console.error("No approved members with shares to distribute profit.");
+            alert("No approved members with shares to distribute profit.");
+            return;
+          }
+
+          // Calculate profit per share
+          const profitPerShare = profit / totalShares;
+
+          // Update each approved member's balance
+          for (const member of approvedMembers) {
+            const profitShare = (member.shares || 0) * profitPerShare;
+            const newBalance = (member.balance || 0) + profitShare;
+
+            await updateDoc(doc(db, "members", member.id), {
+              balance: newBalance
+            });
+            console.log(`Distributed ${formatCurrency(profitShare)} to ${member.name || 'N/A'} (ID: ${member.id})`);
+          }
+
+          // Reset form and reload members
+          profitForm.reset();
+          await loadMembers();
+          alert(`Successfully distributed ₱${formatCurrency(profit)} to approved members!`);
+        } catch (error) {
+          console.error("Error distributing profit:", error);
+          alert(`Failed to distribute profit: ${error.message}`);
+        }
+      });
+
       // Event Delegation for Edit and Delete Buttons
       membersList.addEventListener("click", (e) => {
         const target = e.target;
@@ -309,6 +397,7 @@
         }
       }
 
+      // Initialize
       loadMembers();
       listenForRequests();
 
