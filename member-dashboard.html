@@ -1,183 +1,327 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Baccarat Fund - Member Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
-</head>
-<body class="bg-gray-100 min-h-screen">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Baccarat Fund Members Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  </head>
+  <body class="bg-gray-900 text-white p-4">
+    <!-- Header with Logout Button -->
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">👤 Baccarat Fund Members Dashboard</h1>
+      <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded text-sm hover:bg-red-700">Logout</button>
+    </div>
 
-  <!-- Header -->
-  <header class="bg-indigo-700 text-white p-4 flex justify-between items-center">
-    <h1 class="text-xl font-bold">🎲 Baccarat Fund - Member</h1>
-    <button id="logoutBtn" class="bg-red-500 px-3 py-1 rounded">Logout</button>
-  </header>
+    <!-- Member Profile -->
+    <div class="bg-gray-800 p-4 rounded shadow mb-6">
+      <h2 class="text-xl font-bold mb-2">Profile</h2>
+      <p><strong>Name:</strong> <span id="memberName">Loading...</span></p>
+      <p><strong>Email:</strong> <span id="memberEmail">Loading...</span></p>
+      <p><strong>Status:</strong> <span id="memberStatus">Loading...</span></p>
+      <p><strong>Shares:</strong> <span id="memberShares">Loading...</span></p>
+      <p><strong>Balance:</strong> ₱<span id="memberBalance">Loading...</span></p>
+    </div>
 
-  <!-- Main Content -->
-  <main class="max-w-4xl mx-auto p-4 space-y-6">
+    <!-- Transaction History -->
+    <div class="bg-gray-800 p-4 rounded shadow mb-6">
+      <h2 class="text-xl font-bold mb-2">📜 Transaction History</h2>
+      <select id="historyFilter" class="p-2 rounded bg-gray-700 text-white mb-2">
+        <option value="all">All Transactions</option>
+        <option value="deposit">Deposits</option>
+        <option value="cashout">Cash Outs</option>
+        <option value="profit">Profit Distributions</option>
+        <option value="loss">Loss Deductions</option>
+      </select>
+      <div id="historyList" class="space-y-4 max-h-96 overflow-auto">Loading transaction history...</div>
+    </div>
 
-    <!-- Profile Section -->
-    <section class="bg-white shadow rounded p-4">
-      <h2 class="text-lg font-semibold mb-2">👤 My Profile</h2>
-      <p><strong>Email:</strong> <span id="userEmail">Loading...</span></p>
-      <p><strong>Member Since:</strong> <span id="memberSince">Loading...</span></p>
-    </section>
+    <!-- Pending Requests -->
+    <div class="bg-gray-800 p-4 rounded shadow mb-6">
+      <h2 class="text-xl font-bold mb-2">💰 Pending Requests</h2>
+      <div id="requestsList" class="space-y-4 max-h-96 overflow-auto">Loading requests...</div>
+    </div>
 
-    <!-- Shares Info -->
-    <section class="bg-white shadow rounded p-4">
-      <h2 class="text-lg font-semibold mb-2">📈 My Shares</h2>
-      <p><strong>Total Shares:</strong> <span id="totalShares">0</span></p>
-      <p><strong>Total Invested:</strong> ₱<span id="totalInvested">0.00</span></p>
-    </section>
-
-    <!-- Share Transactions -->
-    <section class="bg-white shadow rounded p-4 overflow-x-auto">
-      <h2 class="text-lg font-semibold mb-2">📋 Share Transactions</h2>
-      <table class="w-full table-auto border">
-        <thead>
-          <tr class="bg-gray-200 text-sm">
-            <th class="p-2">Date</th>
-            <th class="p-2">Type</th>
-            <th class="p-2">Shares</th>
-            <th class="p-2">Amount (₱)</th>
-          </tr>
-        </thead>
-        <tbody id="transactionList">
-          <tr><td colspan="4" class="text-center p-4 text-gray-500">Loading...</td></tr>
-        </tbody>
-      </table>
-    </section>
-
-    <!-- Withdrawal Request -->
-    <section class="bg-white shadow rounded p-4">
-      <h2 class="text-lg font-semibold mb-2">💸 Request Cash Out</h2>
-      <form id="withdrawForm" class="space-y-2">
-        <input type="number" id="withdrawShares" class="w-full border p-2 rounded" placeholder="Number of shares" min="1" required />
-        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded">Submit Request</button>
-        <p id="withdrawMessage" class="text-sm text-gray-600"></p>
-        <p id="loadingIndicator" class="hidden text-blue-600">Submitting request...</p>
+    <!-- Request Submission Form -->
+    <div class="bg-gray-800 p-4 rounded shadow mb-6">
+      <h2 class="text-xl font-bold mb-4">💸 Submit Request</h2>
+      <form id="requestForm" class="flex flex-col space-y-4">
+        <div>
+          <label class="block text-sm mb-1">Request Type</label>
+          <select id="requestType" class="w-full p-2 rounded bg-gray-700 text-white" required>
+            <option value="deposit">Deposit</option>
+            <option value="cashout">Cash Out</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Amount (₱)</label>
+          <input
+            type="number"
+            id="requestAmount"
+            class="w-full p-2 rounded bg-gray-700 text-white"
+            placeholder="Enter amount"
+            required
+            min="0"
+            step="0.01"
+          />
+        </div>
+        <button
+          type="submit"
+          id="submitRequestBtn"
+          class="bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
+        >
+          Submit Request
+        </button>
       </form>
-    </section>
+      <p id="requestError" class="text-red-500 text-sm mt-2 hidden"></p>
+    </div>
 
-  </main>
+    <script type="module">
+      // Import Firebase SDKs
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+      import {
+        getFirestore,
+        collection,
+        query,
+        where,
+        onSnapshot,
+        addDoc,
+        serverTimestamp,
+      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+      import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-  <!-- Firebase + Script -->
-  <script type="module">
-    import { auth, db } from './firebase-config.js';
-    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { doc, getDoc, collection, query, where, getDocs, addDoc, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+      // Firebase Configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
+        authDomain: "bfc-tracker.firebaseapp.com",
+        projectId: "bfc-tracker",
+        storageBucket: "bfc-tracker.firebasestorage.app",
+        messagingSenderId: "127052459580",
+        appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
+        measurementId: "G-PNYRCFJHYM"
+      };
 
-    const userEmail = document.getElementById("userEmail");
-    const memberSince = document.getElementById("memberSince");
-    const totalShares = document.getElementById("totalShares");
-    const totalInvested = document.getElementById("totalInvested");
-    const transactionList = document.getElementById("transactionList");
-    const withdrawForm = document.getElementById("withdrawForm");
-    const withdrawShares = document.getElementById("withdrawShares");
-    const withdrawMessage = document.getElementById("withdrawMessage");
-    const loadingIndicator = document.getElementById("loadingIndicator");
-    const logoutBtn = document.getElementById("logoutBtn");
-
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        window.location.href = "login.html";
-        return;
+      // Initialize Firebase
+      let app, db, auth;
+      try {
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+      } catch (error) {
+        console.error("Firebase initialization failed:", error);
+        document.body.innerHTML = '<p class="text-red-500 p-4">Failed to initialize Firebase. Please check configuration.</p>';
       }
 
-      userEmail.textContent = user.email;
-      memberSince.textContent = new Date(user.metadata.creationTime).toLocaleDateString();
+      // DOM Elements
+      const elements = {
+        memberName: document.getElementById("memberName"),
+        memberEmail: document.getElementById("memberEmail"),
+        memberStatus: document.getElementById("memberStatus"),
+        memberShares: document.getElementById("memberShares"),
+        memberBalance: document.getElementById("memberBalance"),
+        historyList: document.getElementById("historyList"),
+        historyFilter: document.getElementById("historyFilter"),
+        requestsList: document.getElementById("requestsList"),
+        requestForm: document.getElementById("requestForm"),
+        requestType: document.getElementById("requestType"),
+        requestAmount: document.getElementById("requestAmount"),
+        submitRequestBtn: document.getElementById("submitRequestBtn"),
+        requestError: document.getElementById("requestError"),
+        logoutBtn: document.getElementById("logoutBtn"),
+      };
 
-      try {
-        const memberDoc = await getDoc(doc(db, "members", user.uid));
-        if (memberDoc.exists()) {
-          const data = memberDoc.data();
-          totalShares.textContent = data.shares || 0;
-          totalInvested.textContent = (data.totalInvested || 0).toFixed(2);
-        } else {
-          totalShares.textContent = "0";
-          totalInvested.textContent = "0.00";
-        }
-      } catch (err) {
-        console.error("Error loading member data:", err);
+      const formatCurrency = (value) => parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+
+      const showError = (element, message) => {
+        element.textContent = message;
+        element.classList.remove("hidden");
+        setTimeout(() => element.classList.add("hidden"), 5000);
+      };
+
+      const showLoading = (element, message = "Loading...") => {
+        element.innerHTML = `<p class="text-gray-400">${message}</p>`;
+      };
+
+      // Load Member Profile
+      function loadMemberProfile(userId) {
+        showLoading(elements.memberName);
+        const q = query(collection(db, "users"), where("id", "==", userId));
+        onSnapshot(q, (snapshot) => {
+          const member = snapshot.docs[0]?.data() || {};
+          elements.memberName.textContent = member.name || "N/A";
+          elements.memberEmail.textContent = member.email || "N/A";
+          elements.memberStatus.textContent = member.status || "N/A";
+          elements.memberShares.textContent = member.shares || 0;
+          elements.memberBalance.textContent = formatCurrency(member.balance);
+        }, (error) => {
+          console.error("Error loading member profile:", error);
+          showError(elements.requestError, `Failed to load profile: ${error.message}`);
+        });
       }
 
-      // Load transactions
-      try {
-        const q = query(collection(db, "transactions"), where("uid", "==", user.uid), orderBy("date", "desc"));
-        const snap = await getDocs(q);
+      // Load Transaction History
+      function loadTransactionHistory(userId) {
+        showLoading(elements.historyList);
+        const profitQuery = query(collection(db, "profit_distributions"), where("adminId", "==", userId));
+        const transactionQuery = query(collection(db, "transactions"), where("memberName", "==", userId));
 
-        if (snap.empty) {
-          transactionList.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-gray-500">No transactions found.</td></tr>`;
-        } else {
-          transactionList.innerHTML = "";
-          snap.forEach(doc => {
-            const d = doc.data();
-            const dateStr = d.date?.seconds ? new Date(d.date.seconds * 1000).toLocaleDateString() : "Unknown";
-            transactionList.innerHTML += `
-              <tr class="text-sm text-center">
-                <td class="p-2">${dateStr}</td>
-                <td class="p-2">${d.type}</td>
-                <td class="p-2">${d.shares}</td>
-                <td class="p-2">₱${d.amount.toFixed(2)}</td>
-              </tr>`;
+        onSnapshot(profitQuery, (profitSnapshot) => {
+          onSnapshot(transactionQuery, (transactionSnapshot) => {
+            let allTransactions = [];
+
+            profitSnapshot.docs.forEach((doc) => {
+              const data = doc.data();
+              allTransactions.push({
+                type: data.type === "profit" ? "Profit Distribution" : "Loss Deduction",
+                filterType: data.type,
+                amount: data.amount,
+                timestamp: data.timestamp?.toDate() || new Date(),
+                details: `Distributed to ${data.memberCount} members, Total Shares: ${data.totalShares}`,
+              });
+            });
+
+            transactionSnapshot.docs.forEach((doc) => {
+              const data = doc.data();
+              allTransactions.push({
+                type: data.type === "deposit" ? "Deposit" : "Cash Out",
+                filterType: data.type === "deposit" ? "deposit" : "cashout",
+                amount: data.amount,
+                timestamp: data.timestamp?.toDate() || new Date(),
+                details: `Status: ${data.status || "N/A"}`,
+              });
+            });
+
+            displayTransactionHistory(allTransactions);
+          }, (error) => {
+            console.error("Error loading transactions:", error);
+            showError(elements.requestError, `Failed to load transaction history: ${error.message}`);
           });
+        }, (error) => {
+          console.error("Error loading profit distributions:", error);
+          showError(elements.requestError, `Failed to load transaction history: ${error.message}`);
+        });
+      }
+
+      function displayTransactionHistory(transactions) {
+        const filter = elements.historyFilter.value;
+        let filteredTransactions = transactions;
+        if (filter !== "all") {
+          filteredTransactions = transactions.filter((txn) => txn.filterType === filter);
         }
-      } catch (err) {
-        console.error("Error loading transactions:", err);
-        transactionList.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-red-600">Failed to load transactions.</td></tr>`;
-      }
-    });
 
-    withdrawForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      withdrawMessage.textContent = "";
-      withdrawMessage.classList.remove("text-red-600");
-      loadingIndicator.classList.remove("hidden");
+        filteredTransactions.sort((a, b) => a.timestamp - b.timestamp);
 
-      const sharesToWithdraw = parseInt(withdrawShares.value);
-      const user = auth.currentUser;
-      if (!user || isNaN(sharesToWithdraw) || sharesToWithdraw <= 0) {
-        withdrawMessage.textContent = "⚠️ Please enter a valid number of shares.";
-        withdrawMessage.classList.add("text-red-600");
-        loadingIndicator.classList.add("hidden");
-        return;
-      }
-
-      try {
-        const memberDoc = await getDoc(doc(db, "members", user.uid));
-        const currentShares = memberDoc.exists() ? memberDoc.data().shares || 0 : 0;
-
-        if (sharesToWithdraw > currentShares) {
-          withdrawMessage.textContent = "⚠️ You cannot withdraw more shares than you own.";
-          withdrawMessage.classList.add("text-red-600");
-          loadingIndicator.classList.add("hidden");
+        elements.historyList.innerHTML = "";
+        if (filteredTransactions.length === 0) {
+          elements.historyList.innerHTML = '<p class="text-gray-400">Walang kasaysayan ng transaksyon para sa napiling filter.</p>';
           return;
         }
 
-        await addDoc(collection(db, "withdrawals"), {
-          uid: user.uid,
-          email: user.email,
-          shares: sharesToWithdraw,
-          status: "Pending",
-          createdAt: serverTimestamp()
+        filteredTransactions.forEach((txn) => {
+          const div = document.createElement("div");
+          div.className = "bg-gray-700 p-4 rounded";
+          div.innerHTML = `
+            <p><strong>Uri:</strong> ${txn.type}</p>
+            <p><strong>Halaga:</strong> ₱${formatCurrency(txn.amount)}</p>
+            <p><strong>Petsa:</strong> ${txn.timestamp.toLocaleString()}</p>
+            <p><strong>Mga Detalye:</strong> ${txn.details}</p>
+          `;
+          elements.historyList.appendChild(div);
         });
-
-        withdrawMessage.textContent = "✅ Withdrawal request submitted.";
-        withdrawMessage.classList.remove("text-red-600");
-        withdrawForm.reset();
-      } catch (err) {
-        console.error("Error submitting withdrawal:", err);
-        withdrawMessage.textContent = "❌ Failed to submit withdrawal request.";
-        withdrawMessage.classList.add("text-red-600");
-      } finally {
-        loadingIndicator.classList.add("hidden");
       }
-    });
 
-    logoutBtn.addEventListener("click", () => {
-      signOut(auth).then(() => window.location.href = "index.html");
-    });
-  </script>
-</body>
+      // Load Pending Requests
+      function loadPendingRequests(userId) {
+        showLoading(elements.requestsList);
+        const q = query(collection(db, "transactions"), where("memberName", "==", userId), where("status", "==", "pending"));
+        onSnapshot(q, (snapshot) => {
+          elements.requestsList.innerHTML = "";
+          const pendingRequests = snapshot.docs;
+          if (pendingRequests.length === 0) {
+            elements.requestsList.innerHTML = '<p class="text-gray-400">Walang pending na kahilingan.</p>';
+          } else {
+            pendingRequests.forEach((doc) => {
+              const data = doc.data();
+              const div = document.createElement("div");
+              div.className = "bg-gray-700 p-4 rounded";
+              div.innerHTML = `
+                <p><strong>Uri:</strong> ${data.type === "deposit" ? "Deposit" : "Cash Out"}</p>
+                <p><strong>Halaga:</strong> ₱${formatCurrency(data.amount)}</p>
+                <p><strong>Petsa:</strong> ${data.timestamp?.toDate().toLocaleString() || "N/A"}</p>
+              `;
+              elements.requestsList.appendChild(div);
+            });
+          }
+        }, (error) => {
+          console.error("Error loading pending requests:", error);
+          showError(elements.requestError, `Failed to load pending requests: ${error.message}`);
+          elements.requestsList.innerHTML = '<p class="text-red-500">Failed to load requests.</p>';
+        });
+      }
+
+      // Submit Request
+      elements.requestForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        elements.submitRequestBtn.disabled = true;
+        elements.submitRequestBtn.textContent = "Processing...";
+
+        try {
+          const type = elements.requestType.value;
+          const amount = parseFloat(elements.requestAmount.value);
+          if (isNaN(amount) || amount <= 0) {
+            showError(elements.requestError, "Please enter a valid amount greater than 0.");
+            return;
+          }
+
+          const user = auth.currentUser;
+          await addDoc(collection(db, "transactions"), {
+            type,
+            amount,
+            timestamp: serverTimestamp(),
+            memberName: user.displayName || user.email,
+            status: "pending",
+          });
+
+          elements.requestForm.reset();
+          alert(`Request for ₱${formatCurrency(amount)} (${type}) submitted successfully!`);
+        } catch (error) {
+          console.error("Error submitting request:", error);
+          showError(elements.requestError, `Failed to submit request: ${error.message}`);
+        } finally {
+          elements.submitRequestBtn.disabled = false;
+          elements.submitRequestBtn.textContent = "Submit Request";
+        }
+      });
+
+      // Logout Functionality
+      elements.logoutBtn.addEventListener("click", async () => {
+        try {
+          await signOut(auth);
+          window.location.href = "/login.html";
+        } catch (error) {
+          console.error("Error logging out:", error);
+          showError(elements.requestError, `Failed to logout: ${error.message}`);
+        }
+      });
+
+      // Authentication Check and Data Loading
+      onAuthStateChanged(auth, (user) => {
+        if (!user) {
+          showError(elements.requestError, "Not authenticated. Redirecting to login...");
+          setTimeout(() => (window.location.href = "/login.html"), 2000);
+        } else {
+          loadMemberProfile(user.uid);
+          loadTransactionHistory(user.uid);
+          loadPendingRequests(user.uid);
+        }
+      });
+
+      // Filter Transaction History
+      elements.historyFilter.addEventListener("change", () => {
+        const user = auth.currentUser;
+        if (user) loadTransactionHistory(user.uid);
+      });
+    </script>
+  </body>
 </html>
