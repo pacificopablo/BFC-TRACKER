@@ -37,8 +37,10 @@
     <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md">
       <h2 class="text-xl font-bold mb-4 text-center">Sign Up</h2>
       <form id="signupForm" class="space-y-4">
+        <input type="text" id="signupUsername" placeholder="Username" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
         <input type="email" id="signupEmail" placeholder="Email" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
         <input type="password" id="signupPassword" placeholder="Password" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
+        <input type="password" id="confirmPassword" placeholder="Confirm Password" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
         <button type="submit" class="w-full bg-green-600 hover:bg-green-700 py-2 rounded">Sign Up</button>
       </form>
       <p id="signupError" class="text-red-400 text-center mt-2 hidden"></p>
@@ -51,7 +53,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { 
       getAuth, signInWithEmailAndPassword, 
-      createUserWithEmailAndPassword, sendPasswordResetEmail 
+      createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification 
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { 
       getFirestore, doc, getDoc, setDoc 
@@ -127,22 +129,44 @@
     // Handle Signup
     document.getElementById("signupForm").addEventListener("submit", async (e) => {
       e.preventDefault();
+      const username = document.getElementById("signupUsername").value.trim();
       const email = document.getElementById("signupEmail").value.trim();
       const password = document.getElementById("signupPassword").value;
+      const confirmPassword = document.getElementById("confirmPassword").value;
       const signupError = document.getElementById("signupError");
+
+      signupError.classList.add("hidden");
+
+      // Basic validation
+      if (password !== confirmPassword) {
+        signupError.textContent = "Passwords do not match.";
+        signupError.classList.remove("hidden");
+        return;
+      }
+
+      // Password strength validation
+      if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+        signupError.textContent = "Password must be at least 8 characters long and include an uppercase letter and a number.";
+        signupError.classList.remove("hidden");
+        return;
+      }
 
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        // Save user with default role = "member"
+        // Save user with default role = "member" and username
         await setDoc(doc(db, "users", user.uid), {
+          username: username,
           email: email,
           role: "member",
           createdAt: new Date()
         });
 
-        alert("Account created. You can now log in.");
+        // Send email verification
+        await sendEmailVerification(user);
+        
+        alert("Account created successfully! Please check your email to verify your account.");
         document.getElementById("signupModal").classList.add("hidden");
       } catch (err) {
         signupError.textContent = err.message;
