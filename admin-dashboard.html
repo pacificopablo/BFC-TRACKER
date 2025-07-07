@@ -205,7 +205,341 @@
         totalMembers: document.getElementById("totalMembers"),
         totalShares: document.getElementById("totalShares"),
         totalBalance: document.getElementById("totalBalance"),
-        membersList: document.getElementBy-event.preventDefault();
+        membersList: document.getElementById("membersList"),
+        topShareholders: document.getElementById("topShareholders"),
+        searchInput: document.getElementById("searchInput"),
+        requestsList: document.getElementById("requestsList"),
+        historyList: document.getElementById("historyList"),
+        historyFilter: document.getElementById("historyFilter"),
+        historySort: document.getElementById("historySort"),
+        editModal: document.getElementById("editModal"),
+        editForm: document.getElementById("editForm"),
+        editMemberId: document.getElementById("editMemberId"),
+        editName: document.getElementById("editName"),
+        editEmail: document.getElementById("editEmail"),
+        editStatus: document.getElementById("editStatus"),
+        editShares: document.getElementById("editShares"),
+        editBalance: document.getElementById("editBalance"),
+        editApprovalDate: document.getElementById("editApprovalDate"),
+        cancelEdit: document.getElementById("cancelEdit"),
+        logoutBtn: document.getElementById("logoutBtn"),
+        profitForm: document.getElementById("profitForm"),
+        profitAmount: document.getElementById("profitAmount"),
+        distributeBtn: document.getElementById("distributeBtn"),
+        profitError: document.getElementById("profitError"),
+        fundBalance: document.getElementById("fundBalance"),
+        transactionType: document.getElementById("transactionType"),
+      };
+
+      let allMembers = [];
+      let allTransactions = [];
+      let lastSubmissionTime = 0;
+      const SUBMISSION_COOLDOWN = 5000; // 5 seconds
+      const HOURS_THRESHOLD = 24; // 24-hour eligibility threshold
+
+      // Utility Functions
+      const formatCurrency = (value) =>
+        parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+
+      const showError = (element, message) => {
+        element.textContent = message;
+        element.classList.remove("hidden");
+        setTimeout(() => element.classList.add("hidden"), 5000);
+      };
+
+      const showLoading = (element, message = "Loading...") => {
+        element.innerHTML = `<p class="text-gray-400">${message}</p>`;
+      };
+
+      // Load Fund Balance
+      async function loadFundBalance() {
+        try {
+          const fundSnapshot = await getDocs(collection(db, "fund"));
+          if (fundSnapshot.empty) {
+            await setDoc(doc(db, "fund", "main"), { balance: 0 });
+            elements.fundBalance.textContent = formatCurrency(0);
+            return 0;
+          }
+          const fundDoc = fundSnapshot.docs[0];
+          const balance = fundDoc.data().balance || 0;
+          elements.fundBalance.textContent = formatCurrency(balance);
+          return balance;
+        } catch (error) {
+          console.error("Error loading fund balance:", error);
+          showError(elements.profitError, `Nabigo sa pag-load ng fund balance: ${error.message}`);
+          return 0;
+        }
+      }
+
+      // Authentication Check
+      onAuthStateChanged(auth, (user) => {
+        if (!user) {
+          showError(elements.profitError, "Hindi ka authenticated. Ire-redirect sa login...");
+          setTimeout(() => (window.location.href = "/login.html"), 2000);
+        } else {
+          loadFundBalance().then(() => {
+            loadMembers();
+            listenForRequests();
+            listenForTransactionHistory();
+          });
+        }
+      });
+
+      // Check if member is eligible (approved for at least 24 hours)
+      function isMemberEligible(member) {
+        const approvalDate = member.approvalDate ? new Date(member.approvalDate) : null;
+        if (!approvalDate) return false; // No approval date, not eligible
+        const now = new Date("2025-07-07T12:12:00-07:00"); // Current time: 12:12 PM PST, July 07, 2025
+        const hoursSinceApproval = (now - approvalDate) / (1000 * 60 * 60); // Convert to hours
+        return hoursSinceApproval >= HOURS_THRESHOLD;
+      }
+
+      // Load Members from 'users' collection
+      async function loadMembers() {
+        showLoading(elements.membersList, "Naglo-load ng mga miyembro...");
+        showLoading(elements.topShareholders, "Naglo-load ng mga shareholder...");
+        elements.totalMembers.textContent = "Naglo-load...";
+        elements.totalShares.textContent = "Naglo-load...";
+        elements.totalBalance.textContent = "Naglo-load...";
+
+        try {
+          const snapshot = await getDocs(collection(db, "users"));
+          allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          if (allMembers.length === 0) {
+            elements.membersList.innerHTML = '<p class="text-gray-400">Walang nahanap na miyembro.</p>';
+            elements.topShareholders.innerHTML = '<p class="text-gray-400">Walang shareholders.</p>';
+            elements.totalMembers.textContent = "0";
+            elements.totalShares.textContent = "0";
+            elements.totalBalance.textContent = formatCurrency(0);
+          } else {
+            console.log("Mga miyembrong nakuha mula sa users collection:", allMembers);
+            displayMembers(allMembers);
+            updateTopShareholders();
+          }
+        } catch (error) {
+          console.error("Error sa pag-load ng mga miyembro mula sa users collection:", error);
+          showError(elements.profitError, `Nabigo sa pag-load ng mga miyembro: ${error.message}`);
+          elements.membersList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng mga miyembro.</p>';
+          elements.totalMembers.textContent = "0";
+          elements.totalShares.textContent = "0";
+          elements.totalBalance.textContent = formatCurrency(0);
+        }
+      }
+
+      // Display Members
+      function displayMembers(members) {
+        let memberCount = 0,
+          shareTotal = 0,
+          balanceTotal = 0;
+        elements.membersList.innerHTML = "";
+
+        members.forEach((m) => {
+          memberCount++;
+          shareTotal += m.shares || 0;
+          balanceTotal += m.balance || 0;
+
+          const div = document.createElement("div");
+          div.className = "bg-gray-800 p-4 rounded shadow";
+          div.innerHTML = `
+            <p><strong>Pangalan:</strong> ${m.name || "N/A"}</p>
+            <p><strong>Email:</strong> ${m.email || "N/A"}</p>
+            <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${
+              m.status === "approved"
+                ? "bg-green-600"
+                : m.status === "pending"
+                ? "bg-yellow-600"
+                : "bg-red-600"
+            }">${m.status || "N/A"}</span></p>
+            <p><strong>Shares:</strong> ${m.shares || 0}</p>
+            <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
+            <p><strong>Eligible for Profit/Loss:</strong> ${isMemberEligible(m) ? "Yes" : "No (Less than 24 hrs)"}</p>
+            <div class="flex space-x-2 mt-2">
+              <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm">I-edit</button>
+              <button data-id="${m.id}" data-name="${
+                m.name || "Unknown"
+              }" class="delete-btn bg-red-600 px-3 py-1 rounded text-sm">I-delete</button>
+            </div>
+          `;
+          elements.membersList.appendChild(div);
+        });
+
+        elements.totalMembers.textContent = memberCount;
+        elements.totalShares.textContent = shareTotal;
+        elements.totalBalance.textContent = formatCurrency(balanceTotal);
+      }
+
+      // Update Top Shareholders
+      function updateTopShareholders() {
+        const top = [...allMembers]
+          .filter((m) => m.status === "approved" && isMemberEligible(m))
+          .sort((a, b) => (b.shares || 0) - (a.shares || 0))
+          .slice(0, 5);
+
+        elements.topShareholders.innerHTML = "";
+        if (top.length === 0) {
+          elements.topShareholders.innerHTML = '<p class="text-gray-400">Walang eligible na shareholders.</p>';
+        } else {
+          top.forEach((m) => {
+            const li = document.createElement("li");
+            li.textContent = `${m.name || "N/A"} — ${m.shares || 0} shares`;
+            elements.topShareholders.appendChild(li);
+          });
+        }
+      }
+
+      // Search Members
+      elements.searchInput.addEventListener("input", () => {
+        const query = elements.searchInput.value.toLowerCase();
+        const filtered = allMembers.filter(
+          (m) =>
+            (m.name || "").toLowerCase().includes(query) ||
+            (m.email || "").toLowerCase().includes(query) ||
+            (m.status || "").toLowerCase().includes(query)
+        );
+        displayMembers(filtered);
+      });
+
+      // Listen for Transaction Requests
+      function listenForRequests() {
+        showLoading(elements.requestsList, "Naglo-load ng mga kahilingan...");
+        const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
+        onSnapshot(
+          q,
+          (snapshot) => {
+            elements.requestsList.innerHTML = "";
+            const pendingRequests = snapshot.docs.filter((doc) => doc.data().status === "pending");
+            if (pendingRequests.length === 0) {
+              elements.requestsList.innerHTML = '<p class="text-gray-400">Walang pending na kahilingan.</p>';
+            } else {
+              pendingRequests.forEach((docSnap) => {
+                const data = docSnap.data();
+                const div = document.createElement("div");
+                div.className = "bg-gray-700 p-4 rounded";
+                div.innerHTML = `
+                  <p><strong>Miyembro:</strong> ${data.memberName || "N/A"}</p>
+                  <p><strong>Uri:</strong> ${data.type || "N/A"}</p>
+                  <p><strong>Halaga:</strong> ₱${formatCurrency(data.amount)}</p>
+                  <p><strong>Petsa:</strong> ${
+                    data.timestamp?.toDate().toLocaleString() || "N/A"
+                  }</p>
+                  <div class="flex space-x-2 mt-2">
+                    <button data-id="${docSnap.id}" class="approve-btn bg-green-600 px-3 py-1 rounded text-sm">Approve</button>
+                    <button data-id="${docSnap.id}" class="reject-btn bg-red-600 px-3 py-1 rounded text-sm">Reject</button>
+                  </div>
+                `;
+                elements.requestsList.appendChild(div);
+              });
+            }
+          },
+          (error) => {
+            console.error("Error sa pag-load ng mga kahilingan:", error);
+            showError(elements.profitError, `Nabigo sa pag-load ng mga kahilingan: ${error.message}`);
+            elements.requestsList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng mga kahilingan.</p>';
+          }
+        );
+      }
+
+      // Listen for Transaction History
+      function listenForTransactionHistory() {
+        showLoading(elements.historyList, "Naglo-load ng kasaysayan ng transaksyon...");
+        const profitQuery = query(collection(db, "profit_distributions"), orderBy("timestamp", "desc"), limit(50));
+        const transactionQuery = query(collection(db, "transactions"), orderBy("timestamp", "desc"), limit(50));
+
+        onSnapshot(profitQuery, (profitSnapshot) => {
+          onSnapshot(transactionQuery, (transactionSnapshot) => {
+            allTransactions = [];
+
+            // Process profit/loss distributions
+            profitSnapshot.docs.forEach((doc) => {
+              const data = doc.data();
+              allTransactions.push({
+                id: doc.id,
+                type: data.type === "profit" ? "Profit Distribution" : "Loss Deduction",
+                filterType: data.type,
+                amount: data.amount,
+                timestamp: data.timestamp?.toDate() || new Date(),
+                details: `Distributed to ${data.memberCount} members, Total Shares: ${data.totalShares}`,
+              });
+            });
+
+            // Process deposit/cash out transactions
+            transactionSnapshot.docs.forEach((doc) => {
+              const data = doc.data();
+              allTransactions.push({
+                id: doc.id,
+                type: data.type === "deposit" ? "Deposit" : "Cash Out",
+                filterType: data.type === "deposit" ? "deposit" : "cashout",
+                amount: data.amount,
+                timestamp: data.timestamp?.toDate() || new Date(),
+                details: `Member: ${data.memberName || "N/A"}, Status: ${data.status || "N/A"}`,
+              });
+            });
+
+            displayTransactionHistory();
+          }, (error) => {
+            console.error("Error sa pag-load ng mga transaksyon:", error);
+            showError(elements.profitError, `Nabigo sa pag-load ng kasaysayan ng transaksyon: ${error.message}`);
+            elements.historyList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng kasaysayan ng transaksyon.</p>';
+          });
+        }, (error) => {
+          console.error("Error sa pag-load ng mga pamimigay ng profit/loss:", error);
+          showError(elements.profitError, `Nabigo sa pag-load ng kasaysayan ng transaksyon: ${error.message}`);
+          elements.historyList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng kasaysayan ng transaksyon.</p>';
+        });
+      }
+
+      // Display Transaction History
+      function displayTransactionHistory() {
+        const filter = elements.historyFilter.value;
+        const sort = elements.historySort.value;
+        
+        let filteredTransactions = allTransactions;
+        if (filter !== "all") {
+          filteredTransactions = allTransactions.filter((txn) => txn.filterType === filter);
+        }
+
+        filteredTransactions.sort((a, b) => 
+          sort === "desc" ? b.timestamp - a.timestamp : a.timestamp - b.timestamp
+        );
+
+        elements.historyList.innerHTML = "";
+        if (filteredTransactions.length === 0) {
+          elements.historyList.innerHTML = '<p class="text-gray-400">Walang kasaysayan ng transaksyon para sa napiling filter.</p>';
+          return;
+        }
+
+        filteredTransactions.forEach((txn) => {
+          const div = document.createElement("div");
+          div.className = "bg-gray-700 p-4 rounded";
+          div.innerHTML = `
+            <p><strong>Uri:</strong> ${txn.type}</p>
+            <p><strong>Halaga:</strong> ₱${formatCurrency(txn.amount)}</p>
+            <p><strong>Petsa:</strong> ${txn.timestamp.toLocaleString()}</p>
+            <p><strong>Mga Detalye:</strong> ${txn.details}</p>
+          `;
+          elements.historyList.appendChild(div);
+        });
+      }
+
+      // Transaction History Filter and Sort
+      elements.historyFilter.addEventListener("change", displayTransactionHistory);
+      elements.historySort.addEventListener("change", displayTransactionHistory);
+
+      // Logout Functionality
+      elements.logoutBtn.addEventListener("click", async () => {
+        try {
+          await signOut(auth);
+          console.log("Matagumpay na nag-logout ang user");
+          window.location.href = "/login.html";
+        } catch (error) {
+          console.error("Error sa pag-logout:", error);
+          showError(elements.profitError, `Nabigo sa pag-logout: ${error.message}`);
+        }
+      });
+
+      // Distribute Profit/Loss Functionality
+      elements.profitForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
 
         const currentTime = Date.now();
         if (currentTime - lastSubmissionTime < SUBMISSION_COOLDOWN) {
@@ -340,7 +674,7 @@
           status: elements.editStatus.value,
           shares,
           balance,
-          approvalDate,
+          approvalDate, // Store the approval date
         };
         try {
           await updateDoc(doc(db, "users", id), updatedData);
