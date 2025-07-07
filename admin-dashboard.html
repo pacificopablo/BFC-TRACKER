@@ -86,6 +86,26 @@
     <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded">
       Loading requests...
     </div>
+    <!-- Transaction History -->
+    <h2 class="text-2xl font-bold mt-10 mb-4">📜 Transaction History</h2>
+    <div class="bg-gray-800 p-4 rounded shadow mb-6">
+      <div class="flex flex-col md:flex-row justify-between mb-4">
+        <select id="historyFilter" class="p-2 rounded bg-gray-700 text-white mb-2 md:mb-0">
+          <option value="all">All Transactions</option>
+          <option value="deposit">Deposits</option>
+          <option value="cashout">Cash Outs</option>
+          <option value="profit">Profit Distributions</option>
+          <option value="loss">Loss Deductions</option>
+        </select>
+        <select id="historySort" class="p-2 rounded bg-gray-700 text-white">
+          <option value="desc">Newest First</option>
+          <option value="asc">Oldest First</option>
+        </select>
+      </div>
+      <div id="historyList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded">
+        Loading transaction history...
+      </div>
+    </div>
     <!-- Edit Member Modal -->
     <div id="editModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center">
       <div class="bg-gray-800 p-6 rounded shadow w-full max-w-md">
@@ -180,6 +200,9 @@
         topShareholders: document.getElementById("topShareholders"),
         searchInput: document.getElementById("searchInput"),
         requestsList: document.getElementById("requestsList"),
+        historyList: document.getElementById("historyList"),
+        historyFilter: document.getElementById("historyFilter"),
+        historySort: document.getElementById("historySort"),
         editModal: document.getElementById("editModal"),
         editForm: document.getElementById("editForm"),
         editMemberId: document.getElementById("editMemberId"),
@@ -199,6 +222,7 @@
       };
 
       let allMembers = [];
+      let allTransactions = [];
       let lastSubmissionTime = 0;
       const SUBMISSION_COOLDOWN = 5000; // 5 seconds
 
@@ -245,6 +269,7 @@
           loadFundBalance().then(() => {
             loadMembers();
             listenForRequests();
+            listenForTransactionHistory();
           });
         }
       });
@@ -389,6 +414,92 @@
         );
       }
 
+      // Listen for Transaction History
+      function listenForTransactionHistory() {
+        showLoading(elements.historyList, "Naglo-load ng kasaysayan ng transaksyon...");
+        const profitQuery = query(collection(db, "profit_distributions"), orderBy("timestamp", "desc"), limit(50));
+        const transactionQuery = query(collection(db, "transactions"), orderBy("timestamp", "desc"), limit(50));
+
+        onSnapshot(profitQuery, (profitSnapshot) => {
+          onSnapshot(transactionQuery, (transactionSnapshot) => {
+            allTransactions = [];
+
+            // Process profit/loss distributions
+            profitSnapshot.docs.forEach((doc) => {
+              const data = doc.data();
+              allTransactions.push({
+                id: doc.id,
+                type: data.type === "profit" ? "Profit Distribution" : "Loss Deduction",
+                filterType: data.type,
+                amount: data.amount,
+                timestamp: data.timestamp?.toDate() || new Date(),
+                details: `Distributed to ${data.memberCount} members, Total Shares: ${data.totalShares}`,
+              });
+            });
+
+            // Process deposit/cash out transactions
+            transactionSnapshot.docs.forEach((doc) => {
+              const data = doc.data();
+              allTransactions.push({
+                id: doc.id,
+                type: data.type === "deposit" ? "Deposit" : "Cash Out",
+                filterType: data.type === "deposit" ? "deposit" : "cashout",
+                amount: data.amount,
+                timestamp: data.timestamp?.toDate() || new Date(),
+                details: `Member: ${data.memberName || "N/A"}, Status: ${data.status || "N/A"}`,
+              });
+            });
+
+            displayTransactionHistory();
+          }, (error) => {
+            console.error("Error sa pag-load ng mga transaksyon:", error);
+            showError(elements.profitError, `Nabigo sa pag-load ng kasaysayan ng transaksyon: ${error.message}`);
+            elements.historyList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng kasaysayan ng transaksyon.</p>';
+          });
+        }, (error) => {
+          console.error("Error sa pag-load ng mga pamimigay ng profit/loss:", error);
+          showError(elements.profitError, `Nabigo sa pag-load ng kasaysayan ng transaksyon: ${error.message}`);
+          elements.historyList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng kasaysayan ng transaksyon.</p>';
+        });
+      }
+
+      // Display Transaction History
+      function displayTransactionHistory() {
+        const filter = elements.historyFilter.value;
+        const sort = elements.historySort.value;
+        
+        let filteredTransactions = allTransactions;
+        if (filter !== "all") {
+          filteredTransactions = allTransactions.filter((txn) => txn.filterType === filter);
+        }
+
+        filteredTransactions.sort((a, b) => 
+          sort === "desc" ? b.timestamp - a.timestamp : a.timestamp - b.timestamp
+        );
+
+        elements.historyList.innerHTML = "";
+        if (filteredTransactions.length === 0) {
+          elements.historyList.innerHTML = '<p class="text-gray-400">Walang kasaysayan ng transaksyon para sa napiling filter.</p>';
+          return;
+        }
+
+        filteredTransactions.forEach((txn) => {
+          const div = document.createElement("div");
+          div.className = "bg-gray-700 p-4 rounded";
+          div.innerHTML = `
+            <p><strong>Uri:</strong> ${txn.type}</p>
+            <p><strong>Halaga:</strong> ₱${formatCurrency(txn.amount)}</p>
+            <p><strong>Petsa:</strong> ${txn.timestamp.toLocaleString()}</p>
+            <p><strong>Mga Detalye:</strong> ${txn.details}</p>
+          `;
+          elements.historyList.appendChild(div);
+        });
+      }
+
+      // Transaction History Filter and Sort
+      elements.historyFilter.addEventListener("change", displayTransactionHistory);
+      elements.historySort.addEventListener("change", displayTransactionHistory);
+
       // Logout Functionality
       elements.logoutBtn.addEventListener("click", async () => {
         try {
@@ -416,14 +527,13 @@
         elements.distributeBtn.textContent = "Pinoproseso...";
 
         try {
-          const transactionType = elements.transactionType.value; // "profit" o "loss"
+          const transactionType = elements.transactionType.value;
           const amount = parseFloat(elements.profitAmount.value);
           if (isNaN(amount) || amount <= 0) {
             showError(elements.profitError, "Maglagay ng valid na halaga na higit sa 0.");
             return;
           }
 
-          // I-load ang fund balance
           const fundSnapshot = await getDocs(collection(db, "fund"));
           if (fundSnapshot.empty) {
             showError(elements.profitError, "Walang fund data. I-initialize ang fund balance.");
@@ -432,13 +542,11 @@
           const fundDoc = fundSnapshot.docs[0];
           const fundBalance = fundDoc.data().balance || 0;
 
-          // Suriin kung sapat ang fund balance para sa loss
           if (transactionType === "loss" && amount > fundBalance) {
             showError(elements.profitError, "Kulang ang fund balance para sa pagkatalo.");
             return;
           }
 
-          // Filter approved members at kalkulahin ang total shares
           const approvedMembers = allMembers.filter((m) => m.status === "approved");
           const totalShares = approvedMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
           if (totalShares === 0) {
@@ -446,13 +554,9 @@
             return;
           }
 
-          // Kalkulahin ang amount per share
           const amountPerShare = amount / totalShares;
-
-          // Gumawa ng batch para sa atomic updates
           const batch = writeBatch(db);
 
-          // I-update ang balances ng mga miyembro
           approvedMembers.forEach((member) => {
             const currentBalance = member.balance || 0;
             let newBalance;
@@ -460,7 +564,7 @@
               newBalance = currentBalance + (member.shares || 0) * amountPerShare;
             } else {
               newBalance = currentBalance - (member.shares || 0) * amountPerShare;
-              if (newBalance < 0) newBalance = 0; // Iwasan ang negatibong balance
+              if (newBalance < 0) newBalance = 0;
             }
             const userRef = doc(db, "users", member.id);
             batch.update(userRef, { balance: newBalance });
@@ -471,7 +575,6 @@
             );
           });
 
-          // I-update ang fund balance
           const fundRef = doc(db, "fund", fundDoc.id);
           const newFundBalance = transactionType === "profit" ? fundBalance + amount : fundBalance - amount;
           if (newFundBalance < 0) {
@@ -480,7 +583,6 @@
           }
           batch.update(fundRef, { balance: newFundBalance });
 
-          // I-log ang transaction sa profit_distributions
           const auditRef = collection(db, "profit_distributions");
           batch.set(doc(auditRef), {
             type: transactionType,
@@ -491,10 +593,8 @@
             totalShares,
           });
 
-          // I-commit ang batch
           await batch.commit();
 
-          // I-reset ang form at i-reload ang data
           elements.profitForm.reset();
           await loadMembers();
           await loadFundBalance();
