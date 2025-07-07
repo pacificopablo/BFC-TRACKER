@@ -33,25 +33,17 @@
       <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
       <canvas id="fundChart" height="100"></canvas>
     </div>
-    <!-- Distribute Profit/Loss Section -->
+    <!-- Distribute Profit Section -->
     <div class="bg-gray-800 p-4 rounded shadow mb-6">
-      <h2 class="text-xl font-bold mb-4">💸 Distribute Profit or Loss</h2>
-      <p class="text-sm mb-2">Current Fund Balance: ₱<span id="fundBalance">Loading...</span></p>
+      <h2 class="text-xl font-bold mb-4">💸 Distribute Profit</h2>
       <form id="profitForm" class="flex flex-col space-y-4">
         <div>
-          <label class="block text-sm mb-1">Transaction Type</label>
-          <select id="transactionType" class="w-full p-2 rounded bg-gray-700 text-white" required>
-            <option value="profit">Profit (Panalo)</option>
-            <option value="loss">Loss (Pagkatalo)</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm mb-1">Amount (₱)</label>
+          <label class="block text-sm mb-1">Total Profit to Distribute (₱)</label>
           <input
             type="number"
             id="profitAmount"
             class="w-full p-2 rounded bg-gray-700 text-white"
-            placeholder="Enter amount"
+            placeholder="Enter profit amount"
             required
             min="0"
             step="0.01"
@@ -62,7 +54,7 @@
           id="distributeBtn"
           class="bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
         >
-          Submit Transaction
+          Distribute Profit
         </button>
       </form>
       <p id="profitError" class="text-red-500 text-sm mt-2 hidden"></p>
@@ -131,8 +123,8 @@
       </div>
     </div>
     <script type="module">
-      // Import Firebase SDKs (use the latest version available in 2025)
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+      // Import Firebase SDKs
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
       import {
         getFirestore,
         collection,
@@ -144,10 +136,10 @@
         orderBy,
         onSnapshot,
         writeBatch,
-        setDoc,
+        addDoc,
         serverTimestamp,
-      } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
-      import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
+      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+      import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
       // Firebase Configuration
       const firebaseConfig = {
@@ -157,7 +149,7 @@
         storageBucket: "bfc-tracker.firebasestorage.app",
         messagingSenderId: "127052459580",
         appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
-        measurementId: "G-PNYRCFJHYM",
+        measurementId: "G-PNYRCFJHYM"
       };
 
       // Initialize Firebase
@@ -166,11 +158,9 @@
         app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
-        console.log("Firebase initialized successfully at", new Date().toLocaleString());
       } catch (error) {
         console.error("Firebase initialization failed:", error);
-        document.body.innerHTML = '<p class="text-red-500 p-4">Failed to initialize Firebase. Check console for details.</p>';
-        return;
+        document.body.innerHTML = '<p class="text-red-500 p-4">Failed to initialize Firebase. Please check configuration.</p>';
       }
 
       // DOM Elements
@@ -196,8 +186,6 @@
         profitAmount: document.getElementById("profitAmount"),
         distributeBtn: document.getElementById("distributeBtn"),
         profitError: document.getElementById("profitError"),
-        fundBalance: document.getElementById("fundBalance"),
-        transactionType: document.getElementById("transactionType"),
       };
 
       let allMembers = [];
@@ -218,110 +206,43 @@
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
-      // Load Fund Balance
-      async function loadFundBalance() {
-        try {
-          const snapshot = await getDocs(collection(db, "users"));
-          console.log("Users snapshot:", snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-          allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          const totalBalance = allMembers.reduce((sum, m) => sum + (m.balance || 0), 0);
-          console.log("Total balance calculated:", totalBalance);
-
-          const fundSnapshot = await getDocs(collection(db, "fund"));
-          console.log("Fund snapshot:", fundSnapshot.docs.map((doc) => doc.data()));
-          if (fundSnapshot.empty) {
-            console.log("No fund data, initializing...");
-            await setDoc(doc(db, "fund", "main"), { balance: totalBalance });
-          } else {
-            const fundRef = doc(db, "fund", fundSnapshot.docs[0].id);
-            await updateDoc(fundRef, { balance: totalBalance });
-          }
-
-          elements.fundBalance.textContent = formatCurrency(totalBalance);
-          elements.totalBalance.textContent = formatCurrency(totalBalance); // Sync with total balance
-          return totalBalance;
-        } catch (error) {
-          console.error("Error loading fund balance:", error);
-          showError(elements.profitError, `Nabigo sa pag-load ng fund balance: ${error.message}`);
-          elements.fundBalance.textContent = formatCurrency(0);
-          elements.totalBalance.textContent = formatCurrency(0);
-          return 0;
-        }
-      }
-
-      // Authentication Check with Delay
+      // Authentication Check
       onAuthStateChanged(auth, (user) => {
-        console.log("Auth state checked at", new Date().toLocaleString(), "User:", user ? user.uid : "No user");
         if (!user) {
-          showError(elements.profitError, "Hindi ka authenticated. Ire-redirect sa login...");
-          setTimeout(() => (window.location.href = "https://pacificopablo.github.io/BFC-TRACKER/"), 2000);
+          showError(elements.profitError, "You are not authenticated. Redirecting to login...");
+          setTimeout(() => (window.location.href = "/login.html"), 2000);
         } else {
-          console.log("User authenticated:", user.uid);
-          // Wait for auth state to stabilize
-          setTimeout(() => {
-            loadFundBalance().then(() => {
-              loadMembers();
-              listenForRequests();
-              listenForMemberChanges();
-            }).catch((error) => {
-              console.error("Initial load failed:", error);
-              showError(elements.profitError, `Nabigo sa pag-load ng datos: ${error.message}`);
-            });
-          }, 1000); // 1-second delay to ensure auth state
+          loadMembers();
+          listenForRequests();
         }
       });
 
-      // Listen for Member Changes
-      function listenForMemberChanges() {
-        onSnapshot(
-          collection(db, "users"),
-          (snapshot) => {
-            console.log("Member snapshot at", new Date().toLocaleString(), "Data:", snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-            if (snapshot.empty) {
-              console.log("No users found");
-              allMembers = [];
-              elements.membersList.innerHTML = '<p class="text-gray-400">Walang miyembro na natagpuan.</p>';
-              elements.totalMembers.textContent = "0";
-              elements.totalShares.textContent = "0";
-              elements.totalBalance.textContent = formatCurrency(0);
-              return;
-            }
-            allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-            displayMembers(allMembers);
-            loadFundBalance();
-          },
-          (error) => {
-            console.error("Error listening for member changes:", error);
-            showError(elements.profitError, `Nabigo sa pag-monitor ng mga miyembro: ${error.message}`);
-            elements.membersList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng mga miyembro.</p>';
-          }
-        );
-      }
-
-      // Load Members
+      // Load Members from 'users' collection
       async function loadMembers() {
-        showLoading(elements.membersList, "Naglo-load ng mga miyembro...");
-        showLoading(elements.topShareholders, "Naglo-load ng mga shareholder...");
-        elements.totalMembers.textContent = "Naglo-load...";
-        elements.totalShares.textContent = "Naglo-load...";
-        elements.totalBalance.textContent = "Naglo-load...";
+        showLoading(elements.membersList, "Loading members...");
+        showLoading(elements.topShareholders, "Loading shareholders...");
+        elements.totalMembers.textContent = "Loading...";
+        elements.totalShares.textContent = "Loading...";
+        elements.totalBalance.textContent = "Loading...";
 
         try {
+          const snapshot = await getDocs(collection(db, "users"));
+          allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
           if (allMembers.length === 0) {
-            console.log("No members available, displaying empty state");
-            elements.membersList.innerHTML = '<p class="text-gray-400">Walang miyembro na natagpuan.</p>';
+            elements.membersList.innerHTML = '<p class="text-gray-400">No members found.</p>';
+            elements.topShareholders.innerHTML = '<p class="text-gray-400">No shareholders.</p>';
             elements.totalMembers.textContent = "0";
             elements.totalShares.textContent = "0";
             elements.totalBalance.textContent = formatCurrency(0);
-            elements.topShareholders.innerHTML = '<p class="text-gray-400">Walang approved na shareholders.</p>';
-            return;
+          } else {
+            console.log("Members fetched from users collection:", allMembers);
+            displayMembers(allMembers);
+            updateTopShareholders();
           }
-          displayMembers(allMembers);
-          updateTopShareholders();
         } catch (error) {
-          console.error("Error loading members:", error);
-          showError(elements.profitError, `Nabigo sa pag-load ng mga miyembro: ${error.message}`);
-          elements.membersList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng mga miyembro.</p>';
+          console.error("Error loading members from users collection:", error);
+          showError(elements.profitError, `Failed to load members: ${error.message}`);
+          elements.membersList.innerHTML = '<p class="text-red-500">Failed to load members.</p>';
           elements.totalMembers.textContent = "0";
           elements.totalShares.textContent = "0";
           elements.totalBalance.textContent = formatCurrency(0);
@@ -330,19 +251,10 @@
 
       // Display Members
       function displayMembers(members) {
-        console.log("Displaying members at", new Date().toLocaleString(), "Members:", members);
         let memberCount = 0,
           shareTotal = 0,
           balanceTotal = 0;
         elements.membersList.innerHTML = "";
-
-        if (members.length === 0) {
-          elements.membersList.innerHTML = '<p class="text-gray-400">Walang miyembro na natagpuan.</p>';
-          elements.totalMembers.textContent = "0";
-          elements.totalShares.textContent = "0";
-          elements.totalBalance.textContent = formatCurrency(0);
-          return;
-        }
 
         members.forEach((m) => {
           memberCount++;
@@ -352,7 +264,7 @@
           const div = document.createElement("div");
           div.className = "bg-gray-800 p-4 rounded shadow";
           div.innerHTML = `
-            <p><strong>Pangalan:</strong> ${m.name || "N/A"}</p>
+            <p><strong>Name:</strong> ${m.name || "N/A"}</p>
             <p><strong>Email:</strong> ${m.email || "N/A"}</p>
             <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${
               m.status === "approved"
@@ -364,10 +276,10 @@
             <p><strong>Shares:</strong> ${m.shares || 0}</p>
             <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
             <div class="flex space-x-2 mt-2">
-              <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm">I-edit</button>
+              <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm">Edit</button>
               <button data-id="${m.id}" data-name="${
                 m.name || "Unknown"
-              }" class="delete-btn bg-red-600 px-3 py-1 rounded text-sm">I-delete</button>
+              }" class="delete-btn bg-red-600 px-3 py-1 rounded text-sm">Delete</button>
             </div>
           `;
           elements.membersList.appendChild(div);
@@ -387,7 +299,7 @@
 
         elements.topShareholders.innerHTML = "";
         if (top.length === 0) {
-          elements.topShareholders.innerHTML = '<p class="text-gray-400">Walang approved na shareholders.</p>';
+          elements.topShareholders.innerHTML = '<p class="text-gray-400">No approved shareholders.</p>';
         } else {
           top.forEach((m) => {
             const li = document.createElement("li");
@@ -411,26 +323,25 @@
 
       // Listen for Transaction Requests
       function listenForRequests() {
-        showLoading(elements.requestsList, "Naglo-load ng mga kahilingan...");
+        showLoading(elements.requestsList, "Loading requests...");
         const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
         onSnapshot(
           q,
           (snapshot) => {
-            console.log("Transactions snapshot at", new Date().toLocaleString(), "Data:", snapshot.docs.map((doc) => doc.data()));
             elements.requestsList.innerHTML = "";
             const pendingRequests = snapshot.docs.filter((doc) => doc.data().status === "pending");
             if (pendingRequests.length === 0) {
-              elements.requestsList.innerHTML = '<p class="text-gray-400">Walang pending na kahilingan.</p>';
+              elements.requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
             } else {
               pendingRequests.forEach((docSnap) => {
                 const data = docSnap.data();
                 const div = document.createElement("div");
                 div.className = "bg-gray-700 p-4 rounded";
                 div.innerHTML = `
-                  <p><strong>Miyembro:</strong> ${data.memberName || "N/A"}</p>
-                  <p><strong>Uri:</strong> ${data.type || "N/A"}</p>
-                  <p><strong>Halaga:</strong> ₱${formatCurrency(data.amount)}</p>
-                  <p><strong>Petsa:</strong> ${
+                  <p><strong>Member:</strong> ${data.memberName || "N/A"}</p>
+                  <p><strong>Type:</strong> ${data.type || "N/A"}</p>
+                  <p><strong>Amount:</strong> ₱${formatCurrency(data.amount)}</p>
+                  <p><strong>Date:</strong> ${
                     data.timestamp?.toDate().toLocaleString() || "N/A"
                   }</p>
                 `;
@@ -439,9 +350,9 @@
             }
           },
           (error) => {
-            console.error("Error loading requests:", error);
-            showError(elements.profitError, `Nabigo sa pag-load ng mga kahilingan: ${error.message}`);
-            elements.requestsList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng mga kahilingan.</p>';
+            console.error("Error listening for requests:", error);
+            showError(elements.profitError, `Failed to load requests: ${error.message}`);
+            elements.requestsList.innerHTML = '<p class="text-red-500">Failed to load requests.</p>';
           }
         );
       }
@@ -450,117 +361,113 @@
       elements.logoutBtn.addEventListener("click", async () => {
         try {
           await signOut(auth);
-          console.log("Logout successful at", new Date().toLocaleString());
-          window.location.href = "https://pacificopablo.github.io/BFC-TRACKER/";
+          console.log("User logged out successfully");
+          window.location.href = "/login.html";
         } catch (error) {
           console.error("Error logging out:", error);
-          showError(elements.profitError, `Nabigo sa pag-logout: ${error.message}`);
+          showError(elements.profitError, `Failed to log out: ${error.message}`);
         }
       });
 
-      // Distribute Profit/Loss Functionality
+      // Distribute Profit Functionality
       elements.profitForm.addEventListener("submit", async (e) => {
         e.preventDefault();
 
+        // Rate Limiting
         const currentTime = Date.now();
         if (currentTime - lastSubmissionTime < SUBMISSION_COOLDOWN) {
-          showError(
-            elements.profitError,
-            `Maghintay ng ${Math.ceil(
-              (SUBMISSION_COOLDOWN - (Date.now() - lastSubmissionTime)) / 1000
-            )} segundo bago muling mag-submit.`
-          );
+          showError(elements.profitError, "Please wait a few seconds before submitting again.");
           return;
         }
         lastSubmissionTime = currentTime;
 
+        // Show loading state
         elements.distributeBtn.disabled = true;
-        elements.distributeBtn.textContent = "Pinoproseso...";
+        elements.distributeBtn.textContent = "Processing...";
 
         try {
-          const transactionType = elements.transactionType.value;
-          const amount = parseFloat(elements.profitAmount.value);
-          if (isNaN(amount) || amount <= 0) {
-            showError(elements.profitError, "Maglagay ng valid na halaga na higit sa 0.");
+          const profit = parseFloat(elements.profitAmount.value);
+          if (isNaN(profit) || profit <= 0) {
+            showError(elements.profitError, "Please enter a valid profit amount greater than 0.");
             return;
           }
 
-          const approvedMembers = allMembers.filter((m) => m.status === "approved");
-          const totalShares = approvedMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
-          if (totalShares === 0) {
-            showError(elements.profitError, "Walang approved na miyembro na may shares.");
-            return;
-          }
-
+          // Fetch fund balance
           const fundSnapshot = await getDocs(collection(db, "fund"));
           if (fundSnapshot.empty) {
-            showError(elements.profitError, "Walang fund data. I-initialize ang fund balance.");
+            showError(elements.profitError, "Fund data not found. Please initialize fund balance.");
             return;
           }
           const fundDoc = fundSnapshot.docs[0];
-          const currentFundBalance = fundDoc.data().balance || 0;
-
-          if (transactionType === "loss" && amount > currentFundBalance) {
-            showError(elements.profitError, "Kulang ang fund balance para sa pagkatalo.");
+          const fundBalance = fundDoc.data().balance || 0;
+          if (profit > fundBalance) {
+            showError(elements.profitError, "Insufficient fund balance for distribution.");
             return;
           }
 
-          const amountPerShare = amount / totalShares;
-          const batch = writeBatch(db);
-          let newTotalBalance = 0;
+          // Filter approved members and calculate total shares
+          const approvedMembers = allMembers.filter((m) => m.status === "approved");
+          const totalShares = approvedMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
 
+          if (totalShares === 0) {
+            showError(elements.profitError, "No approved members with shares to distribute profit.");
+            return;
+          }
+
+          // Calculate profit per share
+          const profitPerShare = profit / totalShares;
+
+          // Create batch for atomic updates
+          const batch = writeBatch(db);
+
+          // Update member balances in 'users' collection
           approvedMembers.forEach((member) => {
-            const currentBalance = member.balance || 0;
-            let newBalance;
-            if (transactionType === "profit") {
-              newBalance = currentBalance + (member.shares || 0) * amountPerShare;
-            } else {
-              newBalance = Math.max(0, currentBalance - (member.shares || 0) * amountPerShare);
-            }
-            newTotalBalance += newBalance;
+            const profitShare = (member.shares || 0) * profitPerShare;
+            const newBalance = (member.balance || 0) + profitShare;
             const userRef = doc(db, "users", member.id);
             batch.update(userRef, { balance: newBalance });
+            console.log(
+              `Prepared to distribute ${formatCurrency(profitShare)} to ${
+                member.name || "N/A"
+              } (ID: ${member.id})`
+            );
           });
 
+          // Update fund balance
           const fundRef = doc(db, "fund", fundDoc.id);
-          batch.update(fundRef, { balance: newTotalBalance });
+          batch.update(fundRef, { balance: fundBalance - profit });
 
+          // Log distribution to audit trail
           const auditRef = collection(db, "profit_distributions");
           batch.set(doc(auditRef), {
-            type: transactionType,
-            amount: amount,
+            amount: profit,
             timestamp: serverTimestamp(),
             adminId: auth.currentUser?.uid || "unknown",
             memberCount: approvedMembers.length,
             totalShares,
           });
 
+          // Commit batch
           await batch.commit();
+
+          // Reset form and reload data
           elements.profitForm.reset();
           await loadMembers();
-          await loadFundBalance();
-          alert(
-            `Matagumpay na ${transactionType === "profit" ? "ipinadistribute" : "ibinawas"} ang ₱${formatCurrency(
-              amount
-            )} sa ${approvedMembers.length} miyembro!`
-          );
+          alert(`Successfully distributed ₱${formatCurrency(profit)} to ${approvedMembers.length} members!`);
         } catch (error) {
-          console.error(`Error ${transactionType === "profit" ? "distributing profit" : "deducting loss"}:`, error);
-          showError(
-            elements.profitError,
-            `Nabigo ang ${transactionType === "profit" ? "pamimigay ng profit" : "pagbabawas ng loss"}: ${error.message}`
-          );
+          console.error("Error distributing profit:", error);
+          showError(elements.profitError, `Failed to distribute profit: ${error.message}`);
         } finally {
           elements.distributeBtn.disabled = false;
-          elements.distributeBtn.textContent = "Submit Transaction";
+          elements.distributeBtn.textContent = "Distribute Profit";
         }
       });
 
       // Edit Member Functions
       function openEditModal(member) {
         if (!member || !member.id) {
-          console.error("Invalid member data at", new Date().toLocaleString(), "Data:", member);
-          showError(elements.profitError, "Hindi mae-edit: Invalid ang data ng miyembro.");
+          console.error("Invalid member data:", member);
+          showError(elements.profitError, "Cannot edit: Member data is invalid.");
           return;
         }
         elements.editMemberId.value = member.id;
@@ -578,7 +485,7 @@
         const shares = parseInt(elements.editShares.value);
         const balance = parseFloat(elements.editBalance.value);
         if (isNaN(shares) || shares < 0 || isNaN(balance) || balance < 0) {
-          showError(elements.profitError, "Ang shares at balance ay dapat na hindi negatibo.");
+          showError(elements.profitError, "Shares and balance must be non-negative numbers.");
           return;
         }
         const updatedData = {
@@ -592,11 +499,10 @@
           await updateDoc(doc(db, "users", id), updatedData);
           elements.editModal.classList.add("hidden");
           await loadMembers();
-          await loadFundBalance();
-          alert("Matagumpay na na-update ang miyembro!");
+          alert("Member updated successfully!");
         } catch (error) {
-          console.error("Error updating member:", error);
-          showError(elements.profitError, `Nabigo sa pag-update ng miyembro: ${error.message}`);
+          console.error("Error updating member in users collection:", error);
+          showError(elements.profitError, `Failed to update member: ${error.message}`);
         }
       });
 
@@ -606,15 +512,14 @@
 
       // Delete Member
       async function deleteMember(id, name) {
-        if (confirm(`Sigurado ka bang gusto mong i-delete si ${name || "miyembrong ito"}?`)) {
+        if (confirm(`Are you sure you want to delete ${name || "this member"}?`)) {
           try {
             await deleteDoc(doc(db, "users", id));
             await loadMembers();
-            await loadFundBalance();
-            alert("Matagumpay na na-delete ang miyembro!");
+            alert("Member deleted successfully!");
           } catch (error) {
-            console.error("Error deleting member:", error);
-            showError(elements.profitError, `Nabigo sa pag-delete ng miyembro: ${error.message}`);
+            console.error("Error deleting member from users collection:", error);
+            showError(elements.profitError, `Failed to delete member: ${error.message}`);
           }
         }
       }
@@ -626,7 +531,7 @@
         if (target.classList.contains("edit-btn") && id) {
           const member = allMembers.find((m) => m.id === id);
           if (member) openEditModal(member);
-          else showError(elements.profitError, "Hindi nahanap ang data ng miyembro.");
+          else showError(elements.profitError, "Member data not found.");
         } else if (target.classList.contains("delete-btn") && id) {
           const name = target.dataset.name;
           deleteMember(id, name);
@@ -636,7 +541,6 @@
       // Initialize Chart
       try {
         const ctx = document.getElementById("fundChart").getContext("2d");
-        console.log("Chart context initialized at", new Date().toLocaleString());
         new Chart(ctx, {
           type: "line",
           data: {
@@ -664,25 +568,10 @@
         });
         console.log("Chart initialized successfully");
       } catch (error) {
-        console.error("Chart initialization error at", new Date().toLocaleString(), "Error:", error);
+        console.error("Error initializing chart:", error);
         document.getElementById("fundChart").parentElement.innerHTML =
-          '<p class="text-red-500">Nabigo sa pag-load ng chart.</p>';
+          '<p class="text-red-500">Failed to load chart.</p>';
       }
-
-      // Optional: Mock data for testing if Firebase fails
-      /*
-      allMembers = [
-        { id: "1", name: "John Doe", email: "john@example.com", status: "approved", shares: 10, balance: 1000 },
-        { id: "2", name: "Jane Smith", email: "jane@example.com", status: "pending", shares: 5, balance: 500 },
-      ];
-      displayMembers(allMembers);
-      updateTopShareholders();
-      elements.fundBalance.textContent = formatCurrency(1500);
-      elements.totalMembers.textContent = allMembers.length;
-      elements.totalShares.textContent = allMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
-      elements.totalBalance.textContent = formatCurrency(allMembers.reduce((sum, m) => sum + (m.balance || 0), 0));
-      console.log("Mock data applied at", new Date().toLocaleString());
-      */
     </script>
   </body>
 </html>
