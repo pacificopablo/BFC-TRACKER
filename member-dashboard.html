@@ -146,17 +146,31 @@
       // Load Member Profile
       function loadMemberProfile(userId) {
         showLoading(elements.memberName);
-        const q = query(collection(db, "users"), where("id", "==", userId));
+        const q = query(collection(db, "users"), where("uid", "==", userId)); // Changed to "uid"
         onSnapshot(q, (snapshot) => {
-          const member = snapshot.docs[0]?.data() || {};
+          if (snapshot.empty) {
+            elements.memberName.textContent = "N/A";
+            elements.memberEmail.textContent = "N/A";
+            elements.memberStatus.textContent = "N/A";
+            elements.memberShares.textContent = "0";
+            elements.memberBalance.textContent = formatCurrency(0);
+            console.warn("No user profile found for UID:", userId);
+            return;
+          }
+          const member = snapshot.docs[0].data() || {};
           elements.memberName.textContent = member.name || "N/A";
           elements.memberEmail.textContent = member.email || "N/A";
           elements.memberStatus.textContent = member.status || "N/A";
           elements.memberShares.textContent = member.shares || 0;
-          elements.memberBalance.textContent = formatCurrency(member.balance);
+          elements.memberBalance.textContent = formatCurrency(member.balance || 0);
         }, (error) => {
           console.error("Error loading member profile:", error);
           showError(elements.requestError, `Failed to load profile: ${error.message}`);
+          elements.memberName.textContent = "N/A";
+          elements.memberEmail.textContent = "N/A";
+          elements.memberStatus.textContent = "N/A";
+          elements.memberShares.textContent = "0";
+          elements.memberBalance.textContent = formatCurrency(0);
         });
       }
 
@@ -311,9 +325,29 @@
           showError(elements.requestError, "Not authenticated. Redirecting to login...");
           setTimeout(() => (window.location.href = "/login.html"), 2000);
         } else {
-          loadMemberProfile(user.uid);
-          loadTransactionHistory(user.uid);
-          loadPendingRequests(user.uid);
+          console.log("Authenticated user:", user);
+          // Check if user profile exists and create if not
+          const q = query(collection(db, "users"), where("uid", "==", user.uid));
+          onSnapshot(q, (snapshot) => {
+            if (snapshot.empty) {
+              addDoc(collection(db, "users"), {
+                uid: user.uid,
+                name: user.displayName || "N/A",
+                email: user.email || "N/A",
+                status: "Active",
+                shares: 0,
+                balance: 0
+              }).then(() => {
+                loadMemberProfile(user.uid);
+                loadTransactionHistory(user.uid);
+                loadPendingRequests(user.uid);
+              });
+            } else {
+              loadMemberProfile(user.uid);
+              loadTransactionHistory(user.uid);
+              loadPendingRequests(user.uid);
+            }
+          });
         }
       });
 
