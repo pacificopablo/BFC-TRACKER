@@ -166,10 +166,10 @@
         app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
-        console.log("Firebase initialized successfully");
+        console.log("Firebase initialized successfully at", new Date().toLocaleString());
       } catch (error) {
         console.error("Firebase initialization failed:", error);
-        document.body.innerHTML = '<p class="text-red-500 p-4">Failed to initialize Firebase. Please check configuration.</p>';
+        document.body.innerHTML = '<p class="text-red-500 p-4">Failed to initialize Firebase. Check console for details.</p>';
         return;
       }
 
@@ -218,19 +218,19 @@
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
-      // Load Fund Balance (Sum of Members' balances)
+      // Load Fund Balance
       async function loadFundBalance() {
         try {
           const snapshot = await getDocs(collection(db, "users"));
-          console.log("Users snapshot:", snapshot.docs.map((doc) => doc.data()));
+          console.log("Users snapshot:", snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
           allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
           const totalBalance = allMembers.reduce((sum, m) => sum + (m.balance || 0), 0);
-          console.log("Total balance:", totalBalance);
+          console.log("Total balance calculated:", totalBalance);
 
           const fundSnapshot = await getDocs(collection(db, "fund"));
           console.log("Fund snapshot:", fundSnapshot.docs.map((doc) => doc.data()));
           if (fundSnapshot.empty) {
-            console.log("No fund data found, initializing...");
+            console.log("No fund data, initializing...");
             await setDoc(doc(db, "fund", "main"), { balance: totalBalance });
           } else {
             const fundRef = doc(db, "fund", fundSnapshot.docs[0].id);
@@ -238,37 +238,48 @@
           }
 
           elements.fundBalance.textContent = formatCurrency(totalBalance);
+          elements.totalBalance.textContent = formatCurrency(totalBalance); // Sync with total balance
           return totalBalance;
         } catch (error) {
           console.error("Error loading fund balance:", error);
           showError(elements.profitError, `Nabigo sa pag-load ng fund balance: ${error.message}`);
+          elements.fundBalance.textContent = formatCurrency(0);
+          elements.totalBalance.textContent = formatCurrency(0);
           return 0;
         }
       }
 
-      // Authentication Check
+      // Authentication Check with Delay
       onAuthStateChanged(auth, (user) => {
-        console.log("Auth state:", user);
+        console.log("Auth state checked at", new Date().toLocaleString(), "User:", user ? user.uid : "No user");
         if (!user) {
           showError(elements.profitError, "Hindi ka authenticated. Ire-redirect sa login...");
           setTimeout(() => (window.location.href = "https://pacificopablo.github.io/BFC-TRACKER/"), 2000);
         } else {
           console.log("User authenticated:", user.uid);
-          loadFundBalance().then(() => {
-            loadMembers();
-            listenForRequests();
-            listenForMemberChanges();
-          });
+          // Wait for auth state to stabilize
+          setTimeout(() => {
+            loadFundBalance().then(() => {
+              loadMembers();
+              listenForRequests();
+              listenForMemberChanges();
+            }).catch((error) => {
+              console.error("Initial load failed:", error);
+              showError(elements.profitError, `Nabigo sa pag-load ng datos: ${error.message}`);
+            });
+          }, 1000); // 1-second delay to ensure auth state
         }
       });
 
-      // Listen for Member Changes (Real-Time)
+      // Listen for Member Changes
       function listenForMemberChanges() {
         onSnapshot(
           collection(db, "users"),
           (snapshot) => {
+            console.log("Member snapshot at", new Date().toLocaleString(), "Data:", snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
             if (snapshot.empty) {
-              console.log("No users found in Firestore");
+              console.log("No users found");
+              allMembers = [];
               elements.membersList.innerHTML = '<p class="text-gray-400">Walang miyembro na natagpuan.</p>';
               elements.totalMembers.textContent = "0";
               elements.totalShares.textContent = "0";
@@ -276,13 +287,13 @@
               return;
             }
             allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-            console.log("Member changes detected:", allMembers);
             displayMembers(allMembers);
             loadFundBalance();
           },
           (error) => {
             console.error("Error listening for member changes:", error);
             showError(elements.profitError, `Nabigo sa pag-monitor ng mga miyembro: ${error.message}`);
+            elements.membersList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng mga miyembro.</p>';
           }
         );
       }
@@ -308,7 +319,7 @@
           displayMembers(allMembers);
           updateTopShareholders();
         } catch (error) {
-          console.error("Error sa pag-load ng mga miyembro:", error);
+          console.error("Error loading members:", error);
           showError(elements.profitError, `Nabigo sa pag-load ng mga miyembro: ${error.message}`);
           elements.membersList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng mga miyembro.</p>';
           elements.totalMembers.textContent = "0";
@@ -319,7 +330,7 @@
 
       // Display Members
       function displayMembers(members) {
-        console.log("Displaying members:", members);
+        console.log("Displaying members at", new Date().toLocaleString(), "Members:", members);
         let memberCount = 0,
           shareTotal = 0,
           balanceTotal = 0;
@@ -365,7 +376,6 @@
         elements.totalMembers.textContent = memberCount;
         elements.totalShares.textContent = shareTotal;
         elements.totalBalance.textContent = formatCurrency(balanceTotal);
-        elements.fundBalance.textContent = formatCurrency(balanceTotal);
       }
 
       // Update Top Shareholders
@@ -406,7 +416,7 @@
         onSnapshot(
           q,
           (snapshot) => {
-            console.log("Transactions snapshot:", snapshot.docs.map((doc) => doc.data()));
+            console.log("Transactions snapshot at", new Date().toLocaleString(), "Data:", snapshot.docs.map((doc) => doc.data()));
             elements.requestsList.innerHTML = "";
             const pendingRequests = snapshot.docs.filter((doc) => doc.data().status === "pending");
             if (pendingRequests.length === 0) {
@@ -429,7 +439,7 @@
             }
           },
           (error) => {
-            console.error("Error sa pag-load ng mga kahilingan:", error);
+            console.error("Error loading requests:", error);
             showError(elements.profitError, `Nabigo sa pag-load ng mga kahilingan: ${error.message}`);
             elements.requestsList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng mga kahilingan.</p>';
           }
@@ -440,10 +450,10 @@
       elements.logoutBtn.addEventListener("click", async () => {
         try {
           await signOut(auth);
-          console.log("Matagumpay na nag-logout ang user");
+          console.log("Logout successful at", new Date().toLocaleString());
           window.location.href = "https://pacificopablo.github.io/BFC-TRACKER/";
         } catch (error) {
-          console.error("Error sa pag-logout:", error);
+          console.error("Error logging out:", error);
           showError(elements.profitError, `Nabigo sa pag-logout: ${error.message}`);
         }
       });
@@ -538,9 +548,7 @@
           console.error(`Error ${transactionType === "profit" ? "distributing profit" : "deducting loss"}:`, error);
           showError(
             elements.profitError,
-            `Nabigo ang ${transactionType === "profit" ? "pamimigay ng profit" : "pagbabawas ng loss"}: ${
-              error.message
-            }`
+            `Nabigo ang ${transactionType === "profit" ? "pamimigay ng profit" : "pagbabawas ng loss"}: ${error.message}`
           );
         } finally {
           elements.distributeBtn.disabled = false;
@@ -551,7 +559,7 @@
       // Edit Member Functions
       function openEditModal(member) {
         if (!member || !member.id) {
-          console.error("Invalid member data:", member);
+          console.error("Invalid member data at", new Date().toLocaleString(), "Data:", member);
           showError(elements.profitError, "Hindi mae-edit: Invalid ang data ng miyembro.");
           return;
         }
@@ -587,7 +595,7 @@
           await loadFundBalance();
           alert("Matagumpay na na-update ang miyembro!");
         } catch (error) {
-          console.error("Error sa pag-update ng miyembro:", error);
+          console.error("Error updating member:", error);
           showError(elements.profitError, `Nabigo sa pag-update ng miyembro: ${error.message}`);
         }
       });
@@ -605,7 +613,7 @@
             await loadFundBalance();
             alert("Matagumpay na na-delete ang miyembro!");
           } catch (error) {
-            console.error("Error sa pag-delete ng miyembro:", error);
+            console.error("Error deleting member:", error);
             showError(elements.profitError, `Nabigo sa pag-delete ng miyembro: ${error.message}`);
           }
         }
@@ -625,10 +633,10 @@
         }
       });
 
-      // Initialize Chart (Static data; consider fetching from Firestore for dynamic data)
+      // Initialize Chart
       try {
         const ctx = document.getElementById("fundChart").getContext("2d");
-        console.log("Chart context:", ctx);
+        console.log("Chart context initialized at", new Date().toLocaleString());
         new Chart(ctx, {
           type: "line",
           data: {
@@ -656,7 +664,7 @@
         });
         console.log("Chart initialized successfully");
       } catch (error) {
-        console.error("Chart initialization error:", error);
+        console.error("Chart initialization error at", new Date().toLocaleString(), "Error:", error);
         document.getElementById("fundChart").parentElement.innerHTML =
           '<p class="text-red-500">Nabigo sa pag-load ng chart.</p>';
       }
@@ -673,6 +681,7 @@
       elements.totalMembers.textContent = allMembers.length;
       elements.totalShares.textContent = allMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
       elements.totalBalance.textContent = formatCurrency(allMembers.reduce((sum, m) => sum + (m.balance || 0), 0));
+      console.log("Mock data applied at", new Date().toLocaleString());
       */
     </script>
   </body>
