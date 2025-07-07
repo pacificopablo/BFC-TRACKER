@@ -33,17 +33,25 @@
       <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
       <canvas id="fundChart" height="100"></canvas>
     </div>
-    <!-- Distribute Profit Section -->
+    <!-- Distribute Profit/Loss Section -->
     <div class="bg-gray-800 p-4 rounded shadow mb-6">
-      <h2 class="text-xl font-bold mb-4">💸 Distribute Profit</h2>
+      <h2 class="text-xl font-bold mb-4">💸 Distribute Profit or Loss</h2>
+      <p class="text-sm mb-2">Current Fund Balance: ₱<span id="fundBalance">Loading...</span></p>
       <form id="profitForm" class="flex flex-col space-y-4">
         <div>
-          <label class="block text-sm mb-1">Total Profit to Distribute (₱)</label>
+          <label class="block text-sm mb-1">Transaction Type</label>
+          <select id="transactionType" class="w-full p-2 rounded bg-gray-700 text-white" required>
+            <option value="profit">Profit (Panalo)</option>
+            <option value="loss">Loss (Pagkatalo)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Amount (₱)</label>
           <input
             type="number"
             id="profitAmount"
             class="w-full p-2 rounded bg-gray-700 text-white"
-            placeholder="Enter profit amount"
+            placeholder="Enter amount"
             required
             min="0"
             step="0.01"
@@ -54,7 +62,7 @@
           id="distributeBtn"
           class="bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
         >
-          Distribute Profit
+          Submit Transaction
         </button>
       </form>
       <p id="profitError" class="text-red-500 text-sm mt-2 hidden"></p>
@@ -136,7 +144,7 @@
         orderBy,
         onSnapshot,
         writeBatch,
-        addDoc,
+        setDoc,
         serverTimestamp,
       } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
       import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -186,6 +194,8 @@
         profitAmount: document.getElementById("profitAmount"),
         distributeBtn: document.getElementById("distributeBtn"),
         profitError: document.getElementById("profitError"),
+        fundBalance: document.getElementById("fundBalance"),
+        transactionType: document.getElementById("transactionType"),
       };
 
       let allMembers = [];
@@ -206,43 +216,65 @@
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
+      // Load Fund Balance
+      async function loadFundBalance() {
+        try {
+          const fundSnapshot = await getDocs(collection(db, "fund"));
+          if (fundSnapshot.empty) {
+            await setDoc(doc(db, "fund", "main"), { balance: 0 });
+            elements.fundBalance.textContent = formatCurrency(0);
+            return 0;
+          }
+          const fundDoc = fundSnapshot.docs[0];
+          const balance = fundDoc.data().balance || 0;
+          elements.fundBalance.textContent = formatCurrency(balance);
+          return balance;
+        } catch (error) {
+          console.error("Error loading fund balance:", error);
+          showError(elements.profitError, `Nabigo sa pag-load ng fund balance: ${error.message}`);
+          return 0;
+        }
+      }
+
       // Authentication Check
       onAuthStateChanged(auth, (user) => {
         if (!user) {
-          showError(elements.profitError, "You are not authenticated. Redirecting to login...");
+          showError(elements.profitError, "Hindi ka authenticated. Ire-redirect sa login...");
           setTimeout(() => (window.location.href = "/login.html"), 2000);
         } else {
-          loadMembers();
-          listenForRequests();
+          loadFundBalance().then(() => {
+            loadMembers();
+            listenForRequests();
+          });
         }
       });
 
       // Load Members from 'users' collection
       async function loadMembers() {
-        showLoading(elements.membersList, "Loading members...");
-        showLoading(elements.topShareholders, "Loading shareholders...");
-        elements.totalMembers.textContent = "Loading...";
-        elements.totalShares.textContent = "Loading...";
-        elements.totalBalance.textContent = "Loading...";
+        showLoading(elements.membersList, "Naglo-load ng mga miyembro...");
+        showLoading(elements.topShareholders, "Naglo-load ng mga shareholder...");
+        elements.totalMembers.textContent = "Naglo-load...";
+        elements.totalShares.textContent = "Naglo-load...";
+        elements.totalBalance.textContent = "Naglo-load...";
 
         try {
           const snapshot = await getDocs(collection(db, "users"));
           allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
           if (allMembers.length === 0) {
-            elements.membersList.innerHTML = '<p class="text-gray-400">No members found.</p>';
-            elements.topShareholders.innerHTML = '<p class="text-gray-400">No shareholders.</p>';
+            elements.membersList.innerHTML = '<p class="text-gray-400">Walang nahanap na miyembro.</p>';
+            elements.topShareholders.innerHTML = '<p class="text-gray-400">Walang shareholders.</p>';
             elements.totalMembers.textContent = "0";
             elements.totalShares.textContent = "0";
             elements.totalBalance.textContent = formatCurrency(0);
           } else {
-            console.log("Members fetched from users collection:", allMembers);
+            console.log("Mga miyembrong nakuha mula sa users collection:", allMembers);
             displayMembers(allMembers);
             updateTopShareholders();
           }
         } catch (error) {
-          console.error("Error loading members from users collection:", error);
-          showError(elements.profitError, `Failed to load members: ${error.message}`);
-          elements.membersList.innerHTML = '<p class="text-red-500">Failed to load members.</p>';
+          console.error("Error sa pag-load ng mga miyembro mula sa users collection:", error);
+          showError(elements.profitError, `Nabigo sa pag-load ng mga miyembro: ${error.message}`);
+          elements.membersList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng mga miyembro.</p>';
           elements.totalMembers.textContent = "0";
           elements.totalShares.textContent = "0";
           elements.totalBalance.textContent = formatCurrency(0);
@@ -264,7 +296,7 @@
           const div = document.createElement("div");
           div.className = "bg-gray-800 p-4 rounded shadow";
           div.innerHTML = `
-            <p><strong>Name:</strong> ${m.name || "N/A"}</p>
+            <p><strong>Pangalan:</strong> ${m.name || "N/A"}</p>
             <p><strong>Email:</strong> ${m.email || "N/A"}</p>
             <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${
               m.status === "approved"
@@ -276,10 +308,10 @@
             <p><strong>Shares:</strong> ${m.shares || 0}</p>
             <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
             <div class="flex space-x-2 mt-2">
-              <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm">Edit</button>
+              <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm">I-edit</button>
               <button data-id="${m.id}" data-name="${
                 m.name || "Unknown"
-              }" class="delete-btn bg-red-600 px-3 py-1 rounded text-sm">Delete</button>
+              }" class="delete-btn bg-red-600 px-3 py-1 rounded text-sm">I-delete</button>
             </div>
           `;
           elements.membersList.appendChild(div);
@@ -299,7 +331,7 @@
 
         elements.topShareholders.innerHTML = "";
         if (top.length === 0) {
-          elements.topShareholders.innerHTML = '<p class="text-gray-400">No approved shareholders.</p>';
+          elements.topShareholders.innerHTML = '<p class="text-gray-400">Walang approved na shareholders.</p>';
         } else {
           top.forEach((m) => {
             const li = document.createElement("li");
@@ -323,7 +355,7 @@
 
       // Listen for Transaction Requests
       function listenForRequests() {
-        showLoading(elements.requestsList, "Loading requests...");
+        showLoading(elements.requestsList, "Naglo-load ng mga kahilingan...");
         const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
         onSnapshot(
           q,
@@ -331,17 +363,17 @@
             elements.requestsList.innerHTML = "";
             const pendingRequests = snapshot.docs.filter((doc) => doc.data().status === "pending");
             if (pendingRequests.length === 0) {
-              elements.requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
+              elements.requestsList.innerHTML = '<p class="text-gray-400">Walang pending na kahilingan.</p>';
             } else {
               pendingRequests.forEach((docSnap) => {
                 const data = docSnap.data();
                 const div = document.createElement("div");
                 div.className = "bg-gray-700 p-4 rounded";
                 div.innerHTML = `
-                  <p><strong>Member:</strong> ${data.memberName || "N/A"}</p>
-                  <p><strong>Type:</strong> ${data.type || "N/A"}</p>
-                  <p><strong>Amount:</strong> ₱${formatCurrency(data.amount)}</p>
-                  <p><strong>Date:</strong> ${
+                  <p><strong>Miyembro:</strong> ${data.memberName || "N/A"}</p>
+                  <p><strong>Uri:</strong> ${data.type || "N/A"}</p>
+                  <p><strong>Halaga:</strong> ₱${formatCurrency(data.amount)}</p>
+                  <p><strong>Petsa:</strong> ${
                     data.timestamp?.toDate().toLocaleString() || "N/A"
                   }</p>
                 `;
@@ -350,9 +382,9 @@
             }
           },
           (error) => {
-            console.error("Error listening for requests:", error);
-            showError(elements.profitError, `Failed to load requests: ${error.message}`);
-            elements.requestsList.innerHTML = '<p class="text-red-500">Failed to load requests.</p>';
+            console.error("Error sa pag-load ng mga kahilingan:", error);
+            showError(elements.profitError, `Nabigo sa pag-load ng mga kahilingan: ${error.message}`);
+            elements.requestsList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng mga kahilingan.</p>';
           }
         );
       }
@@ -361,105 +393,122 @@
       elements.logoutBtn.addEventListener("click", async () => {
         try {
           await signOut(auth);
-          console.log("User logged out successfully");
+          console.log("Matagumpay na nag-logout ang user");
           window.location.href = "/login.html";
         } catch (error) {
-          console.error("Error logging out:", error);
-          showError(elements.profitError, `Failed to log out: ${error.message}`);
+          console.error("Error sa pag-logout:", error);
+          showError(elements.profitError, `Nabigo sa pag-logout: ${error.message}`);
         }
       });
 
-      // Distribute Profit Functionality
+      // Distribute Profit/Loss Functionality
       elements.profitForm.addEventListener("submit", async (e) => {
         e.preventDefault();
 
-        // Rate Limiting
         const currentTime = Date.now();
         if (currentTime - lastSubmissionTime < SUBMISSION_COOLDOWN) {
-          showError(elements.profitError, "Please wait a few seconds before submitting again.");
+          showError(elements.profitError, `Maghintay ng ${Math.ceil((SUBMISSION_COOLDOWN - (Date.now() - lastSubmissionTime)) / 1000)} segundo bago muling mag-submit.`);
           return;
         }
         lastSubmissionTime = currentTime;
 
-        // Show loading state
         elements.distributeBtn.disabled = true;
-        elements.distributeBtn.textContent = "Processing...";
+        elements.distributeBtn.textContent = "Pinoproseso...";
 
         try {
-          const profit = parseFloat(elements.profitAmount.value);
-          if (isNaN(profit) || profit <= 0) {
-            showError(elements.profitError, "Please enter a valid profit amount greater than 0.");
+          const transactionType = elements.transactionType.value; // "profit" o "loss"
+          const amount = parseFloat(elements.profitAmount.value);
+          if (isNaN(amount) || amount <= 0) {
+            showError(elements.profitError, "Maglagay ng valid na halaga na higit sa 0.");
             return;
           }
 
-          // Fetch fund balance
+          // I-load ang fund balance
           const fundSnapshot = await getDocs(collection(db, "fund"));
           if (fundSnapshot.empty) {
-            showError(elements.profitError, "Fund data not found. Please initialize fund balance.");
+            showError(elements.profitError, "Walang fund data. I-initialize ang fund balance.");
             return;
           }
           const fundDoc = fundSnapshot.docs[0];
           const fundBalance = fundDoc.data().balance || 0;
-          if (profit > fundBalance) {
-            showError(elements.profitError, "Insufficient fund balance for distribution.");
+
+          // Suriin kung sapat ang fund balance para sa loss
+          if (transactionType === "loss" && amount > fundBalance) {
+            showError(elements.profitError, "Kulang ang fund balance para sa pagkatalo.");
             return;
           }
 
-          // Filter approved members and calculate total shares
+          // Filter approved members at kalkulahin ang total shares
           const approvedMembers = allMembers.filter((m) => m.status === "approved");
           const totalShares = approvedMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
-
           if (totalShares === 0) {
-            showError(elements.profitError, "No approved members with shares to distribute profit.");
+            showError(elements.profitError, "Walang approved na miyembro na may shares.");
             return;
           }
 
-          // Calculate profit per share
-          const profitPerShare = profit / totalShares;
+          // Kalkulahin ang amount per share
+          const amountPerShare = amount / totalShares;
 
-          // Create batch for atomic updates
+          // Gumawa ng batch para sa atomic updates
           const batch = writeBatch(db);
 
-          // Update member balances in 'users' collection
+          // I-update ang balances ng mga miyembro
           approvedMembers.forEach((member) => {
-            const profitShare = (member.shares || 0) * profitPerShare;
-            const newBalance = (member.balance || 0) + profitShare;
+            const currentBalance = member.balance || 0;
+            let newBalance;
+            if (transactionType === "profit") {
+              newBalance = currentBalance + (member.shares || 0) * amountPerShare;
+            } else {
+              newBalance = currentBalance - (member.shares || 0) * amountPerShare;
+              if (newBalance < 0) newBalance = 0; // Iwasan ang negatibong balance
+            }
             const userRef = doc(db, "users", member.id);
             batch.update(userRef, { balance: newBalance });
             console.log(
-              `Prepared to distribute ${formatCurrency(profitShare)} to ${
-                member.name || "N/A"
-              } (ID: ${member.id})`
+              `${transactionType === "profit" ? "Idinagdag" : "Ibinawas"} ₱${formatCurrency(
+                (member.shares || 0) * amountPerShare
+              )} sa ${member.name || "N/A"} (Bagong balance: ₱${formatCurrency(newBalance)})`
             );
           });
 
-          // Update fund balance
+          // I-update ang fund balance
           const fundRef = doc(db, "fund", fundDoc.id);
-          batch.update(fundRef, { balance: fundBalance - profit });
+          const newFundBalance = transactionType === "profit" ? fundBalance + amount : fundBalance - amount;
+          if (newFundBalance < 0) {
+            showError(elements.profitError, "Ang pagkatalo ay magreresulta sa negatibong fund balance.");
+            return;
+          }
+          batch.update(fundRef, { balance: newFundBalance });
 
-          // Log distribution to audit trail
+          // I-log ang transaction sa profit_distributions
           const auditRef = collection(db, "profit_distributions");
           batch.set(doc(auditRef), {
-            amount: profit,
+            type: transactionType,
+            amount: amount,
             timestamp: serverTimestamp(),
             adminId: auth.currentUser?.uid || "unknown",
             memberCount: approvedMembers.length,
             totalShares,
           });
 
-          // Commit batch
+          // I-commit ang batch
           await batch.commit();
 
-          // Reset form and reload data
+          // I-reset ang form at i-reload ang data
           elements.profitForm.reset();
           await loadMembers();
-          alert(`Successfully distributed ₱${formatCurrency(profit)} to ${approvedMembers.length} members!`);
+          await loadFundBalance();
+          alert(
+            `Matagumpay na ${transactionType === "profit" ? "ipinadistribute" : "ibinawas"} ang ₱${formatCurrency(
+              amount
+            )} sa ${approvedMembers.length} miyembro!`
+          );
         } catch (error) {
-          console.error("Error distributing profit:", error);
-          showError(elements.profitError, `Failed to distribute profit: ${error.message}`);
+          console.error(`Error ${transactionType === "profit" ? "distributing profit" : "deducting loss"}:`, error.code, error.message);
+          showError(elements.profitError, `Nabigo ang ${transactionType === "profit" ? "pamimigay ng profit" : "pagbabawas ng loss"}: ${error.code} - ${error.message}`);
         } finally {
           elements.distributeBtn.disabled = false;
-          elements.distributeBtn.textContent = "Distribute Profit";
+          elements.distributeBtn.textContent = "Submit Transaction";
         }
       });
 
@@ -467,7 +516,7 @@
       function openEditModal(member) {
         if (!member || !member.id) {
           console.error("Invalid member data:", member);
-          showError(elements.profitError, "Cannot edit: Member data is invalid.");
+          showError(elements.profitError, "Hindi mae-edit: Invalid ang data ng miyembro.");
           return;
         }
         elements.editMemberId.value = member.id;
@@ -485,7 +534,7 @@
         const shares = parseInt(elements.editShares.value);
         const balance = parseFloat(elements.editBalance.value);
         if (isNaN(shares) || shares < 0 || isNaN(balance) || balance < 0) {
-          showError(elements.profitError, "Shares and balance must be non-negative numbers.");
+          showError(elements.profitError, "Ang shares at balance ay dapat na hindi negatibo.");
           return;
         }
         const updatedData = {
@@ -499,10 +548,10 @@
           await updateDoc(doc(db, "users", id), updatedData);
           elements.editModal.classList.add("hidden");
           await loadMembers();
-          alert("Member updated successfully!");
+          alert("Matagumpay na na-update ang miyembro!");
         } catch (error) {
-          console.error("Error updating member in users collection:", error);
-          showError(elements.profitError, `Failed to update member: ${error.message}`);
+          console.error("Error sa pag-update ng miyembro sa users collection:", error);
+          showError(elements.profitError, `Nabigo sa pag-update ng miyembro: ${error.message}`);
         }
       });
 
@@ -512,14 +561,14 @@
 
       // Delete Member
       async function deleteMember(id, name) {
-        if (confirm(`Are you sure you want to delete ${name || "this member"}?`)) {
+        if (confirm(`Sigurado ka bang gusto mong i-delete si ${name || "miyembrong ito"}?`)) {
           try {
             await deleteDoc(doc(db, "users", id));
             await loadMembers();
-            alert("Member deleted successfully!");
+            alert("Matagumpay na na-delete ang miyembro!");
           } catch (error) {
-            console.error("Error deleting member from users collection:", error);
-            showError(elements.profitError, `Failed to delete member: ${error.message}`);
+            console.error("Error sa pag-delete ng miyembro mula sa users collection:", error);
+            showError(elements.profitError, `Nabigo sa pag-delete ng miyembro: ${error.message}`);
           }
         }
       }
@@ -531,7 +580,7 @@
         if (target.classList.contains("edit-btn") && id) {
           const member = allMembers.find((m) => m.id === id);
           if (member) openEditModal(member);
-          else showError(elements.profitError, "Member data not found.");
+          else showError(elements.profitError, "Hindi nahanap ang data ng miyembro.");
         } else if (target.classList.contains("delete-btn") && id) {
           const name = target.dataset.name;
           deleteMember(id, name);
@@ -566,11 +615,11 @@
             },
           },
         });
-        console.log("Chart initialized successfully");
+        console.log("Matagumpay na na-initialize ang chart");
       } catch (error) {
-        console.error("Error initializing chart:", error);
+        console.error("Error sa pag-initialize ng chart:", error);
         document.getElementById("fundChart").parentElement.innerHTML =
-          '<p class="text-red-500">Failed to load chart.</p>';
+          '<p class="text-red-500">Nabigo sa pag-load ng chart.</p>';
       }
     </script>
   </body>
