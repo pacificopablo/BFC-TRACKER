@@ -62,7 +62,7 @@
           id="distributeBtn"
           class="bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
         >
-          Submit Transaction
+          Distribute
         </button>
       </form>
       <p id="profitError" class="text-red-500 text-sm mt-2 hidden"></p>
@@ -143,6 +143,15 @@
               step="0.01"
             />
           </div>
+          <div class="mb-4">
+            <label class="block text-sm">Approval Date</label>
+            <input
+              type="datetime-local"
+              id="editApprovalDate"
+              class="w-full p-2 rounded bg-gray-700 text-white"
+              required
+            />
+          </div>
           <div class="flex justify-end space-x-2">
             <button type="button" id="cancelEdit" class="bg-gray-600 px-4 py-2 rounded">Cancel</button>
             <button type="submit" class="bg-blue-600 px-4 py-2 rounded">Save</button>
@@ -211,6 +220,7 @@
         editStatus: document.getElementById("editStatus"),
         editShares: document.getElementById("editShares"),
         editBalance: document.getElementById("editBalance"),
+        editApprovalDate: document.getElementById("editApprovalDate"),
         cancelEdit: document.getElementById("cancelEdit"),
         logoutBtn: document.getElementById("logoutBtn"),
         profitForm: document.getElementById("profitForm"),
@@ -225,6 +235,7 @@
       let allTransactions = [];
       let lastSubmissionTime = 0;
       const SUBMISSION_COOLDOWN = 5000; // 5 seconds
+      const HOURS_THRESHOLD = 24; // 24-hour eligibility threshold
 
       // Utility Functions
       const formatCurrency = (value) =>
@@ -273,6 +284,15 @@
           });
         }
       });
+
+      // Check if member is eligible (approved for at least 24 hours)
+      function isMemberEligible(member) {
+        const approvalDate = member.approvalDate ? new Date(member.approvalDate) : null;
+        if (!approvalDate) return false; // No approval date, not eligible
+        const now = new Date("2025-07-07T12:12:00-07:00"); // Current time: 12:12 PM PST, July 07, 2025
+        const hoursSinceApproval = (now - approvalDate) / (1000 * 60 * 60); // Convert to hours
+        return hoursSinceApproval >= HOURS_THRESHOLD;
+      }
 
       // Load Members from 'users' collection
       async function loadMembers() {
@@ -332,6 +352,7 @@
             }">${m.status || "N/A"}</span></p>
             <p><strong>Shares:</strong> ${m.shares || 0}</p>
             <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
+            <p><strong>Eligible for Profit/Loss:</strong> ${isMemberEligible(m) ? "Yes" : "No (Less than 24 hrs)"}</p>
             <div class="flex space-x-2 mt-2">
               <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm">I-edit</button>
               <button data-id="${m.id}" data-name="${
@@ -350,13 +371,13 @@
       // Update Top Shareholders
       function updateTopShareholders() {
         const top = [...allMembers]
-          .filter((m) => m.status === "approved")
+          .filter((m) => m.status === "approved" && isMemberEligible(m))
           .sort((a, b) => (b.shares || 0) - (a.shares || 0))
           .slice(0, 5);
 
         elements.topShareholders.innerHTML = "";
         if (top.length === 0) {
-          elements.topShareholders.innerHTML = '<p class="text-gray-400">Walang approved na shareholders.</p>';
+          elements.topShareholders.innerHTML = '<p class="text-gray-400">Walang eligible na shareholders.</p>';
         } else {
           top.forEach((m) => {
             const li = document.createElement("li");
@@ -401,6 +422,10 @@
                   <p><strong>Petsa:</strong> ${
                     data.timestamp?.toDate().toLocaleString() || "N/A"
                   }</p>
+                  <div class="flex space-x-2 mt-2">
+                    <button data-id="${docSnap.id}" class="approve-btn bg-green-600 px-3 py-1 rounded text-sm">Approve</button>
+                    <button data-id="${docSnap.id}" class="reject-btn bg-red-600 px-3 py-1 rounded text-sm">Reject</button>
+                  </div>
                 `;
                 elements.requestsList.appendChild(div);
               });
@@ -547,17 +572,19 @@
             return;
           }
 
-          const approvedMembers = allMembers.filter((m) => m.status === "approved");
-          const totalShares = approvedMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+          const eligibleMembers = allMembers.filter((m) => 
+            m.status === "approved" && isMemberEligible(m)
+          );
+          const totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
           if (totalShares === 0) {
-            showError(elements.profitError, "Walang approved na miyembro na may shares.");
+            showError(elements.profitError, "Walang eligible na miyembro na may shares.");
             return;
           }
 
           const amountPerShare = amount / totalShares;
           const batch = writeBatch(db);
 
-          approvedMembers.forEach((member) => {
+          eligibleMembers.forEach((member) => {
             const currentBalance = member.balance || 0;
             let newBalance;
             if (transactionType === "profit") {
@@ -578,7 +605,7 @@
           const fundRef = doc(db, "fund", fundDoc.id);
           const newFundBalance = transactionType === "profit" ? fundBalance + amount : fundBalance - amount;
           if (newFundBalance < 0) {
-            showError(elements.profitError, "Ang pagkatalo ay magreresulta sa negatibong fund balance.");
+            showError(elements.profitError, "Ang transaksyon ay magreresulta sa negatibong fund balance.");
             return;
           }
           batch.update(fundRef, { balance: newFundBalance });
@@ -589,7 +616,7 @@
             amount: amount,
             timestamp: serverTimestamp(),
             adminId: auth.currentUser?.uid || "unknown",
-            memberCount: approvedMembers.length,
+            memberCount: eligibleMembers.length,
             totalShares,
           });
 
@@ -601,14 +628,14 @@
           alert(
             `Matagumpay na ${transactionType === "profit" ? "ipinadistribute" : "ibinawas"} ang ₱${formatCurrency(
               amount
-            )} sa ${approvedMembers.length} miyembro!`
+            )} sa ${eligibleMembers.length} miyembro!`
           );
         } catch (error) {
           console.error(`Error ${transactionType === "profit" ? "distributing profit" : "deducting loss"}:`, error.code, error.message);
           showError(elements.profitError, `Nabigo ang ${transactionType === "profit" ? "pamimigay ng profit" : "pagbabawas ng loss"}: ${error.code} - ${error.message}`);
         } finally {
           elements.distributeBtn.disabled = false;
-          elements.distributeBtn.textContent = "Submit Transaction";
+          elements.distributeBtn.textContent = "Distribute";
         }
       });
 
@@ -625,6 +652,9 @@
         elements.editStatus.value = member.status || "pending";
         elements.editShares.value = member.shares || 0;
         elements.editBalance.value = member.balance || 0;
+        elements.editApprovalDate.value = member.approvalDate 
+          ? new Date(member.approvalDate).toISOString().slice(0, 16)
+          : new Date().toISOString().slice(0, 16);
         elements.editModal.classList.remove("hidden");
       }
 
@@ -633,6 +663,7 @@
         const id = elements.editMemberId.value;
         const shares = parseInt(elements.editShares.value);
         const balance = parseFloat(elements.editBalance.value);
+        const approvalDate = new Date(elements.editApprovalDate.value).toISOString();
         if (isNaN(shares) || shares < 0 || isNaN(balance) || balance < 0) {
           showError(elements.profitError, "Ang shares at balance ay dapat na hindi negatibo.");
           return;
@@ -643,6 +674,7 @@
           status: elements.editStatus.value,
           shares,
           balance,
+          approvalDate, // Store the approval date
         };
         try {
           await updateDoc(doc(db, "users", id), updatedData);
@@ -673,7 +705,7 @@
         }
       }
 
-      // Event Delegation for Edit and Delete Buttons
+      // Event Delegation for Edit, Delete, Approve, and Reject Buttons
       elements.membersList.addEventListener("click", (e) => {
         const target = e.target;
         const id = target.dataset.id;
@@ -686,6 +718,30 @@
           deleteMember(id, name);
         }
       });
+
+      elements.requestsList.addEventListener("click", async (e) => {
+        const target = e.target;
+        const id = target.dataset.id;
+
+        if (target.classList.contains("approve-btn") && id) {
+          await updateTransactionStatus(id, "approved");
+          alert("Matagumpay na naaprubahan ang kahilingan!");
+        } else if (target.classList.contains("reject-btn") && id) {
+          await updateTransactionStatus(id, "rejected");
+          alert("Matagumpay na na-reject ang kahilingan!");
+        }
+      });
+
+      // Function to update transaction status
+      async function updateTransactionStatus(transactionId, status) {
+        try {
+          const transactionRef = doc(db, "transactions", transactionId);
+          await updateDoc(transactionRef, { status: status });
+        } catch (error) {
+          console.error("Error sa pag-update ng status ng transaksyon:", error);
+          showError(elements.profitError, `Nabigo sa pag-update ng status: ${error.message}`);
+        }
+      }
 
       // Initialize Chart
       try {
