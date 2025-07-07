@@ -7,7 +7,6 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-900 flex items-center justify-center min-h-screen text-white">
-
   <!-- Login Form -->
   <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md">
     <h2 class="text-2xl font-bold mb-6 text-center">Login to Your Account</h2>
@@ -37,6 +36,7 @@
     <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md">
       <h2 class="text-xl font-bold mb-4 text-center">Sign Up</h2>
       <form id="signupForm" class="space-y-4">
+        <input type="text" id="signupName" placeholder="Full Name" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
         <input type="text" id="signupUsername" placeholder="Username" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
         <input type="email" id="signupEmail" placeholder="Email" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
         <input type="password" id="signupPassword" placeholder="Password" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
@@ -129,6 +129,7 @@
     // Handle Signup
     document.getElementById("signupForm").addEventListener("submit", async (e) => {
       e.preventDefault();
+      const name = document.getElementById("signupName").value.trim();
       const username = document.getElementById("signupUsername").value.trim();
       const email = document.getElementById("signupEmail").value.trim();
       const password = document.getElementById("signupPassword").value;
@@ -138,6 +139,12 @@
       signupError.classList.add("hidden");
 
       // Basic validation
+      if (!name) {
+        signupError.textContent = "Name is required.";
+        signupError.classList.remove("hidden");
+        return;
+      }
+
       if (password !== confirmPassword) {
         signupError.textContent = "Passwords do not match.";
         signupError.classList.remove("hidden");
@@ -155,8 +162,9 @@
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        // Save user with default role = "member" and username
+        // Save user with default role = "member", name, and username
         await setDoc(doc(db, "users", user.uid), {
+          name: name,
           username: username,
           email: email,
           role: "member",
