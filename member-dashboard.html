@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <title>Baccarat Fund Members Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   </head>
   <body class="bg-gray-900 text-white p-4">
@@ -99,7 +98,7 @@
         storageBucket: "bfc-tracker.firebasestorage.app",
         messagingSenderId: "127052459580",
         appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
-        measurementId: "G-PNYRCFJHYM"
+        measurementId: "G-PNYRCFJHYM",
       };
 
       // Initialize Firebase
@@ -111,6 +110,7 @@
       } catch (error) {
         console.error("Firebase initialization failed:", error);
         document.body.innerHTML = '<p class="text-red-500 p-4">Failed to initialize Firebase. Please check configuration.</p>';
+        return;
       }
 
       // DOM Elements
@@ -131,6 +131,7 @@
         logoutBtn: document.getElementById("logoutBtn"),
       };
 
+      // Utility Functions
       const formatCurrency = (value) => parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
 
       const showError = (element, message) => {
@@ -145,78 +146,95 @@
 
       // Load Member Profile
       function loadMemberProfile(userId) {
-        showLoading(elements.memberName);
-        const q = query(collection(db, "users"), where("uid", "==", userId)); // Changed to "uid"
-        onSnapshot(q, (snapshot) => {
-          if (snapshot.empty) {
+        showLoading(elements.memberName.parentElement, "Loading profile...");
+        const q = query(collection(db, "users"), where("uid", "==", userId));
+        onSnapshot(
+          q,
+          (snapshot) => {
+            if (snapshot.empty) {
+              elements.memberName.textContent = "N/A";
+              elements.memberEmail.textContent = "N/A";
+              elements.memberStatus.textContent = "N/A";
+              elements.memberShares.textContent = "0";
+              elements.memberBalance.textContent = formatCurrency(0);
+              console.warn("No user profile found for UID:", userId);
+              return;
+            }
+            const member = snapshot.docs[0].data() || {};
+            elements.memberName.textContent = member.name || "N/A";
+            elements.memberEmail.textContent = member.email || "N/A";
+            elements.memberStatus.textContent = member.status || "N/A";
+            elements.memberShares.textContent = member.shares || 0;
+            elements.memberBalance.textContent = formatCurrency(member.balance || 0);
+          },
+          (error) => {
+            console.error("Error loading member profile:", error);
+            showError(elements.requestError, `Failed to load profile: ${error.message}`);
             elements.memberName.textContent = "N/A";
             elements.memberEmail.textContent = "N/A";
             elements.memberStatus.textContent = "N/A";
             elements.memberShares.textContent = "0";
             elements.memberBalance.textContent = formatCurrency(0);
-            console.warn("No user profile found for UID:", userId);
-            return;
           }
-          const member = snapshot.docs[0].data() || {};
-          elements.memberName.textContent = member.name || "N/A";
-          elements.memberEmail.textContent = member.email || "N/A";
-          elements.memberStatus.textContent = member.status || "N/A";
-          elements.memberShares.textContent = member.shares || 0;
-          elements.memberBalance.textContent = formatCurrency(member.balance || 0);
-        }, (error) => {
-          console.error("Error loading member profile:", error);
-          showError(elements.requestError, `Failed to load profile: ${error.message}`);
-          elements.memberName.textContent = "N/A";
-          elements.memberEmail.textContent = "N/A";
-          elements.memberStatus.textContent = "N/A";
-          elements.memberShares.textContent = "0";
-          elements.memberBalance.textContent = formatCurrency(0);
-        });
+        );
       }
 
       // Load Transaction History
       function loadTransactionHistory(userId) {
-        showLoading(elements.historyList);
+        showLoading(elements.historyList, "Loading transaction history...");
         const profitQuery = query(collection(db, "profit_distributions"), where("adminId", "==", userId));
         const transactionQuery = query(collection(db, "transactions"), where("memberName", "==", userId));
 
-        onSnapshot(profitQuery, (profitSnapshot) => {
-          onSnapshot(transactionQuery, (transactionSnapshot) => {
-            let allTransactions = [];
+        onSnapshot(
+          profitQuery,
+          (profitSnapshot) => {
+            onSnapshot(
+              transactionQuery,
+              (transactionSnapshot) => {
+                let allTransactions = [];
 
-            profitSnapshot.docs.forEach((doc) => {
-              const data = doc.data();
-              allTransactions.push({
-                type: data.type === "profit" ? "Profit Distribution" : "Loss Deduction",
-                filterType: data.type,
-                amount: data.amount,
-                timestamp: data.timestamp?.toDate() || new Date(),
-                details: `Distributed to ${data.memberCount} members, Total Shares: ${data.totalShares}`,
-              });
-            });
+                // Process profit/loss distributions
+                profitSnapshot.docs.forEach((doc) => {
+                  const data = doc.data();
+                  allTransactions.push({
+                    type: data.type === "profit" ? "Profit Distribution" : "Loss Deduction",
+                    filterType: data.type,
+                    amount: data.amount,
+                    timestamp: data.timestamp?.toDate() || new Date(),
+                    details: `Distributed to ${data.memberCount} members, Total Shares: ${data.totalShares}`,
+                  });
+                });
 
-            transactionSnapshot.docs.forEach((doc) => {
-              const data = doc.data();
-              allTransactions.push({
-                type: data.type === "deposit" ? "Deposit" : "Cash Out",
-                filterType: data.type === "deposit" ? "deposit" : "cashout",
-                amount: data.amount,
-                timestamp: data.timestamp?.toDate() || new Date(),
-                details: `Status: ${data.status || "N/A"}`,
-              });
-            });
+                // Process deposit/cash out transactions
+                transactionSnapshot.docs.forEach((doc) => {
+                  const data = doc.data();
+                  allTransactions.push({
+                    type: data.type === "deposit" ? "Deposit" : "Cash Out",
+                    filterType: data.type,
+                    amount: data.amount,
+                    timestamp: data.timestamp?.toDate() || new Date(),
+                    details: `Status: ${data.status || "N/A"}`,
+                  });
+                });
 
-            displayTransactionHistory(allTransactions);
-          }, (error) => {
-            console.error("Error loading transactions:", error);
+                displayTransactionHistory(allTransactions);
+              },
+              (error) => {
+                console.error("Error loading transactions:", error);
+                showError(elements.requestError, `Failed to load transaction history: ${error.message}`);
+                elements.historyList.innerHTML = '<p class="text-red-500">Failed to load transaction history.</p>';
+              }
+            );
+          },
+          (error) => {
+            console.error("Error loading profit distributions:", error);
             showError(elements.requestError, `Failed to load transaction history: ${error.message}`);
-          });
-        }, (error) => {
-          console.error("Error loading profit distributions:", error);
-          showError(elements.requestError, `Failed to load transaction history: ${error.message}`);
-        });
+            elements.historyList.innerHTML = '<p class="text-red-500">Failed to load transaction history.</p>';
+          }
+        );
       }
 
+      // Display Transaction History
       function displayTransactionHistory(transactions) {
         const filter = elements.historyFilter.value;
         let filteredTransactions = transactions;
@@ -224,11 +242,11 @@
           filteredTransactions = transactions.filter((txn) => txn.filterType === filter);
         }
 
-        filteredTransactions.sort((a, b) => a.timestamp - b.timestamp);
+        filteredTransactions.sort((a, b) => b.timestamp - a.timestamp); // Newest first
 
         elements.historyList.innerHTML = "";
         if (filteredTransactions.length === 0) {
-          elements.historyList.innerHTML = '<p class="text-gray-400">Walang kasaysayan ng transaksyon para sa napiling filter.</p>';
+          elements.historyList.innerHTML = '<p class="text-gray-400">No transaction history for selected filter.</p>';
           return;
         }
 
@@ -236,10 +254,10 @@
           const div = document.createElement("div");
           div.className = "bg-gray-700 p-4 rounded";
           div.innerHTML = `
-            <p><strong>Uri:</strong> ${txn.type}</p>
-            <p><strong>Halaga:</strong> ₱${formatCurrency(txn.amount)}</p>
-            <p><strong>Petsa:</strong> ${txn.timestamp.toLocaleString()}</p>
-            <p><strong>Mga Detalye:</strong> ${txn.details}</p>
+            <p><strong>Type:</strong> ${txn.type}</p>
+            <p><strong>Amount:</strong> ₱${formatCurrency(txn.amount)}</p>
+            <p><strong>Date:</strong> ${txn.timestamp.toLocaleString()}</p>
+            <p><strong>Details:</strong> ${txn.details}</p>
           `;
           elements.historyList.appendChild(div);
         });
@@ -247,31 +265,34 @@
 
       // Load Pending Requests
       function loadPendingRequests(userId) {
-        showLoading(elements.requestsList);
+        showLoading(elements.requestsList, "Loading requests...");
         const q = query(collection(db, "transactions"), where("memberName", "==", userId), where("status", "==", "pending"));
-        onSnapshot(q, (snapshot) => {
-          elements.requestsList.innerHTML = "";
-          const pendingRequests = snapshot.docs;
-          if (pendingRequests.length === 0) {
-            elements.requestsList.innerHTML = '<p class="text-gray-400">Walang pending na kahilingan.</p>';
-          } else {
-            pendingRequests.forEach((doc) => {
-              const data = doc.data();
-              const div = document.createElement("div");
-              div.className = "bg-gray-700 p-4 rounded";
-              div.innerHTML = `
-                <p><strong>Uri:</strong> ${data.type === "deposit" ? "Deposit" : "Cash Out"}</p>
-                <p><strong>Halaga:</strong> ₱${formatCurrency(data.amount)}</p>
-                <p><strong>Petsa:</strong> ${data.timestamp?.toDate().toLocaleString() || "N/A"}</p>
-              `;
-              elements.requestsList.appendChild(div);
-            });
+        onSnapshot(
+          q,
+          (snapshot) => {
+            elements.requestsList.innerHTML = "";
+            if (snapshot.empty) {
+              elements.requestsList.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
+            } else {
+              snapshot.forEach((doc) => {
+                const data = doc.data();
+                const div = document.createElement("div");
+                div.className = "bg-gray-700 p-4 rounded";
+                div.innerHTML = `
+                  <p><strong>Type:</strong> ${data.type === "deposit" ? "Deposit" : "Cash Out"}</p>
+                  <p><strong>Amount:</strong> ₱${formatCurrency(data.amount)}</p>
+                  <p><strong>Date:</strong> ${data.timestamp?.toDate().toLocaleString() || "N/A"}</p>
+                `;
+                elements.requestsList.appendChild(div);
+              });
+            }
+          },
+          (error) => {
+            console.error("Error loading pending requests:", error);
+            showError(elements.requestError, `Failed to load pending requests: ${error.message}`);
+            elements.requestsList.innerHTML = '<p class="text-red-500">Failed to load requests.</p>';
           }
-        }, (error) => {
-          console.error("Error loading pending requests:", error);
-          showError(elements.requestError, `Failed to load pending requests: ${error.message}`);
-          elements.requestsList.innerHTML = '<p class="text-red-500">Failed to load requests.</p>';
-        });
+        );
       }
 
       // Submit Request
@@ -283,17 +304,23 @@
         try {
           const type = elements.requestType.value;
           const amount = parseFloat(elements.requestAmount.value);
+
           if (isNaN(amount) || amount <= 0) {
             showError(elements.requestError, "Please enter a valid amount greater than 0.");
             return;
           }
 
           const user = auth.currentUser;
+          if (!user) {
+            showError(elements.requestError, "Not authenticated. Please log in.");
+            return;
+          }
+
           await addDoc(collection(db, "transactions"), {
             type,
             amount,
             timestamp: serverTimestamp(),
-            memberName: user.displayName || user.email,
+            memberName: user.displayName || user.email || "Unknown",
             status: "pending",
           });
 
@@ -319,42 +346,41 @@
         }
       });
 
+      // Filter Transaction History
+      elements.historyFilter.addEventListener("change", () => {
+        const user = auth.currentUser;
+        if (user) loadTransactionHistory(user.uid);
+      });
+
       // Authentication Check and Data Loading
       onAuthStateChanged(auth, (user) => {
         if (!user) {
           showError(elements.requestError, "Not authenticated. Redirecting to login...");
           setTimeout(() => (window.location.href = "/login.html"), 2000);
-        } else {
-          console.log("Authenticated user:", user);
-          // Check if user profile exists and create if not
-          const q = query(collection(db, "users"), where("uid", "==", user.uid));
-          onSnapshot(q, (snapshot) => {
-            if (snapshot.empty) {
-              addDoc(collection(db, "users"), {
-                uid: user.uid,
-                name: user.displayName || "N/A",
-                email: user.email || "N/A",
-                status: "Active",
-                shares: 0,
-                balance: 0
-              }).then(() => {
-                loadMemberProfile(user.uid);
-                loadTransactionHistory(user.uid);
-                loadPendingRequests(user.uid);
-              });
-            } else {
+          return;
+        }
+
+        const q = query(collection(db, "users"), where("uid", "==", user.uid));
+        onSnapshot(q, (snapshot) => {
+          if (snapshot.empty) {
+            addDoc(collection(db, "users"), {
+              uid: user.uid,
+              name: user.displayName || "N/A",
+              email: user.email || "N/A",
+              status: "pending",
+              shares: 0,
+              balance: 0,
+            }).then(() => {
               loadMemberProfile(user.uid);
               loadTransactionHistory(user.uid);
               loadPendingRequests(user.uid);
-            }
-          });
-        }
-      });
-
-      // Filter Transaction History
-      elements.historyFilter.addEventListener("change", () => {
-        const user = auth.currentUser;
-        if (user) loadTransactionHistory(user.uid);
+            });
+          } else {
+            loadMemberProfile(user.uid);
+            loadTransactionHistory(user.uid);
+            loadPendingRequests(user.uid);
+          }
+        });
       });
     </script>
   </body>
