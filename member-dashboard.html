@@ -215,7 +215,7 @@
 
           await addDoc(collection(db, "transactions"), {
             uid: user.uid,
-            memberName: userData.name || user.email, // Use the stored name from Firestore
+            memberName: user.displayName || user.email,
             type: elements.requestType.value,
             amount,
             status: "pending",
@@ -248,11 +248,9 @@
           return setTimeout(() => (window.location.href = "/login.html"), 2000);
         }
 
-        // Only create a new document if it doesn't exist, using setDoc to overwrite safely
-        const userDocRef = doc(db, "users", user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (!userDocSnap.exists()) {
-          await setDoc(userDocRef, {
+        const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
+        if (snap.empty) {
+          await addDoc(collection(db, "users"), {
             uid: user.uid,
             name: user.displayName || "N/A",
             email: user.email || "N/A",
