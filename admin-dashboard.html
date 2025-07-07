@@ -401,6 +401,10 @@
                   <p><strong>Petsa:</strong> ${
                     data.timestamp?.toDate().toLocaleString() || "N/A"
                   }</p>
+                  <div class="flex space-x-2 mt-2">
+                    <button data-id="${docSnap.id}" class="approve-btn bg-green-600 px-3 py-1 rounded text-sm">Approve</button>
+                    <button data-id="${docSnap.id}" class="reject-btn bg-red-600 px-3 py-1 rounded text-sm">Reject</button>
+                  </div>
                 `;
                 elements.requestsList.appendChild(div);
               });
@@ -673,7 +677,7 @@
         }
       }
 
-      // Event Delegation for Edit and Delete Buttons
+      // Event Delegation for Edit, Delete, Approve, and Reject Buttons
       elements.membersList.addEventListener("click", (e) => {
         const target = e.target;
         const id = target.dataset.id;
@@ -686,6 +690,30 @@
           deleteMember(id, name);
         }
       });
+
+      elements.requestsList.addEventListener("click", async (e) => {
+        const target = e.target;
+        const id = target.dataset.id;
+
+        if (target.classList.contains("approve-btn") && id) {
+          await updateTransactionStatus(id, "approved");
+          alert("Matagumpay na naaprubahan ang kahilingan!");
+        } else if (target.classList.contains("reject-btn") && id) {
+          await updateTransactionStatus(id, "rejected");
+          alert("Matagumpay na na-reject ang kahilingan!");
+        }
+      });
+
+      // Function to update transaction status
+      async function updateTransactionStatus(transactionId, status) {
+        try {
+          const transactionRef = doc(db, "transactions", transactionId);
+          await updateDoc(transactionRef, { status: status });
+        } catch (error) {
+          console.error("Error sa pag-update ng status ng transaksyon:", error);
+          showError(elements.profitError, `Nabigo sa pag-update ng status: ${error.message}`);
+        }
+      }
 
       // Initialize Chart
       try {
