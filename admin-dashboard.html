@@ -62,7 +62,7 @@
           id="distributeBtn"
           class="bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
         >
-          Submit Transaction
+          Distribute
         </button>
       </form>
       <p id="profitError" class="text-red-500 text-sm mt-2 hidden"></p>
@@ -235,7 +235,6 @@
       let allTransactions = [];
       let lastSubmissionTime = 0;
       const SUBMISSION_COOLDOWN = 5000; // 5 seconds
-      const DAILY_PROFIT_PERCENTAGE = 0.05; // 5% of fund balance as daily profit (adjust as needed)
       const HOURS_THRESHOLD = 24; // 24-hour eligibility threshold
 
       // Utility Functions
@@ -272,14 +271,13 @@
         }
       }
 
-      // Authentication Check and Daily Profit Distribution
+      // Authentication Check
       onAuthStateChanged(auth, (user) => {
         if (!user) {
           showError(elements.profitError, "Hindi ka authenticated. Ire-redirect sa login...");
           setTimeout(() => (window.location.href = "/login.html"), 2000);
         } else {
-          loadFundBalance().then((fundBalance) => {
-            checkAndDistributeDailyProfit(fundBalance);
+          loadFundBalance().then(() => {
             loadMembers();
             listenForRequests();
             listenForTransactionHistory();
@@ -287,82 +285,11 @@
         }
       });
 
-      // Check and Distribute Daily Profit
-      async function checkAndDistributeDailyProfit(fundBalance) {
-        const lastDistribution = localStorage.getItem("lastProfitDistribution");
-        const today = new Date().toDateString();
-
-        if (lastDistribution !== today) {
-          if (fundBalance > 0) {
-            const profitAmount = fundBalance * DAILY_PROFIT_PERCENTAGE;
-            await distributeProfit(profitAmount);
-            localStorage.setItem("lastProfitDistribution", today);
-            alert(`Matagumpay na naipamahagi ang daily profit ng ₱${formatCurrency(profitAmount)}!`);
-          } else {
-            showError(elements.profitError, "Walang sapat na fund balance para sa daily profit.");
-          }
-        }
-      }
-
-      // Distribute Profit Function with 24-hour eligibility check
-      async function distributeProfit(amount) {
-        try {
-          const approvedMembers = allMembers.filter((m) => 
-            m.status === "approved" && isMemberEligible(m)
-          );
-          const totalShares = approvedMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
-          if (totalShares === 0) {
-            showError(elements.profitError, "Walang eligible na miyembro na may shares.");
-            return;
-          }
-
-          const amountPerShare = amount / totalShares;
-          const batch = writeBatch(db);
-
-          approvedMembers.forEach((member) => {
-            const currentBalance = member.balance || 0;
-            const newBalance = currentBalance + (member.shares || 0) * amountPerShare;
-            const userRef = doc(db, "users", member.id);
-            batch.update(userRef, { balance: newBalance });
-            console.log(
-              `Idinagdag ₱${formatCurrency((member.shares || 0) * amountPerShare)} sa ${member.name || "N/A"} (Bagong balance: ₱${formatCurrency(newBalance)})`
-            );
-          });
-
-          const fundSnapshot = await getDocs(collection(db, "fund"));
-          const fundDoc = fundSnapshot.docs[0];
-          const newFundBalance = fundBalance - amount;
-          if (newFundBalance < 0) {
-            showError(elements.profitError, "Ang daily profit ay magreresulta sa negatibong fund balance.");
-            return;
-          }
-          const fundRef = doc(db, "fund", fundDoc.id);
-          batch.update(fundRef, { balance: newFundBalance });
-
-          const auditRef = collection(db, "profit_distributions");
-          batch.set(doc(auditRef), {
-            type: "profit",
-            amount: amount,
-            timestamp: serverTimestamp(),
-            adminId: auth.currentUser?.uid || "unknown",
-            memberCount: approvedMembers.length,
-            totalShares,
-          });
-
-          await batch.commit();
-          await loadMembers();
-          await loadFundBalance();
-        } catch (error) {
-          console.error("Error distributing daily profit:", error.code, error.message);
-          showError(elements.profitError, `Nabigo ang pamimigay ng daily profit: ${error.code} - ${error.message}`);
-        }
-      }
-
       // Check if member is eligible (approved for at least 24 hours)
       function isMemberEligible(member) {
         const approvalDate = member.approvalDate ? new Date(member.approvalDate) : null;
         if (!approvalDate) return false; // No approval date, not eligible
-        const now = new Date();
+        const now = new Date("2025-07-07T12:12:00-07:00"); // Current time: 12:12 PM PST, July 07, 2025
         const hoursSinceApproval = (now - approvalDate) / (1000 * 60 * 60); // Convert to hours
         return hoursSinceApproval >= HOURS_THRESHOLD;
       }
@@ -610,7 +537,7 @@
         }
       });
 
-      // Distribute Profit/Loss Functionality with 24-hour eligibility check
+      // Distribute Profit/Loss Functionality
       elements.profitForm.addEventListener("submit", async (e) => {
         e.preventDefault();
 
@@ -708,7 +635,7 @@
           showError(elements.profitError, `Nabigo ang ${transactionType === "profit" ? "pamimigay ng profit" : "pagbabawas ng loss"}: ${error.code} - ${error.message}`);
         } finally {
           elements.distributeBtn.disabled = false;
-          elements.distributeBtn.textContent = "Submit Transaction";
+          elements.distributeBtn.textContent = "Distribute";
         }
       });
 
