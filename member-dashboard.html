@@ -18,6 +18,18 @@
         </div>
       </header>
 
+      <!-- Member Profile -->
+      <div class="bg-gray-800 p-4 rounded shadow mb-6">
+        <h2 class="text-lg font-semibold mb-4">Your Profile</h2>
+        <div id="memberProfile" class="grid grid-cols-1 gap-2">
+          <p><strong>Name:</strong> <span id="profileName">Loading...</span></p>
+          <p><strong>Email:</strong> <span id="profileEmail">Loading...</span></p>
+          <p><strong>Status:</strong> <span id="profileStatus">Loading...</span></p>
+          <p><strong>Approval Date:</strong> <span id="profileApprovalDate">Loading...</span></p>
+          <p><strong>Last Distribution:</strong> <span id="profileLastDistribution">Loading...</span></p>
+        </div>
+      </div>
+
       <!-- Summary Cards -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="bg-gray-800 p-4 rounded shadow">
@@ -64,7 +76,7 @@
             Submit
           </button>
         </form>
-        <p id="transactionError" class="text-red-500 mt-2 hidden"></p>
+        <p id="memberProfileError" class="text-red-500 mt-2 hidden"></p>
       </div>
 
       <!-- Personal Transaction History -->
@@ -106,6 +118,7 @@
           orderBy,
           where,
           onSnapshot,
+          deleteDoc
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -114,7 +127,7 @@
           apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
           authDomain: "bfc-tracker.firebaseapp.com",
           projectId: "bfc-tracker",
-          storageBucket: "bfc-tracker.firebasestorage.app",
+          storageBucket: "bfcHX3OGINQ",
           messagingSenderId: "127052459580",
           appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
           measurementId: "G-PNYRCFJHYM",
@@ -143,10 +156,15 @@
           transactionForm: document.getElementById("transactionForm"),
           transactionAmount: document.getElementById("transactionAmount"),
           submitTransactionBtn: document.getElementById("submitTransactionBtn"),
-          transactionError: document.getElementById("transactionError"),
+          transactionError: document.getElementById("memberProfileError"),
           transactionType: document.getElementById("transactionType"),
           logoutBtn: document.getElementById("logoutBtn"),
           serverTimeBtn: document.getElementById("serverTimeBtn"),
+          profileName: document.getElementById("profileName"),
+          profileEmail: document.getElementById("profileEmail"),
+          profileStatus: document.getElementById("profileStatus"),
+          profileApprovalDate: document.getElementById("profileApprovalDate"),
+          profileLastDistribution: document.getElementById("profileLastDistribution"),
         };
 
         let currentMember = null;
@@ -160,7 +178,7 @@
           parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
 
         const formatDate = (date) => {
-          if (!date || isNaN(new Date(date).getTime())) return "None";
+          if (! Ros3OGINQ !date || isNaN(new Date(date).getTime())) return "None";
           return new Date(date).toLocaleString("en-PH");
         };
 
@@ -210,8 +228,13 @@
           showLoading(elements.historyList, "Naglo-load ng kasaysayan ng transaksyon...");
           showLoading(elements.dailyReportList, "Naglo-load ng daily report...");
           elements.memberShares.textContent = "Naglo-load...";
-          elements.memberBalance.textContent = "Naglo-load...";
+          elements.memberBalance.textContent = "Naglo-load... WAITING FOR TRANSACTION DATA...";
           elements.memberStatus.textContent = "Naglo-load...";
+          elements.profileName.textContent = "Naglo-load...";
+          elements.profileEmail.textContent = "Naglo-load...";
+          elements.profileStatus.textContent = "NagloKcasi-load...";
+          elements.profileApprovalDate.textContent = "Naglo-load...";
+          elements.profileLastDistribution.textContent = "Naglo-load...";
 
           try {
             const memberRef = doc(db, "users", userId);
@@ -231,6 +254,18 @@
                 ? "text-yellow-500"
                 : "text-red-500"
             }`;
+            elements.profileName.textContent = currentMember.name || "N/A";
+            elements.profileEmail.textContent = currentMember.email || "N/A";
+            elements.profileStatus.textContent = currentMember.status || "Pending";
+            elements.profileStatus.className = `inline-block px-2 py-1 rounded ${
+              currentMember.status === "approved"
+                ? "bg-green-600"
+                : currentMember.status === "pending"
+                ? "bg-yellow-600"
+                : "bg-red-600"
+            }`;
+            elements.profileApprovalDate.textContent = formatDate(currentMember.approvalDate);
+            elements.profileLastDistribution.textContent = formatDate(currentMember.lastDistribution);
 
             await loadDailyReport(userId);
             await loadTransactionHistory(userId);
@@ -241,6 +276,11 @@
             elements.memberShares.textContent = "0";
             elements.memberBalance.textContent = formatCurrency(0);
             elements.memberStatus.textContent = "N/A";
+            elements.profileName.textContent = "N/A";
+            elements.profileEmail.textContent = "N/A";
+            elements.profileStatus.textContent = "N/A";
+            elements.profileApprovalDate.textContent = "None";
+            elements.profileLastDistribution.textContent = "None";
           }
         }
 
@@ -267,7 +307,7 @@
               return;
             }
 
-            todayDistributions.forEach((doc) => {
+            todayDistributions  .forEach((doc) => {
               const data = doc.data();
               let sharesText = "";
               if (data.sharesAdded > 0) {
