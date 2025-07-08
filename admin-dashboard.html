@@ -291,31 +291,39 @@
       function isMemberEligible(member) {
         try {
           let approvalDate;
-          if (member.approvalDate) {
-            // Handle Firestore Timestamp
-            if (member.approvalDate.toDate) {
-              approvalDate = member.approvalDate.toDate();
-            } else {
-              // Handle ISO string or other date formats
-              approvalDate = new Date(member.approvalDate);
-            }
+          if (!member || !member.id) {
+            console.warn("Invalid member object:", member);
+            return { eligible: false, reason: "Invalid member data" };
+          }
+
+          if (!member.approvalDate) {
+            console.warn(`No approvalDate for member ${member.id}`);
+            return { eligible: false, reason: "No approval date" };
+          }
+
+          // Handle Firestore Timestamp or string
+          if (member.approvalDate.toDate) {
+            approvalDate = member.approvalDate.toDate();
           } else {
-            console.warn(`No approvalDate for member ${member.id || 'unknown'}`);
-            return false; // No approval date, not eligible
+            approvalDate = new Date(member.approvalDate);
           }
 
-          // Check if approvalDate is valid
+          // Validate date
           if (isNaN(approvalDate.getTime())) {
-            console.error(`Invalid approvalDate for member ${member.id || 'unknown'}: ${member.approvalDate}`);
-            return false; // Invalid date, not eligible
+            console.error(`Invalid approvalDate for member ${member.id}: ${JSON.stringify(member.approvalDate)}`);
+            return { eligible: false, reason: "Invalid approval date" };
           }
 
-          const now = new Date(); // Current time (09:19 PM PST, July 08, 2025)
-          const hoursSinceApproval = (now - approvalDate) / (1000 * 60 * 60); // Convert to hours
-          return hoursSinceApproval >= HOURS_THRESHOLD;
+          const now = new Date(); // Current time in UTC (09:31 PM PST, July 08, 2025 = 2025-07-09T04:31:00Z)
+          const hoursSinceApproval = (now.getTime() - approvalDate.getTime()) / (1000 * 60 * 60);
+          if (hoursSinceApproval >= HOURS_THRESHOLD) {
+            return { eligible: true, reason: "Approved for 24+ hours" };
+          } else {
+            return { eligible: false, reason: "Less than 24 hours since approval" };
+          }
         } catch (error) {
           console.error(`Error checking eligibility for member ${member.id || 'unknown'}:`, error);
-          return false; // Return false on any error
+          return { eligible: false, reason: "Eligibility check failed" };
         }
       }
 
@@ -355,11 +363,8 @@
         const div = document.createElement("div");
         div.className = "bg-gray-800 p-4 rounded shadow";
 
-        const eligibilityStatus = isMemberEligible(member)
-          ? "Yes"
-          : member.approvalDate
-          ? "No (Less than 24 hrs)"
-          : "No (No approval date)";
+        const eligibility = isMemberEligible(member);
+        const eligibilityStatus = eligibility.eligible ? "Yes" : `No (${eligibility.reason})`;
 
         const fields = [
           { label: "Pangalan", value: member.name || "N/A" },
@@ -417,7 +422,7 @@
       // Update Top Shareholders
       function updateTopShareholders() {
         const top = [...allMembers]
-          .filter((m) => m.status === "approved" && isMemberEligible(m))
+          .filter((m) => m.status === "approved" && isMemberEligible(m).eligible)
           .sort((a, b) => (b.shares || 0) - (a.shares || 0))
           .slice(0, 5);
 
@@ -704,7 +709,7 @@
             return;
           }
 
-          const eligibleMembers = allMembers.filter((m) => m.status === "approved" && isMemberEligible(m));
+          const eligibleMembers = allMembers.filter((m) => m.status === "approved" && isMemberEligible(m).eligible);
           const totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
           if (totalShares === 0) {
             showError(elements.profitError, "Walang eligible na miyembro na may shares.");
@@ -786,11 +791,20 @@
         elements.editBalance.value = member.balance || 0;
 
         let approvalDate;
-        if (member.approvalDate && member.approvalDate.toDate) {
-          approvalDate = member.approvalDate.toDate();
-        } else if (member.approvalDate) {
-          approvalDate = new Date(member.approvalDate);
-        } else {
+        try {
+          if (member.approvalDate && member.approvalDate.toDate) {
+            approvalDate = member.approvalDate.toDate();
+          } else if (member.approvalDate) {
+            approvalDate = new Date(member.approvalDate);
+          } else {
+            approvalDate = new Date();
+          }
+          if (isNaN(approvalDate.getTime())) {
+            console.warn(`Invalid approvalDate in openEditModal for member ${member.id}: ${JSON.stringify(member.approvalDate)}`);
+            approvalDate = new Date();
+          }
+        } catch (error) {
+          console.error(`Error parsing approvalDate for member ${member.id}:`, error);
           approvalDate = new Date();
         }
 
@@ -803,16 +817,21 @@
         const id = elements.editMemberId.value;
         const shares = parseInt(elements.editShares.value);
         const balance = parseFloat(elements.editBalance.value);
-        const approvalDate = elements.editApprovalDate.value
-          ? new Date(elements.editApprovalDate.value)
-          : new Date();
+        let approvalDate;
+        try {
+          approvalDate = elements.editApprovalDate.value ? new Date(elements.editApprovalDate.value) : new Date();
+          if (isNaN(approvalDate.getTime())) {
+            showError(elements.profitError, "Invalid na petsa ng pag-apruba.");
+            return;
+          }
+        } catch (error) {
+          console.error(`Error parsing approvalDate in editForm for member ${id}:`, error);
+          showError(elements.profitError, "Invalid na petsa ng pag-apruba.");
+          return;
+        }
 
         if (isNaN(shares) || shares < 0 || isNaN(balance) || balance < 0) {
           showError(elements.profitError, "Ang shares at balance ay dapat na hindi negatibo.");
-          return;
-        }
-        if (isNaN(approvalDate.getTime())) {
-          showError(elements.profitError, "Invalid na petsa ng pag-apruba.");
           return;
         }
 
