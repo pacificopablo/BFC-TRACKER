@@ -118,7 +118,7 @@
           orderBy,
           where,
           onSnapshot,
-          deleteDoc
+          deleteDoc,
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -127,7 +127,7 @@
           apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
           authDomain: "bfc-tracker.firebaseapp.com",
           projectId: "bfc-tracker",
-          storageBucket: "bfcHX3OGINQ",
+          storageBucket: "bfc-tracker.firebasestorage.app",
           messagingSenderId: "127052459580",
           appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
           measurementId: "G-PNYRCFJHYM",
@@ -139,6 +139,7 @@
           app = initializeApp(firebaseConfig);
           db = getFirestore(app);
           auth = getAuth(app);
+          console.log("Firebase initialized successfully");
         } catch (error) {
           console.error("Firebase initialization failed:", error);
           document.body.innerHTML = '<p class="text-red-500 p-4">Failed to initialize Firebase. Please check configuration.</p>';
@@ -178,13 +179,14 @@
           parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
 
         const formatDate = (date) => {
-          if (! Ros3OGINQ !date || isNaN(new Date(date).getTime())) return "None";
+          if (!date || isNaN(new Date(date).getTime())) return "None";
           return new Date(date).toLocaleString("en-PH");
         };
 
         const showError = (element, message) => {
           element.textContent = message;
           element.classList.remove("hidden");
+          console.error(message);
           setTimeout(() => element.classList.add("hidden"), 5000);
         };
 
@@ -201,6 +203,7 @@
             if (docSnap.exists()) {
               const serverTime = docSnap.data().timestamp.toDate();
               await deleteDoc(tempRef);
+              console.log("Server time retrieved:", serverTime);
               return serverTime;
             }
             throw new Error("Failed to retrieve server time");
@@ -225,25 +228,28 @@
 
         // Load Member Data
         async function loadMemberData(userId) {
+          console.log("Loading member data for userId:", userId);
           showLoading(elements.historyList, "Naglo-load ng kasaysayan ng transaksyon...");
           showLoading(elements.dailyReportList, "Naglo-load ng daily report...");
           elements.memberShares.textContent = "Naglo-load...";
-          elements.memberBalance.textContent = "Naglo-load... WAITING FOR TRANSACTION DATA...";
+          elements.memberBalance.textContent = "Naglo-load...";
           elements.memberStatus.textContent = "Naglo-load...";
           elements.profileName.textContent = "Naglo-load...";
           elements.profileEmail.textContent = "Naglo-load...";
-          elements.profileStatus.textContent = "NagloKcasi-load...";
+          elements.profileStatus.textContent = "Naglo-load...";
           elements.profileApprovalDate.textContent = "Naglo-load...";
           elements.profileLastDistribution.textContent = "Naglo-load...";
 
           try {
             const memberRef = doc(db, "users", userId);
             const memberSnap = await getDoc(memberRef);
+            console.log("Member snapshot:", memberSnap.data());
             if (!memberSnap.exists()) {
               showError(elements.transactionError, "Hindi nahanap ang data ng miyembro.");
               return;
             }
             currentMember = { id: memberSnap.id, ...memberSnap.data() };
+            console.log("Current member data:", currentMember);
             elements.memberShares.textContent = currentMember.shares || 0;
             elements.memberBalance.textContent = formatCurrency(currentMember.balance);
             elements.memberStatus.textContent = currentMember.status || "Pending";
@@ -286,6 +292,7 @@
 
         // Load Daily Distribution Report
         async function loadDailyReport(userId) {
+          console.log("Loading daily report for userId:", userId);
           showLoading(elements.dailyReportList, "Naglo-load ng daily report...");
           try {
             const now = await getServerTimeAsDate();
@@ -296,6 +303,7 @@
               orderBy("timestamp", "desc")
             );
             const snapshot = await getDocs(q);
+            console.log("Daily report snapshot:", snapshot.docs.map(doc => doc.data()));
             const todayDistributions = snapshot.docs.filter((doc) => {
               const timestamp = doc.data().timestamp?.toDate();
               return timestamp && timestamp >= start && timestamp <= end;
@@ -307,7 +315,7 @@
               return;
             }
 
-            todayDistributions  .forEach((doc) => {
+            todayDistributions.forEach((doc) => {
               const data = doc.data();
               let sharesText = "";
               if (data.sharesAdded > 0) {
@@ -333,6 +341,7 @@
 
         // Load Transaction History
         async function loadTransactionHistory(userId) {
+          console.log("Loading transaction history for userId:", userId);
           showLoading(elements.historyList, "Naglo-load ng kasaysayan ng transaksyon...");
           const profitQuery = query(
             collection(db, "member_distributions"),
@@ -346,7 +355,9 @@
           );
 
           onSnapshot(profitQuery, (profitSnapshot) => {
+            console.log("Profit snapshot:", profitSnapshot.docs.map(doc => doc.data()));
             onSnapshot(transactionQuery, (transactionSnapshot) => {
+              console.log("Transaction snapshot:", transactionSnapshot.docs.map(doc => doc.data()));
               allTransactions = [];
 
               profitSnapshot.docs.forEach((doc) => {
@@ -501,9 +512,11 @@
         // Authentication Check
         onAuthStateChanged(auth, (user) => {
           if (!user) {
+            console.log("No authenticated user, redirecting to login...");
             showError(elements.transactionError, "Hindi ka authenticated. Ire-redirect sa login...");
             setTimeout(() => (window.location.href = "/login.html"), 2000);
           } else {
+            console.log("Authenticated user:", user.uid);
             loadMemberData(user.uid);
           }
         });
