@@ -290,22 +290,38 @@
       // Check if member is eligible (approved for at least 24 hours)
       function isMemberEligible(member) {
         try {
-          let approvalDate;
           if (!member || !member.id) {
-            console.warn("Invalid member object:", member);
+            console.warn("Invalid member object:", JSON.stringify(member));
             return { eligible: false, reason: "Invalid member data" };
           }
 
           if (!member.approvalDate) {
             console.warn(`No approvalDate for member ${member.id}`);
-            return { eligible: false, reason: "No approval date" };
+            return { eligible: false, reason: "No approval date set" };
           }
 
-          // Handle Firestore Timestamp or string
-          if (member.approvalDate.toDate) {
-            approvalDate = member.approvalDate.toDate();
-          } else {
-            approvalDate = new Date(member.approvalDate);
+          let approvalDate;
+          try {
+            // Handle Firestore Timestamp
+            if (member.approvalDate && typeof member.approvalDate.toDate === "function") {
+              approvalDate = member.approvalDate.toDate();
+            }
+            // Handle string or other formats
+            else if (typeof member.approvalDate === "string") {
+              approvalDate = new Date(member.approvalDate);
+            }
+            // Handle unexpected object structures
+            else if (typeof member.approvalDate === "object" && member.approvalDate.seconds) {
+              approvalDate = new Date(member.approvalDate.seconds * 1000);
+            }
+            // Fallback for any other unexpected format
+            else {
+              console.error(`Unrecognized approvalDate format for member ${member.id}: ${JSON.stringify(member.approvalDate)}`);
+              return { eligible: false, reason: "Unrecognized approval date format" };
+            }
+          } catch (error) {
+            console.error(`Error parsing approvalDate for member ${member.id}: ${JSON.stringify(member.approvalDate)}`, error);
+            return { eligible: false, reason: "Failed to parse approval date" };
           }
 
           // Validate date
@@ -314,15 +330,18 @@
             return { eligible: false, reason: "Invalid approval date" };
           }
 
-          const now = new Date(); // Current time in UTC (09:31 PM PST, July 08, 2025 = 2025-07-09T04:31:00Z)
+          // Use UTC for consistency
+          const now = new Date(); // Current time: 09:41 PM PST, July 08, 2025 = 2025-07-09T04:41:00Z
           const hoursSinceApproval = (now.getTime() - approvalDate.getTime()) / (1000 * 60 * 60);
+          console.debug(`Member ${member.id}: hoursSinceApproval=${hoursSinceApproval.toFixed(2)}, approvalDate=${approvalDate.toISOString()}`);
+
           if (hoursSinceApproval >= HOURS_THRESHOLD) {
             return { eligible: true, reason: "Approved for 24+ hours" };
           } else {
-            return { eligible: false, reason: "Less than 24 hours since approval" };
+            return { eligible: false, reason: `Less than 24 hours since approval (${hoursSinceApproval.toFixed(2)} hrs)` };
           }
         } catch (error) {
-          console.error(`Error checking eligibility for member ${member.id || 'unknown'}:`, error);
+          console.error(`Unexpected error in isMemberEligible for member ${member.id || 'unknown'}: ${JSON.stringify(member.approvalDate)}`, error);
           return { eligible: false, reason: "Eligibility check failed" };
         }
       }
@@ -779,7 +798,7 @@
       // Edit Member Functions
       function openEditModal(member) {
         if (!member || !member.id) {
-          console.error("Invalid member data:", member);
+          console.error("Invalid member data:", JSON.stringify(member));
           showError(elements.profitError, "Hindi mae-edit: Invalid ang data ng miyembro.");
           return;
         }
@@ -792,11 +811,14 @@
 
         let approvalDate;
         try {
-          if (member.approvalDate && member.approvalDate.toDate) {
+          if (member.approvalDate && typeof member.approvalDate.toDate === "function") {
             approvalDate = member.approvalDate.toDate();
-          } else if (member.approvalDate) {
+          } else if (typeof member.approvalDate === "string") {
             approvalDate = new Date(member.approvalDate);
+          } else if (typeof member.approvalDate === "object" && member.approvalDate.seconds) {
+            approvalDate = new Date(member.approvalDate.seconds * 1000);
           } else {
+            console.warn(`Unrecognized approvalDate format in openEditModal for member ${member.id}: ${JSON.stringify(member.approvalDate)}`);
             approvalDate = new Date();
           }
           if (isNaN(approvalDate.getTime())) {
@@ -804,7 +826,7 @@
             approvalDate = new Date();
           }
         } catch (error) {
-          console.error(`Error parsing approvalDate for member ${member.id}:`, error);
+          console.error(`Error parsing approvalDate in openEditModal for member ${member.id}: ${JSON.stringify(member.approvalDate)}`, error);
           approvalDate = new Date();
         }
 
@@ -821,11 +843,12 @@
         try {
           approvalDate = elements.editApprovalDate.value ? new Date(elements.editApprovalDate.value) : new Date();
           if (isNaN(approvalDate.getTime())) {
+            console.error(`Invalid approvalDate input for member ${id}: ${elements.editApprovalDate.value}`);
             showError(elements.profitError, "Invalid na petsa ng pag-apruba.");
             return;
           }
         } catch (error) {
-          console.error(`Error parsing approvalDate in editForm for member ${id}:`, error);
+          console.error(`Error parsing approvalDate input for member ${id}: ${elements.editApprovalDate.value}`, error);
           showError(elements.profitError, "Invalid na petsa ng pag-apruba.");
           return;
         }
@@ -841,7 +864,7 @@
           status: elements.editStatus.value,
           shares,
           balance,
-          approvalDate: serverTimestamp(), // Store as Firestore Timestamp
+          approvalDate: serverTimestamp(), // Always store as Firestore Timestamp
         };
         try {
           await updateDoc(doc(db, "users", id), updatedData);
