@@ -142,7 +142,7 @@
           console.log("Firebase initialized successfully");
         } catch (error) {
           console.error("Firebase initialization failed:", error);
-          document.body.innerHTML = '<p class="text-red-500 p-4">Failed to initialize Firebase. Please check configuration.</p>';
+          document.body.innerHTML += '<p class="text-red-500 p-4">Firebase initialization failed. Proceeding with limited functionality.</p>';
         }
 
         // DOM Elements
@@ -213,20 +213,20 @@
           }
         }
 
-        // Get start and end of current day in PHT (00:00 to 23:59 PHT)
+        // Get start and end of current day in PHT (UTC+8)
         function getPHTDayRange(serverTime) {
-          const phtTime = new Date(serverTime.getTime() + 8 * 60 * 60 * 1000);
+          const phtTime = new Date(serverTime.getTime() + 8 * 60 * 60 * 1000); // Convert to PHT
           const startOfDay = new Date(phtTime);
           startOfDay.setHours(0, 0, 0, 0);
           const endOfDay = new Date(phtTime);
           endOfDay.setHours(23, 59, 59, 999);
           return {
-            start: new Date(startOfDay.getTime() - 8 * 60 * 60 * 1000),
+            start: new Date(startOfDay.getTime() - 8 * 60 * 60 * 1000), // Convert back to UTC
             end: new Date(endOfDay.getTime() - 8 * 60 * 60 * 1000),
           };
         }
 
-        // Load Member Data
+        // Load or Create Member Data
         async function loadMemberData(userId) {
           console.log("Loading member data for userId:", userId);
           showLoading(elements.historyList, "Naglo-load ng kasaysayan ng transaksyon...");
@@ -243,12 +243,30 @@
           try {
             const memberRef = doc(db, "users", userId);
             const memberSnap = await getDoc(memberRef);
-            console.log("Member snapshot:", memberSnap.data());
             if (!memberSnap.exists()) {
-              showError(elements.transactionError, "Hindi nahanap ang data ng miyembro.");
-              return;
+              console.log("No member document found, creating default...");
+              await setDoc(memberRef, {
+                name: "New Member",
+                email: "no-email@default.com",
+                status: "pending",
+                shares: 0,
+                balance: 0,
+                approvalDate: null,
+                lastDistribution: null,
+              });
+              currentMember = {
+                id: userId,
+                name: "New Member",
+                email: "no-email@default.com",
+                status: "pending",
+                shares: 0,
+                balance: 0,
+                approvalDate: null,
+                lastDistribution: null,
+              };
+            } else {
+              currentMember = { id: memberSnap.id, ...memberSnap.data() };
             }
-            currentMember = { id: memberSnap.id, ...memberSnap.data() };
             console.log("Current member data:", currentMember);
             elements.memberShares.textContent = currentMember.shares || 0;
             elements.memberBalance.textContent = formatCurrency(currentMember.balance);
@@ -509,17 +527,24 @@
           }
         }
 
-        // Authentication Check
-        onAuthStateChanged(auth, (user) => {
-          if (!user) {
-            console.log("No authenticated user, redirecting to login...");
-            showError(elements.transactionError, "Hindi ka authenticated. Ire-redirect sa login...");
-            setTimeout(() => (window.location.href = "/login.html"), 2000);
-          } else {
-            console.log("Authenticated user:", user.uid);
-            loadMemberData(user.uid);
-          }
-        });
+        // Authentication Check with Retry
+        function checkAuth() {
+          onAuthStateChanged(auth, (user) => {
+            if (!user) {
+              console.log("No authenticated user, redirecting to login...");
+              showError(elements.transactionError, "Hindi ka authenticated. Ire-redirect sa login...");
+              setTimeout(() => (window.location.href = "/login.html"), 2000);
+            } else {
+              console.log("Authenticated user:", user.uid);
+              loadMemberData(user.uid);
+            }
+          }, (error) => {
+            console.error("Auth state change error:", error);
+            showError(elements.transactionError, "Authentication error, retrying...");
+            setTimeout(checkAuth, 2000); // Retry after 2 seconds
+          });
+        }
+        checkAuth();
 
         // Submit Transaction Request
         elements.transactionForm.addEventListener("submit", async (e) => {
@@ -536,6 +561,10 @@
           elements.submitTransactionBtn.textContent = "Pinoproseso...";
 
           try {
+            if (!currentMember) {
+              showError(elements.transactionError, "Member data not loaded. Please wait.");
+              return;
+            }
             const transactionType = elements.transactionType.value;
             const amount = parseFloat(elements.transactionAmount.value);
             if (isNaN(amount) || amount <= 0) {
