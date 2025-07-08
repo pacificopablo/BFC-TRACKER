@@ -13,7 +13,8 @@
       <header class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">Baccarat Fund Admin Dashboard</h1>
         <div>
-          <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded">Logout</button>
+          <button id="syncSharesBtn" class="bg-purple-600 px-4 py-2 rounded">Sync Shares</button>
+          <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded ml-2">Logout</button>
           <button id="serverTimeBtn" class="bg-blue-600 px-4 py-2 rounded ml-2">Check Server Time</button>
         </div>
       </header>
@@ -81,7 +82,7 @@
       <!-- Member List -->
       <div class="bg-gray-800 p-4 rounded shadow mb-6">
         <h2 class="text-lg font-semibold mb-4">Member List</h2>
-        <div id="membersList" class="grid grid-cols-1 gap-4"></div>
+        <div id="membersList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
       </div>
 
       <!-- Top Shareholders -->
@@ -142,10 +143,6 @@
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
               </select>
-            </div>
-            <div class="mb-4">
-              <label class="block mb-1">Shares</label>
-              <input id="editShares" type="number" min="0" class="w-full bg-gray-700 p-2 rounded" required />
             </div>
             <div class="mb-4">
               <label class="block mb-1">Balance (₱)</label>
@@ -227,13 +224,13 @@
           editName: document.getElementById("editName"),
           editEmail: document.getElementById("editEmail"),
           editStatus: document.getElementById("editStatus"),
-          editShares: document.getElementById("editShares"),
           editBalance: document.getElementById("editBalance"),
           editApprovalDate: document.getElementById("editApprovalDate"),
           editLastDistribution: document.getElementById("editLastDistribution"),
           cancelEdit: document.getElementById("cancelEdit"),
           logoutBtn: document.getElementById("logoutBtn"),
           serverTimeBtn: document.getElementById("serverTimeBtn"),
+          syncSharesBtn: document.getElementById("syncSharesBtn"),
           profitForm: document.getElementById("profitForm"),
           profitAmount: document.getElementById("profitAmount"),
           distributeBtn: document.getElementById("distributeBtn"),
@@ -247,7 +244,7 @@
         let lastSubmissionTime = 0;
         const SUBMISSION_COOLDOWN = 5000; // 5 seconds
         const HOURS_THRESHOLD = 24; // 24-hour eligibility threshold
-        const SHARES_PER_AMOUNT = 10; // 1 share per ₱10 profit or loss
+        const SHARES_PER_AMOUNT = 10; // 1 share per ₱10
 
         // Utility Functions
         const formatCurrency = (value) =>
@@ -262,6 +259,9 @@
         const showLoading = (element, message = "Loading...") => {
           element.innerHTML = `<p class="text-gray-400">${message}</p>`;
         };
+
+        // Compute Shares from Balance
+        const computeSharesFromBalance = (balance) => Math.floor((balance || 0) / SHARES_PER_AMOUNT);
 
         // Get Firebase Server Time
         async function getServerTimeAsDate() {
@@ -385,6 +385,26 @@
             console.error("Error loading daily report:", error);
             showError(elements.profitError, `Nabigo sa pag-load ng daily report: ${error.message}`);
             elements.dailyReportList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng daily report.</p>';
+          }
+        }
+
+        // Sync Shares for All Members
+        async function syncShares() {
+          try {
+            const batch = writeBatch(db);
+            for (const member of allMembers) {
+              const newShares = computeSharesFromBalance(member.balance);
+              const userRef = doc(db, "users", member.id);
+              batch.update(userRef, { shares: newShares });
+              console.log(`Synced shares for ${member.name || "N/A"}: ${newShares}`);
+            }
+            await batch.commit();
+            await loadMembers();
+            await loadDailyReport();
+            alert("Matagumpay na na-sync ang shares para sa lahat ng miyembro!");
+          } catch (error) {
+            console.error("Error syncing shares:", error);
+            showError(elements.profitError, `Nabigo sa pag-sync ng shares: ${error.message}`);
           }
         }
 
@@ -565,7 +585,7 @@
           const transactionQuery = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
 
           onSnapshot(profitQuery, (profitSnapshot) => {
-            onSnapshot(transactionSnapshot, (transactionSnapshot) => {
+            onSnapshot(transactionQuery, (transactionSnapshot) => {
               allTransactions = [];
 
               profitSnapshot.docs.forEach((doc) => {
@@ -642,6 +662,13 @@
         elements.historyFilter.addEventListener("change", displayTransactionHistory);
         elements.historySort.addEventListener("change", displayTransactionHistory);
 
+        // Sync Shares Button
+        elements.syncSharesBtn.addEventListener("click", async () => {
+          if (confirm("Sigurado ka bang gusto mong i-sync ang shares ng lahat ng miyembro batay sa kanilang balance?")) {
+            await syncShares();
+          }
+        });
+
         // Logout Functionality
         elements.logoutBtn.addEventListener("click", async () => {
           try {
@@ -694,7 +721,6 @@
             const fundDoc = fundSnapshot.docs[0];
             const fundBalance = fundDoc.data().balance || 0;
 
-            // Calculate total shares from all members with positive shares
             const membersWithShares = allMembers.filter((m) => (m.shares || 0) > 0);
             const totalShares = membersWithShares.reduce((sum, m) => sum + (m.shares || 0), 0);
             if (totalShares === 0) {
@@ -707,11 +733,9 @@
             let totalFundChange = 0;
             let eligibleMemberCount = 0;
 
-            // Create a profit_distributions document first to get its ID
             const distributionRef = doc(collection(db, "profit_distributions"));
             const distributionId = distributionRef.id;
 
-            // Process eligible members
             for (const member of membersWithShares) {
               const eligibility = await isMemberEligible(member);
               if (eligibility.eligible) {
@@ -723,12 +747,12 @@
                 if (transactionType === "profit") {
                   newBalance = currentBalance + memberDistributionAmount;
                   sharesChange = Math.floor(memberDistributionAmount / SHARES_PER_AMOUNT);
-                  newShares = currentShares + sharesChange;
+                  newShares = computeSharesFromBalance(newBalance);
                   totalFundChange += memberDistributionAmount;
                 } else {
                   newBalance = Math.max(0, currentBalance - memberDistributionAmount);
                   sharesChange = -Math.floor(memberDistributionAmount / SHARES_PER_AMOUNT);
-                  newShares = Math.max(0, currentShares + sharesChange);
+                  newShares = computeSharesFromBalance(newBalance);
                   totalFundChange -= memberDistributionAmount;
                 }
 
@@ -739,7 +763,6 @@
                   lastDistribution: serverTimestamp(),
                 });
 
-                // Log individual member distribution
                 const memberDistRef = doc(collection(db, "member_distributions"));
                 batch.set(memberDistRef, {
                   memberId: member.id,
@@ -760,7 +783,6 @@
               }
             }
 
-            // Update fund balance
             const fundRef = doc(db, "fund", fundDoc.id);
             const newFundBalance = fundBalance + (transactionType === "profit" ? totalFundChange : -totalFundChange);
             if (newFundBalance < 0) {
@@ -769,7 +791,6 @@
             }
             batch.update(fundRef, { balance: newFundBalance });
 
-            // Log distribution
             batch.set(distributionRef, {
               type: transactionType,
               amount: amount,
@@ -800,6 +821,51 @@
           }
         });
 
+        // Update Transaction Status
+        async function updateTransactionStatus(transactionId, status) {
+          try {
+            const transactionRef = doc(db, "transactions", transactionId);
+            const transactionSnap = await getDoc(transactionRef);
+            if (!transactionSnap.exists()) {
+              showError(elements.profitError, "Hindi nahanap ang transaksyon.");
+              return;
+            }
+            const transactionData = transactionSnap.data();
+            if (status === "approved") {
+              const memberRef = doc(db, "users", transactionData.memberId);
+              const memberSnap = await getDoc(memberRef);
+              if (!memberSnap.exists()) {
+                showError(elements.profitError, "Hindi nahanap ang miyembro.");
+                return;
+              }
+              const memberData = memberSnap.data();
+              let newBalance = memberData.balance || 0;
+              if (transactionData.type === "deposit") {
+                newBalance += transactionData.amount;
+              } else if (transactionData.type === "cashout") {
+                newBalance = Math.max(0, newBalance - transactionData.amount);
+              }
+              const newShares = computeSharesFromBalance(newBalance);
+              const batch = writeBatch(db);
+              batch.update(memberRef, { balance: newBalance, shares: newShares });
+              batch.update(transactionRef, { status: status });
+              await batch.commit();
+              console.log(
+                `Approved ${transactionData.type} of ₱${formatCurrency(transactionData.amount)} for ${
+                  memberData.name || "N/A"
+                }, New balance: ₱${formatCurrency(newBalance)}, New shares: ${newShares}`
+              );
+            } else {
+              await updateDoc(transactionRef, { status: status });
+            }
+            await loadMembers();
+            await loadDailyReport();
+          } catch (error) {
+            console.error("Error sa pag-update ng status ng transaksyon:", error);
+            showError(elements.profitError, `Nabigo sa pag-update ng status: ${error.message}`);
+          }
+        }
+
         // Edit Member Functions
         function openEditModal(member) {
           if (!member || !member.id) {
@@ -811,7 +877,6 @@
           elements.editName.value = member.name || "";
           elements.editEmail.value = member.email || "";
           elements.editStatus.value = member.status || "pending";
-          elements.editShares.value = member.shares || 0;
           elements.editBalance.value = member.balance || 0;
           elements.editApprovalDate.value = member.approvalDate 
             ? new Date(member.approvalDate).toISOString().slice(0, 16)
@@ -825,18 +890,18 @@
         elements.editForm.addEventListener("submit", async (e) => {
           e.preventDefault();
           const id = elements.editMemberId.value;
-          const shares = parseInt(elements.editShares.value);
           const balance = parseFloat(elements.editBalance.value);
           const status = elements.editStatus.value;
           const approvalDate = elements.editApprovalDate.value
             ? new Date(elements.editApprovalDate.value).toISOString()
             : new Date().toISOString();
 
-          if (isNaN(shares) || shares < 0 || isNaN(balance) || balance < 0) {
-            showError(elements.profitError, "Ang shares at balance ay dapat na hindi negatibo.");
+          if (isNaN(balance) || balance < 0) {
+            showError(elements.profitError, "Ang balance ay dapat na hindi negatibo.");
             return;
           }
 
+          const newShares = computeSharesFromBalance(balance);
           const memberRef = doc(db, "users", id);
           const memberSnap = await getDoc(memberRef);
           const currentMemberData = memberSnap.exists() ? memberSnap.data() : {};
@@ -850,7 +915,7 @@
             name: elements.editName.value,
             email: elements.editEmail.value,
             status: status,
-            shares,
+            shares: newShares,
             balance,
             approvalDate: updatedApprovalDate,
             lastDistribution: currentMemberData.lastDistribution || null,
@@ -914,17 +979,6 @@
           }
         });
 
-        // Update Transaction Status
-        async function updateTransactionStatus(transactionId, status) {
-          try {
-            const transactionRef = doc(db, "transactions", transactionId);
-            await updateDoc(transactionRef, { status: status });
-          } catch (error) {
-            console.error("Error sa pag-update ng status ng transaksyon:", error);
-            showError(elements.profitError, `Nabigo sa pag-update ng status: ${error.message}`);
-          }
-        }
-
         // Initialize Chart
         try {
           const ctx = document.getElementById("fundChart").getContext("2d");
@@ -960,5 +1014,5 @@
             '<p class="text-red-500">Nabigo sa pag-load ng chart.</p>';
         }
       </script>
-  </body>
+    </body>
 </html>
