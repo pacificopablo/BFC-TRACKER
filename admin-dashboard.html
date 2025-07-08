@@ -13,7 +13,7 @@
       <header class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">Baccarat Fund Admin Dashboard</h1>
         <div>
-          <button id="syncSharesBtn" class="bg-purple-600 px-4 py-2 rounded">Sync Shares</button>
+          <button id="syncSharesBtn" class="bg-purple-600 px-4 py-2 rounded">Sync Shares & Approval Dates</button>
           <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded ml-2">Logout</button>
           <button id="serverTimeBtn" class="bg-blue-600 px-4 py-2 rounded ml-2">Check Server Time</button>
         </div>
@@ -250,6 +250,11 @@
         const formatCurrency = (value) =>
           parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
 
+        const formatDate = (date) => {
+          if (!date || isNaN(new Date(date).getTime())) return "None";
+          return new Date(date).toLocaleString("en-PH");
+        };
+
         const showError = (element, message) => {
           element.textContent = message;
           element.classList.remove("hidden");
@@ -290,7 +295,7 @@
           endOfDay.setHours(23, 59, 59, 999);
           return {
             start: new Date(startOfDay.getTime() - 8 * 60 * 60 * 1000),
-            end: new Date(endOfDay.getTime() - 8 * 60 * 60 * 1000),
+            end: new Date(endOfDay.getTime() - 8 * 60 * 1000),
           };
         }
 
@@ -299,7 +304,7 @@
           if (member.status !== "approved") return { eligible: false, reason: "Not Approved" };
           if (!member.balance || member.balance <= 0) return { eligible: false, reason: "Zero/Negative Balance" };
           const approvalDate = member.approvalDate ? new Date(member.approvalDate) : null;
-          if (!approvalDate) return { eligible: false, reason: "No Approval Date" };
+          if (!approvalDate || isNaN(approvalDate.getTime())) return { eligible: false, reason: "No Approval Date" };
 
           try {
             const now = await getServerTimeAsDate();
@@ -307,7 +312,7 @@
             if (hoursSinceApproval < HOURS_THRESHOLD) return { eligible: false, reason: "New Member (< 24 hrs)" };
 
             const lastDistribution = member.lastDistribution ? new Date(member.lastDistribution) : null;
-            if (lastDistribution) {
+            if (lastDistribution && !isNaN(lastDistribution.getTime())) {
               const { start } = getPHTDayRange(now);
               if (lastDistribution >= start) {
                 return { eligible: false, reason: "Already Received Today" };
@@ -388,23 +393,32 @@
           }
         }
 
-        // Sync Shares for All Members
-        async function syncShares() {
+        // Sync Shares and Approval Dates
+        async function syncSharesAndApprovalDates() {
           try {
             const batch = writeBatch(db);
+            const now = await getServerTimeAsDate();
+            const nowISO = now.toISOString();
             for (const member of allMembers) {
               const newShares = computeSharesFromBalance(member.balance);
               const userRef = doc(db, "users", member.id);
-              batch.update(userRef, { shares: newShares });
-              console.log(`Synced shares for ${member.name || "N/A"}: ${newShares}`);
+              const updateData = { shares: newShares };
+              if (member.status === "approved" && !member.approvalDate) {
+                updateData.approvalDate = nowISO;
+              }
+              if (member.lastDistribution && isNaN(new Date(member.lastDistribution).getTime())) {
+                updateData.lastDistribution = null;
+              }
+              batch.update(userRef, updateData);
+              console.log(`Synced shares for ${member.name || "N/A"}: ${newShares}, Approval Date: ${updateData.approvalDate || member.approvalDate || "N/A"}, Last Distribution: ${updateData.lastDistribution || member.lastDistribution || "N/A"}`);
             }
             await batch.commit();
             await loadMembers();
             await loadDailyReport();
-            alert("Matagumpay na na-sync ang shares para sa lahat ng miyembro!");
+            alert("Matagumpay na na-sync ang shares at approval dates para sa lahat ng miyembro!");
           } catch (error) {
-            console.error("Error syncing shares:", error);
-            showError(elements.profitError, `Nabigo sa pag-sync ng shares: ${error.message}`);
+            console.error("Error syncing shares and approval dates:", error);
+            showError(elements.profitError, `Nabigo sa pag-sync ng shares at approval dates: ${error.message}`);
           }
         }
 
@@ -468,9 +482,8 @@
             balanceTotal += m.balance || 0;
 
             const eligibility = await isMemberEligible(m);
-            const lastDistributionText = m.lastDistribution
-              ? new Date(m.lastDistribution).toLocaleString("en-PH")
-              : "None";
+            const lastDistributionText = formatDate(m.lastDistribution);
+            const approvalDateText = formatDate(m.approvalDate);
 
             const div = document.createElement("div");
             div.className = "bg-gray-800 p-4 rounded shadow";
@@ -486,6 +499,7 @@
               }">${m.status || "N/A"}</span></p>
               <p><strong>Shares:</strong> ${m.shares || 0}</p>
               <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
+              <p><strong>Approval Date:</strong> ${approvalDateText}</p>
               <p><strong>Eligible for Profit/Loss:</strong> ${eligibility.eligible ? "Yes" : `No (${eligibility.reason})`}</p>
               <p><strong>Last Distribution:</strong> ${lastDistributionText}</p>
               <div class="flex space-x-2 mt-2">
@@ -662,10 +676,10 @@
         elements.historyFilter.addEventListener("change", displayTransactionHistory);
         elements.historySort.addEventListener("change", displayTransactionHistory);
 
-        // Sync Shares Button
+        // Sync Shares and Approval Dates Button
         elements.syncSharesBtn.addEventListener("click", async () => {
-          if (confirm("Sigurado ka bang gusto mong i-sync ang shares ng lahat ng miyembro batay sa kanilang balance?")) {
-            await syncShares();
+          if (confirm("Sigurado ka bang gusto mong i-sync ang shares at approval dates ng lahat ng miyembro?")) {
+            await syncSharesAndApprovalDates();
           }
         });
 
@@ -735,6 +749,8 @@
 
             const distributionRef = doc(collection(db, "profit_distributions"));
             const distributionId = distributionRef.id;
+            const now = await getServerTimeAsDate();
+            const nowISO = now.toISOString();
 
             for (const member of membersWithShares) {
               const eligibility = await isMemberEligible(member);
@@ -761,6 +777,7 @@
                   balance: newBalance,
                   shares: newShares,
                   lastDistribution: serverTimestamp(),
+                  approvalDate: member.approvalDate || nowISO,
                 });
 
                 const memberDistRef = doc(collection(db, "member_distributions"));
@@ -831,6 +848,9 @@
               return;
             }
             const transactionData = transactionSnap.data();
+            const now = await getServerTimeAsDate();
+            const nowISO = now.toISOString();
+
             if (status === "approved") {
               const memberRef = doc(db, "users", transactionData.memberId);
               const memberSnap = await getDoc(memberRef);
@@ -847,7 +867,12 @@
               }
               const newShares = computeSharesFromBalance(newBalance);
               const batch = writeBatch(db);
-              batch.update(memberRef, { balance: newBalance, shares: newShares });
+              batch.update(memberRef, {
+                balance: newBalance,
+                shares: newShares,
+                approvalDate: memberData.approvalDate || (memberData.status === "approved" ? nowISO : null),
+                lastDistribution: memberData.lastDistribution || null,
+              });
               batch.update(transactionRef, { status: status });
               await batch.commit();
               console.log(
@@ -892,9 +917,14 @@
           const id = elements.editMemberId.value;
           const balance = parseFloat(elements.editBalance.value);
           const status = elements.editStatus.value;
+          const now = await getServerTimeAsDate();
+          const nowISO = now.toISOString();
           const approvalDate = elements.editApprovalDate.value
             ? new Date(elements.editApprovalDate.value).toISOString()
-            : new Date().toISOString();
+            : (status === "approved" ? nowISO : null);
+          const lastDistribution = elements.editLastDistribution.value
+            ? new Date(elements.editLastDistribution.value).toISOString()
+            : null;
 
           if (isNaN(balance) || balance < 0) {
             showError(elements.profitError, "Ang balance ay dapat na hindi negatibo.");
@@ -906,19 +936,14 @@
           const memberSnap = await getDoc(memberRef);
           const currentMemberData = memberSnap.exists() ? memberSnap.data() : {};
 
-          let updatedApprovalDate = currentMemberData.approvalDate || approvalDate;
-          if (status === "approved" && !currentMemberData.approvalDate) {
-            updatedApprovalDate = new Date().toISOString();
-          }
-
           const updatedData = {
             name: elements.editName.value,
             email: elements.editEmail.value,
             status: status,
             shares: newShares,
             balance,
-            approvalDate: updatedApprovalDate,
-            lastDistribution: currentMemberData.lastDistribution || null,
+            approvalDate: status === "approved" ? (currentMemberData.approvalDate || nowISO) : null,
+            lastDistribution: lastDistribution || currentMemberData.lastDistribution || null,
           };
 
           try {
