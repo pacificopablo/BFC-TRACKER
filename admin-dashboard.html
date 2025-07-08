@@ -89,6 +89,13 @@
     <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded">
       Loading requests...
     </div>
+    <!-- Daily Distribution Report -->
+    <h2 class="text-2xl font-bold mt-10 mb-4">📈 Daily Distribution Report (Today)</h2>
+    <div id="dailyReport" class="bg-gray-800 p-4 rounded shadow mb-6">
+      <div id="dailyReportList" class="space-y-4 max-h-96 overflow-auto">
+        Loading daily report...
+      </div>
+    </div>
     <!-- Transaction History -->
     <h2 class="text-2xl font-bold mt-10 mb-4">📜 Transaction History</h2>
     <div class="bg-gray-800 p-4 rounded shadow mb-6">
@@ -155,6 +162,15 @@
               required
             />
           </div>
+          <div class="mb-4">
+            <label class="block text-sm">Last Distribution</label>
+            <input
+              type="datetime-local"
+              id="editLastDistribution"
+              class="w-full p-2 rounded bg-gray-700 text-white"
+              readonly
+            />
+          </div>
           <div class="flex justify-end space-x-2">
             <button type="button" id="cancelEdit" class="bg-gray-600 px-4 py-2 rounded">Cancel</button>
             <button type="submit" class="bg-blue-600 px-4 py-2 rounded">Save</button>
@@ -216,6 +232,7 @@
         historyList: document.getElementById("historyList"),
         historyFilter: document.getElementById("historyFilter"),
         historySort: document.getElementById("historySort"),
+        dailyReportList: document.getElementById("dailyReportList"),
         editModal: document.getElementById("editModal"),
         editForm: document.getElementById("editForm"),
         editMemberId: document.getElementById("editMemberId"),
@@ -225,6 +242,7 @@
         editShares: document.getElementById("editShares"),
         editBalance: document.getElementById("editBalance"),
         editApprovalDate: document.getElementById("editApprovalDate"),
+        editLastDistribution: document.getElementById("editLastDistribution"),
         cancelEdit: document.getElementById("cancelEdit"),
         logoutBtn: document.getElementById("logoutBtn"),
         serverTimeBtn: document.getElementById("serverTimeBtn"),
@@ -274,6 +292,46 @@
         }
       }
 
+      // Get start and end of current day in PHT (00:00 to 23:59 PHT)
+      function getPHTDayRange(serverTime) {
+        const phtTime = new Date(serverTime.getTime() + 8 * 60 * 60 * 1000); // Convert UTC to PHT
+        const startOfDay = new Date(phtTime);
+        startOfDay.setHours(0, 0, 0, 0); // 00:00 PHT
+        const endOfDay = new Date(phtTime);
+        endOfDay.setHours(23, 59, 59, 999); // 23:59 PHT
+        return {
+          start: new Date(startOfDay.getTime() - 8 * 60 * 60 * 1000), // UTC
+          end: new Date(endOfDay.getTime() - 8 * 60 * 60 * 1000), // UTC
+        };
+      }
+
+      // Check Member Eligibility
+      async function isMemberEligible(member) {
+        if (member.status !== "approved") return { eligible: false, reason: "Not Approved" };
+        if (!member.balance || member.balance <= 0) return { eligible: false, reason: "Zero/Negative Balance" };
+        const approvalDate = member.approvalDate ? new Date(member.approvalDate) : null;
+        if (!approvalDate) return { eligible: false, reason: "No Approval Date" };
+
+        try {
+          const now = await getServerTimeAsDate();
+          const hoursSinceApproval = (now - approvalDate) / (1000 * 60 * 60);
+          if (hoursSinceApproval < HOURS_THRESHOLD) return { eligible: false, reason: "New Member (< 24 hrs)" };
+
+          const lastDistribution = member.lastDistribution ? new Date(member.lastDistribution) : null;
+          if (lastDistribution) {
+            const { start } = getPHTDayRange(now);
+            if (lastDistribution >= start) {
+              return { eligible: false, reason: "Already Received Today" };
+            }
+          }
+
+          return { eligible: true, reason: "Eligible" };
+        } catch (error) {
+          console.error("Error checking server time for eligibility:", error);
+          return { eligible: false, reason: "Server Time Error" };
+        }
+      }
+
       // Load Fund Balance
       async function loadFundBalance() {
         try {
@@ -294,6 +352,47 @@
         }
       }
 
+      // Load Daily Distribution Report
+      async function loadDailyReport() {
+        showLoading(elements.dailyReportList, "Naglo-load ng daily report...");
+        try {
+          const now = await getServerTimeAsDate();
+          const { start, end } = getPHTDayRange(now);
+          const q = query(
+            collection(db, "member_distributions"),
+            orderBy("timestamp", "desc")
+          );
+          const snapshot = await getDocs(q);
+          const todayDistributions = snapshot.docs.filter((doc) => {
+            const timestamp = doc.data().timestamp?.toDate();
+            return timestamp && timestamp >= start && timestamp <= end;
+          });
+
+          elements.dailyReportList.innerHTML = "";
+          if (todayDistributions.length === 0) {
+            elements.dailyReportList.innerHTML = '<p class="text-gray-400">Walang distribusyon ngayong araw.</p>';
+            return;
+          }
+
+          todayDistributions.forEach((doc) => {
+            const data = doc.data();
+            const div = document.createElement("div");
+            div.className = "bg-gray-700 p-4 rounded";
+            div.innerHTML = `
+              <p><strong>Miyembro:</strong> ${data.memberName || "N/A"}</p>
+              <p><strong>Uri:</strong> ${data.type === "profit" ? "Profit" : "Loss"}</p>
+              <p><strong>Halaga:</strong> ${data.type === "profit" ? "+" : "-"}₱${formatCurrency(data.amount)}</p>
+              <p><strong>Petsa:</strong> ${data.timestamp?.toDate().toLocaleString("en-PH") || "N/A"}</p>
+            `;
+            elements.dailyReportList.appendChild(div);
+          });
+        } catch (error) {
+          console.error("Error loading daily report:", error);
+          showError(elements.profitError, `Nabigo sa pag-load ng daily report: ${error.message}`);
+          elements.dailyReportList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng daily report.</p>';
+        }
+      }
+
       // Authentication Check
       onAuthStateChanged(auth, (user) => {
         if (!user) {
@@ -304,25 +403,10 @@
             loadMembers();
             listenForRequests();
             listenForTransactionHistory();
+            loadDailyReport();
           });
         }
       });
-
-      // Check Member Eligibility
-      async function isMemberEligible(member) {
-        if (member.status !== "approved") return false;
-        if (!member.balance || member.balance <= 0) return false;
-        const approvalDate = member.approvalDate ? new Date(member.approvalDate) : null;
-        if (!approvalDate) return false;
-        try {
-          const now = await getServerTimeAsDate(); // Use Firebase server time
-          const hoursSinceApproval = (now - approvalDate) / (1000 * 60 * 60);
-          return hoursSinceApproval >= HOURS_THRESHOLD;
-        } catch (error) {
-          console.error("Error checking server time for eligibility:", error);
-          return false;
-        }
-      }
 
       // Load Members
       async function loadMembers() {
@@ -368,14 +452,10 @@
           shareTotal += m.shares || 0;
           balanceTotal += m.balance || 0;
 
-          const isEligible = await isMemberEligible(m);
-          const eligibilityText = isEligible
-            ? "Yes"
-            : m.status !== "approved"
-            ? "No (Not Approved)"
-            : m.balance <= 0
-            ? "No (Zero/Negative Balance)"
-            : "No (New Member, < 24 hrs)";
+          const eligibility = await isMemberEligible(m);
+          const lastDistributionText = m.lastDistribution
+            ? new Date(m.lastDistribution).toLocaleString("en-PH")
+            : "None";
 
           const div = document.createElement("div");
           div.className = "bg-gray-800 p-4 rounded shadow";
@@ -391,7 +471,8 @@
             }">${m.status || "N/A"}</span></p>
             <p><strong>Shares:</strong> ${m.shares || 0}</p>
             <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
-            <p><strong>Eligible for Profit/Loss:</strong> ${eligibilityText}</p>
+            <p><strong>Eligible for Profit/Loss:</strong> ${eligibility.eligible ? "Yes" : `No (${eligibility.reason})`}</p>
+            <p><strong>Last Distribution:</strong> ${lastDistributionText}</p>
             <div class="flex space-x-2 mt-2">
               <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm">I-edit</button>
               <button data-id="${m.id}" data-name="${
@@ -411,7 +492,8 @@
       async function updateTopShareholders() {
         const top = [];
         for (const m of allMembers) {
-          if (m.status === "approved" && (await isMemberEligible(m))) {
+          const eligibility = await isMemberEligible(m);
+          if (m.status === "approved" && eligibility.eligible) {
             top.push(m);
           }
         }
@@ -491,7 +573,6 @@
           onSnapshot(transactionSnapshot, (transactionSnapshot) => {
             allTransactions = [];
 
-            // Process profit/loss distributions
             profitSnapshot.docs.forEach((doc) => {
               const data = doc.data();
               allTransactions.push({
@@ -500,11 +581,10 @@
                 filterType: data.type,
                 amount: data.amount,
                 timestamp: data.timestamp?.toDate() || new Date(),
-                details: `Distributed to ${data.memberCount} members, Total Shares: ${data.totalShares}`,
+                details: `Distributed to ${data.eligibleMemberCount} of ${data.totalMemberCount} members, Total Shares: ${data.totalShares}`,
               });
             });
 
-            // Process deposit/cash out transactions
             transactionSnapshot.docs.forEach((doc) => {
               const data = doc.data();
               allTransactions.push({
@@ -534,13 +614,13 @@
       function displayTransactionHistory() {
         const filter = elements.historyFilter.value;
         const sort = elements.historySort.value;
-        
+
         let filteredTransactions = allTransactions;
         if (filter !== "all") {
           filteredTransactions = allTransactions.filter((txn) => txn.filterType === filter);
         }
 
-        filteredTransactions.sort((a, b) => 
+        filteredTransactions.sort((a, b) =>
           sort === "desc" ? b.timestamp - a.timestamp : a.timestamp - b.timestamp
         );
 
@@ -619,60 +699,81 @@
           const fundDoc = fundSnapshot.docs[0];
           const fundBalance = fundDoc.data().balance || 0;
 
-          if (transactionType === "loss" && amount > fundBalance) {
-            showError(elements.profitError, "Kulang ang fund balance para sa pagkatalo.");
-            return;
-          }
-
-          const eligibleMembers = [];
-          for (const member of allMembers) {
-            if (await isMemberEligible(member)) {
-              eligibleMembers.push(member);
-            }
-          }
-
-          const totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+          // Calculate total shares from all members with positive shares
+          const membersWithShares = allMembers.filter((m) => (m.shares || 0) > 0);
+          const totalShares = membersWithShares.reduce((sum, m) => sum + (m.shares || 0), 0);
           if (totalShares === 0) {
-            showError(elements.profitError, "Walang eligible na miyembro na may shares.");
+            showError(elements.profitError, "Walang miyembro na may shares.");
             return;
           }
 
           const amountPerShare = amount / totalShares;
           const batch = writeBatch(db);
+          let totalFundChange = 0;
+          let eligibleMemberCount = 0;
 
-          eligibleMembers.forEach((member) => {
-            const currentBalance = member.balance || 0;
-            let newBalance;
-            if (transactionType === "profit") {
-              newBalance = currentBalance + (member.shares || 0) * amountPerShare;
-            } else {
-              newBalance = currentBalance - (member.shares || 0) * amountPerShare;
-              if (newBalance < 0) newBalance = 0;
+          // Create a profit_distributions document first to get its ID
+          const distributionRef = doc(collection(db, "profit_distributions"));
+          const distributionId = distributionRef.id;
+
+          // Process eligible members
+          for (const member of membersWithShares) {
+            const eligibility = await isMemberEligible(member);
+            if (eligibility.eligible) {
+              const currentBalance = member.balance || 0;
+              let newBalance;
+              const memberDistributionAmount = (member.shares || 0) * amountPerShare;
+              if (transactionType === "profit") {
+                newBalance = currentBalance + memberDistributionAmount;
+                totalFundChange += memberDistributionAmount;
+              } else {
+                newBalance = currentBalance - memberDistributionAmount;
+                if (newBalance < 0) newBalance = 0;
+                totalFundChange -= memberDistributionAmount;
+              }
+              const userRef = doc(db, "users", member.id);
+              batch.update(userRef, {
+                balance: newBalance,
+                lastDistribution: serverTimestamp(),
+              });
+
+              // Log individual member distribution
+              const memberDistRef = doc(collection(db, "member_distributions"));
+              batch.set(memberDistRef, {
+                memberId: member.id,
+                memberName: member.name || "N/A",
+                type: transactionType,
+                amount: memberDistributionAmount,
+                timestamp: serverTimestamp(),
+                distributionId: distributionId,
+              });
+
+              console.log(
+                `${transactionType === "profit" ? "Idinagdag" : "Ibinawas"} ₱${formatCurrency(
+                  memberDistributionAmount
+                )} sa ${member.name || "N/A"} (Bagong balance: ₱${formatCurrency(newBalance)})`
+              );
+              eligibleMemberCount++;
             }
-            const userRef = doc(db, "users", member.id);
-            batch.update(userRef, { balance: newBalance });
-            console.log(
-              `${transactionType === "profit" ? "Idinagdag" : "Ibinawas"} ₱${formatCurrency(
-                (member.shares || 0) * amountPerShare
-              )} sa ${member.name || "N/A"} (Bagong balance: ₱${formatCurrency(newBalance)})`
-            );
-          });
+          }
 
+          // Update fund balance
           const fundRef = doc(db, "fund", fundDoc.id);
-          const newFundBalance = transactionType === "profit" ? fundBalance + amount : fundBalance - amount;
+          const newFundBalance = fundBalance + (transactionType === "profit" ? totalFundChange : -totalFundChange);
           if (newFundBalance < 0) {
             showError(elements.profitError, "Ang transaksyon ay magreresulta sa negatibong fund balance.");
             return;
           }
           batch.update(fundRef, { balance: newFundBalance });
 
-          const auditRef = collection(db, "profit_distributions");
-          batch.set(doc(auditRef), {
+          // Log distribution
+          batch.set(distributionRef, {
             type: transactionType,
             amount: amount,
             timestamp: serverTimestamp(),
             adminId: auth.currentUser?.uid || "unknown",
-            memberCount: eligibleMembers.length,
+            eligibleMemberCount,
+            totalMemberCount: membersWithShares.length,
             totalShares,
           });
 
@@ -681,10 +782,11 @@
           elements.profitForm.reset();
           await loadMembers();
           await loadFundBalance();
+          await loadDailyReport();
           alert(
             `Matagumpay na ${transactionType === "profit" ? "ipinadistribute" : "ibinawas"} ang ₱${formatCurrency(
               amount
-            )} sa ${eligibleMembers.length} miyembro!`
+            )} sa ${eligibleMemberCount} ng ${membersWithShares.length} miyembro!`
           );
         } catch (error) {
           console.error(`Error ${transactionType === "profit" ? "distributing profit" : "deducting loss"}:`, error);
@@ -711,6 +813,9 @@
         elements.editApprovalDate.value = member.approvalDate 
           ? new Date(member.approvalDate).toISOString().slice(0, 16)
           : new Date().toISOString().slice(0, 16);
+        elements.editLastDistribution.value = member.lastDistribution
+          ? new Date(member.lastDistribution).toISOString().slice(0, 16)
+          : "";
         elements.editModal.classList.remove("hidden");
       }
 
@@ -745,12 +850,14 @@
           shares,
           balance,
           approvalDate: updatedApprovalDate,
+          lastDistribution: currentMemberData.lastDistribution || null,
         };
 
         try {
           await updateDoc(memberRef, updatedData);
           elements.editModal.classList.add("hidden");
           await loadMembers();
+          await loadDailyReport();
           alert("Matagumpay na na-update ang miyembro!");
         } catch (error) {
           console.error("Error sa pag-update ng miyembro sa users collection:", error);
@@ -768,6 +875,7 @@
           try {
             await deleteDoc(doc(db, "users", id));
             await loadMembers();
+            await loadDailyReport();
             alert("Matagumpay na na-delete ang miyembro!");
           } catch (error) {
             console.error("Error sa pag-delete ng miyembro mula sa users collection:", error);
