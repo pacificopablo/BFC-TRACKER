@@ -118,7 +118,6 @@
           orderBy,
           where,
           onSnapshot,
-          deleteDoc,
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -226,7 +225,7 @@
           };
         }
 
-        // Load or Create Member Data
+        // Load Member Data
         async function loadMemberData(userId) {
           console.log("Loading member data for userId:", userId);
           showLoading(elements.historyList, "Naglo-load ng kasaysayan ng transaksyon...");
@@ -245,6 +244,8 @@
             const memberSnap = await getDoc(memberRef);
             if (!memberSnap.exists()) {
               console.log("No member document found, creating default...");
+              const now = await getServerTimeAsDate();
+              const nowISO = now.toISOString();
               await setDoc(memberRef, {
                 name: "New Member",
                 email: "no-email@default.com",
@@ -527,24 +528,21 @@
           }
         }
 
-        // Authentication Check with Retry
-        function checkAuth() {
-          onAuthStateChanged(auth, (user) => {
-            if (!user) {
-              console.log("No authenticated user, redirecting to login...");
-              showError(elements.transactionError, "Hindi ka authenticated. Ire-redirect sa login...");
-              setTimeout(() => (window.location.href = "/login.html"), 2000);
-            } else {
-              console.log("Authenticated user:", user.uid);
-              loadMemberData(user.uid);
-            }
-          }, (error) => {
-            console.error("Auth state change error:", error);
-            showError(elements.transactionError, "Authentication error, retrying...");
-            setTimeout(checkAuth, 2000); // Retry after 2 seconds
-          });
-        }
-        checkAuth();
+        // Authentication Check
+        onAuthStateChanged(auth, (user) => {
+          if (!user) {
+            console.log("No authenticated user, redirecting to login...");
+            showError(elements.transactionError, "Hindi ka authenticated. Ire-redirect sa login...");
+            setTimeout(() => (window.location.href = "/login.html"), 2000);
+          } else {
+            console.log("Authenticated user:", user.uid);
+            loadMemberData(user.uid);
+          }
+        }, (error) => {
+          console.error("Auth state change error:", error);
+          showError(elements.transactionError, "Authentication error, retrying...");
+          setTimeout(() => location.reload(), 2000); // Retry by reloading
+        });
 
         // Submit Transaction Request
         elements.transactionForm.addEventListener("submit", async (e) => {
