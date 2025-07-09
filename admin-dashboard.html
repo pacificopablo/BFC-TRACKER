@@ -2,50 +2,59 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Baccarat Fund Admin Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Baccarat Fund Admin Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   </head>
-  <body class="bg-gray-900 text-white p-4">
-    <!-- Header with Logout and Server Time Buttons -->
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold">👑 Baccarat Fund Admin Dashboard</h1>
+  <body class="bg-gray-900 text-white min-h-screen p-4">
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-8">
+      <h1 class="text-2xl font-bold flex items-center">
+        <span class="mr-2">👑</span> Baccarat Fund Admin
+      </h1>
       <div class="flex space-x-2">
-        <button id="serverTimeBtn" class="bg-blue-600 px-4 py-2 rounded text-sm hover:bg-blue-700">Check Server Time</button>
-        <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded text-sm hover:bg-red-700">Logout</button>
+        <button id="serverTimeBtn" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 text-sm">
+          Server Time
+        </button>
+        <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700 text-sm">
+          Logout
+        </button>
       </div>
-    </div>
+    </header>
+
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      <div class="bg-gray-800 p-4 rounded shadow">
-        <p class="text-sm">Total Members</p>
-        <p class="text-2xl font-bold" id="totalMembers">Loading...</p>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div class="bg-gray-800 p-4 rounded-lg shadow">
+        <p class="text-sm text-gray-400">Total Members</p>
+        <p class="text-2xl font-bold" id="totalMembers">0</p>
       </div>
-      <div class="bg-gray-800 p-4 rounded shadow">
-        <p class="text-sm">Total Shares</p>
-        <p class="text-2xl font-bold" id="totalShares">Loading...</p>
+      <div class="bg-gray-800 p-4 rounded-lg shadow">
+        <p class="text-sm text-gray-400">Total Shares</p>
+        <p class="text-2xl font-bold" id="totalShares">0</p>
       </div>
-      <div class="bg-gray-800 p-4 rounded shadow">
-        <p class="text-sm">Total Balance</p>
-        <p class="text-2xl font-bold">₱<span id="totalBalance">Loading...</span></p>
+      <div class="bg-gray-800 p-4 rounded-lg shadow">
+        <p class="text-sm text-gray-400">Total Balance</p>
+        <p class="text-2xl font-bold">₱<span id="totalBalance">0.00</span></p>
       </div>
     </div>
-    <!-- Financial Chart -->
-    <div class="bg-gray-800 p-4 rounded shadow mb-6">
-      <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
-      <canvas id="fund Inspections" height="100"></canvas>
+
+    <!-- Fund Growth Chart -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">📊 Fund Growth</h2>
+      <canvas id="fundChart" height="100"></canvas>
     </div>
-    <!-- Distribute Profit/Loss Section -->
-    <div class="bg-gray-800 p-4 rounded shadow mb-6">
-      <h2 class="text-xl font-bold mb-4">💸 Distribute Profit or Loss</h2>
-      <p class="text-sm mb-2">Current Fund Balance: ₱<span id="fundBalance">Loading...</span></p>
-      <form id="profitForm" class="flex flex-col space-y-4">
+
+    <!-- Distribute Profit/Loss -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">💸 Distribute Profit/Loss</h2>
+      <p class="text-sm mb-4">Fund Balance: ₱<span id="fundBalance">0.00</span></p>
+      <form id="profitForm" class="space-y-4">
         <div>
           <label class="block text-sm mb-1">Transaction Type</label>
-          <select id="transactionType" class="w-full p-2 rounded bg-gray-700 text-white" required>
-            <option value="profit">Profit (Panalo)</option>
-            <option value="loss">Loss (Pagkatalo)</option>
+          <select id="transactionType" class="w-full p-2 bg-gray-700 rounded text-white">
+            <option value="profit">Profit</option>
+            <option value="loss">Loss</option>
           </select>
         </div>
         <div>
@@ -53,122 +62,119 @@
           <input
             type="number"
             id="profitAmount"
-            class="w-full p-2 rounded bg-gray-700 text-white"
+            class="w-full p-2 bg-gray-700 rounded text-white"
             placeholder="Enter amount"
-            required
             min="0"
             step="0.01"
+            required
           />
         </div>
         <button
           type="submit"
           id="distributeBtn"
-          class="bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
+          class="w-full bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600"
         >
           Distribute
         </button>
       </form>
       <p id="profitError" class="text-red-500 text-sm mt-2 hidden"></p>
     </div>
-    <!-- Member Search -->
-    <input
-      type="text"
-      id="searchInput"
-      placeholder="Search by name, email, or status..."
-      class="mb-4 p-2 w-full rounded bg-gray-700 text-white"
-    />
-    <!-- Member List -->
-    <div id="membersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">Loading members...</div>
-    <!-- Top 5 Shareholders -->
-    <div class="bg-gray-800 p-4 mt-8 rounded shadow">
-      <h2 class="text-xl font-bold mb-2">🏆 Top 5 Shareholders</h2>
-      <ul id="topShareholders" class="list-disc list-inside text-sm">Loading...</ul>
-    </div>
-    <!-- Transaction Requests -->
-    <h2 class="text-2xl font-bold mt-10 mb-4">💰 Deposit & Cash Out Requests</h2>
-    <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded">
-      Loading requests...
-    </div>
-    <!-- Daily Distribution Report -->
-    <h2 class="text-2xl font-bold mt-10 mb-4">📈 Daily Distribution Report (Today)</h2>
-    <div id="dailyReport" class="bg-gray-800 p-4 rounded shadow mb-6">
-      <div id="dailyReportList" class="space-y-4 max-h-96 overflow-auto">
-        Loading daily report...
+
+    <!-- Members Section -->
+    <div class="mb-8">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-bold">👥 Members</h2>
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="Search members..."
+          class="p-2 bg-gray-700 rounded text-white w-64"
+        />
       </div>
+      <div id="membersList" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
     </div>
+
+    <!-- Top Shareholders -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">🏆 Top 5 Shareholders</h2>
+      <ul id="topShareholders" class="list-disc list-inside text-sm"></ul>
+    </div>
+
+    <!-- Transaction Requests -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">💰 Transaction Requests</h2>
+      <div id="requestsList" class="space-y-4 max-h-80 overflow-y-auto"></div>
+    </div>
+
+    <!-- Daily Distribution Report -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">📈 Daily Distribution Report</h2>
+      <div id="dailyReportList" class="space-y-4 max-h-80 overflow-y-auto"></div>
+    </div>
+
     <!-- Transaction History -->
-    <h2 class="text-2xl font-bold mt-10 mb-4">📜 Transaction History</h2>
-    <div class="bg-gray-800 p-4 rounded shadow mb-6">
-      <div class="flex flex-col md:flex-row justify-between mb-4">
-        <select id="historyFilter" class="p-2 rounded bg-gray-700 text-white mb-2 md:mb-0">
-          <option value="all">All Transactions</option>
+    <div class="bg-gray-800 p-4 rounded-lg shadow">
+      <h2 class="text-lg font-bold mb-4">📜 Transaction History</h2>
+      <div class="flex flex-col sm:flex-row justify-between mb-4 space-y-2 sm:space-y-0 sm:space-x-2">
+        <select id="historyFilter" class="p-2 bg-gray-700 rounded text-white">
+          <option value="all">All</option>
           <option value="deposit">Deposits</option>
           <option value="cashout">Cash Outs</option>
-          <option value="profit">Profit Distributions</option>
-          <option value="loss">Loss Deductions</option>
+          <option value="profit">Profits</option>
+          <option value="loss">Losses</option>
         </select>
-        <select id="historySort" class="p-2 rounded bg-gray-700 text-white">
+        <select id="historySort" class="p-2 bg-gray-700 rounded text-white">
           <option value="desc">Newest First</option>
           <option value="asc">Oldest First</option>
         </select>
       </div>
-      <div id="historyList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded">
-        Loading transaction history...
-      </div>
+      <div id="historyList" class="space-y-4 max-h-80 overflow-y-auto"></div>
     </div>
+
     <!-- Edit Member Modal -->
     <div id="editModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center">
-      <div class="bg-gray-800 p-6 rounded shadow w-full max-w-md">
-        <h2 class="text-xl font-bold mb-4">Edit Member</h2>
-        <form id="editForm">
+      <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md">
+        <h2 class="text-lg font-bold mb-4">Edit Member</h2>
+        <form id="editForm" class="space-y-4">
           <input type="hidden" id="editMemberId" />
-          <div class="mb-4">
+          <div>
             <label class="block text-sm">Name</label>
-            <input type="text" id="editName" class="w-full p-2 rounded bg-gray-700 text-white" required />
+            <input type="text" id="editName" class="w-full p-2 bg-gray-700 rounded text-white" required />
           </div>
-          <div class="mb-4">
+          <div>
             <label class="block text-sm">Email</label>
-            <input type="email" id="editEmail" class="w-full p-2 rounded bg-gray-700 text-white" required />
+            <input type="email" id="editEmail" class="w-full p-2 bg-gray-700 rounded text-white" required />
           </div>
-          <div class="mb-4">
+          <div>
             <label class="block text-sm">Status</label>
-            <select id="editStatus" class="w-full p-2 rounded bg-gray-700 text-white" required>
+            <select id="editStatus" class="w-full p-2 bg-gray-700 rounded text-white">
               <option value="approved">Approved</option>
               <option value="pending">Pending</option>
               <option value="rejected">Rejected</option>
             </select>
           </div>
-          <div class="mb-4">
+          <div>
             <label class="block text-sm">Shares</label>
-            <input type="number" id="editShares" class="w-full p-2 rounded bg-gray-700 text-white" required min="0" />
+            <input type="number" id="editShares" class="w-full p-2 bg-gray-700 rounded text-white" min="0" required />
           </div>
-          <div class="mb-4">
+          <div>
             <label class="block text-sm">Balance</label>
             <input
               type="number"
               id="editBalance"
-              class="w-full p-2 rounded bg-gray-700 text-white"
-              required
+              class="w-full p-2 bg-gray-700 rounded text-white"
               min="0"
               step="0.01"
+              required
             />
           </div>
-          <div class="mb-4">
+          <div>
             <label class="block text-sm">Approval Date</label>
             <input
               type="datetime-local"
               id="editApprovalDate"
-              class="w-full p-2 rounded bg-gray-700 text-white"
+              class="w-full p-2 bg-gray-700 rounded text-white"
               required
-            />
-          </div>
-          <div class="mb-4">
-            <label class="block text-sm">Last Distribution</label>
-            <input
-              type="datetime-local"
-              id="editLastDistribution"
-              class="w-full p-2 rounded bg-gray-700 text-white"
-              readonly
             />
           </div>
           <div class="flex justify-end space-x-2">
@@ -178,8 +184,9 @@
         </form>
       </div>
     </div>
+
     <script type="module">
-      // Import Firebase SDKs
+      // Firebase Imports
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
       import {
         getFirestore,
@@ -198,7 +205,7 @@
       } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
       import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-      // Firebase Configuration
+      // Firebase Config
       const firebaseConfig = {
         apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
         authDomain: "bfc-tracker.firebaseapp.com",
@@ -206,33 +213,33 @@
         storageBucket: "bfc-tracker.firebasestorage.app",
         messagingSenderId: "127052459580",
         appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
-        measurementId: "G Lot-PNYRCFJHYM"
+        measurementId: "G-PNYRCFJHYM",
       };
 
       // Initialize Firebase
-      let app, db, auth;
-      try {
-        app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-      } catch (error) {
-        console.error("Firebase initialization failed:", error);
-        document.body.innerHTML = '<p class="text-red-500 p-4">Failed to initialize Firebase. Please check configuration.</p>';
-      }
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      const auth = getAuth(app);
 
       // DOM Elements
       const elements = {
         totalMembers: document.getElementById("totalMembers"),
         totalShares: document.getElementById("totalShares"),
         totalBalance: document.getElementById("totalBalance"),
+        fundBalance: document.getElementById("fundBalance"),
         membersList: document.getElementById("membersList"),
         topShareholders: document.getElementById("topShareholders"),
-        searchInput: document.getElementById("searchInput"),
         requestsList: document.getElementById("requestsList"),
         historyList: document.getElementById("historyList"),
+        dailyReportList: document.getElementById("dailyReportList"),
+        searchInput: document.getElementById("searchInput"),
         historyFilter: document.getElementById("historyFilter"),
         historySort: document.getElementById("historySort"),
-        dailyReportList: document.getElementById("dailyReportList"),
+        profitForm: document.getElementById("profitForm"),
+        profitAmount: document.getElementById("profitAmount"),
+        distributeBtn: document.getElementById("distributeBtn"),
+        profitError: document.getElementById("profitError"),
+        transactionType: document.getElementById("transactionType"),
         editModal: document.getElementById("editModal"),
         editForm: document.getElementById("editForm"),
         editMemberId: document.getElementById("editMemberId"),
@@ -242,246 +249,175 @@
         editShares: document.getElementById("editShares"),
         editBalance: document.getElementById("editBalance"),
         editApprovalDate: document.getElementById("editApprovalDate"),
-        editLastDistribution: document.getElementById("editLastDistribution"),
         cancelEdit: document.getElementById("cancelEdit"),
         logoutBtn: document.getElementById("logoutBtn"),
         serverTimeBtn: document.getElementById("serverTimeBtn"),
-        profitForm: document.getElementById("profitForm"),
-        profitAmount: document.getElementById("profitAmount"),
-        distributeBtn: document.getElementById("distributeBtn"),
-        profitError: document.getElementById("profitError"),
-        fundBalance: document.getElementById("fundBalance"),
-        transactionType: document.getElementById("transactionType"),
       };
 
       let allMembers = [];
       let allTransactions = [];
+      let fundChartInstance = null;
+      const SUBMISSION_COOLDOWN = 5000;
+      const HOURS_THRESHOLD = 24;
       let lastSubmissionTime = 0;
-      const SUBMISSION_COOLDOWN = 5000; // 5 seconds
-      const HOURS_THRESHOLD = 24; // 24-hour eligibility threshold
 
       // Utility Functions
       const formatCurrency = (value) =>
         parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
 
-      const showError = (element, message) => {
-        element.textContent = message;
-        element.classList.remove("hidden");
-        setTimeout(() => element.classList.add("hidden"), 5000);
+      const showError = (message) => {
+        elements.profitError.textContent = message;
+        elements.profitError.classList.remove("hidden");
+        setTimeout(() => elements.profitError.classList.add("hidden"), 5000);
       };
 
       const showLoading = (element, message = "Loading...") => {
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
-      // Get Firebase Server Time
-      async function getServerTimeAsDate() {
-        try {
-          const tempRef = doc(collection(db, "temp"));
-          await setDoc(tempRef, { timestamp: serverTimestamp() });
-          const docSnap = await getDoc(tempRef);
-          if (docSnap.exists()) {
-            const serverTime = docSnap.data().timestamp.toDate();
-            await deleteDoc(tempRef); // Clean up
-            console.log("Server time retrieved:", serverTime.toISOString());
-            return serverTime;
-          }
-          throw new Error("Failed to retrieve server time: Document does not exist");
-        } catch (error) {
-          console.error("Error getting server time:", error);
-          throw error;
-        }
+      // Get Server Time
+      async function getServerTime() {
+        const tempRef = doc(collection(db, "temp"));
+        await setDoc(tempRef, { timestamp: serverTimestamp() });
+        const docSnap = await getDoc(tempRef);
+        const serverTime = docSnap.exists() ? docSnap.data().timestamp.toDate() : new Date();
+        await deleteDoc(tempRef);
+        return serverTime;
       }
 
-      // Get start and end of current day in PHT (00:00 to 23:59 PHT)
+      // Get PHT Day Range
       function getPHTDayRange(serverTime) {
-        const phtTime = new Date(serverTime.getTime() + 8 * 60 * 60 * 1000); // Convert UTC to PHT
-        const startOfDay = new Date(phtTime);
-        startOfDay.setHours(0, 0, 0, 0); // 00:00 PHT
-        const endOfDay = new Date(phtTime);
-        endOfDay.setHours(23, 59, 59, 999); // 23:59 PHT
+        const phtTime = new Date(serverTime.getTime() + 8 * 60 * 60 * 1000);
+        const startOfDay = new Date(phtTime).setHours(0, 0, 0, 0);
+        const endOfDay = new Date(phtTime).setHours(23, 59, 59, 999);
         return {
-          start: new Date(startOfDay.getTime() - 8 * 60 * 60 * 1000), // UTC
-          end: new Date(endOfDay.getTime() - 8 * 60 * 60 * 1000), // UTC
+          start: new Date(startOfDay - 8 * 60 * 60 * 1000),
+          end: new Date(endOfDay - 8 * 60 * 60 * 1000),
         };
       }
 
       // Check Member Eligibility
-      async function isMemberEligible(member, cachedServerTime) {
+      async function isMemberEligible(member, serverTime) {
         if (member.status !== "approved") return { eligible: false, reason: "Not Approved" };
-        if (!member.balance || member.balance <= 0) return { eligible: false, reason: "Zero/Negative Balance" };
+        if (member.balance <= 0) return { eligible: false, reason: "Zero/Negative Balance" };
 
-        // Handle Firestore Timestamp or ISO string
         const approvalDate = member.approvalDate?.toDate
           ? member.approvalDate.toDate()
-          : member.approvalDate
-            ? new Date(member.approvalDate)
-            : null;
+          : new Date(member.approvalDate);
         if (!approvalDate || isNaN(approvalDate)) return { eligible: false, reason: "No Approval Date" };
 
-        try {
-          const now = cachedServerTime || await getServerTimeAsDate();
-          const hoursSinceApproval = Math.max(0, (now - approvalDate) / (1000 * 60 * 60));
-          if (hoursSinceApproval < HOURS_THRESHOLD) {
-            console.log(`Member ${member.name || "Unknown"}: hoursSinceApproval = ${hoursSinceApproval}`);
-            return { eligible: false, reason: `New Member (${hoursSinceApproval.toFixed(2)} hrs < ${HOURS_THRESHOLD} hrs)` };
-          }
-
-          const lastDistribution = member.lastDistribution?.toDate
-            ? member.lastDistribution.toDate()
-            : member.lastDistribution
-              ? new Date(member.lastDistribution)
-              : null;
-          if (lastDistribution && !isNaN(lastDistribution)) {
-            const { start } = getPHTDayRange(now);
-            if (lastDistribution >= start) {
-              return { eligible: false, reason: "Already Received Today" };
-            }
-          }
-
-          return { eligible: true, reason: "Eligible" };
-        } catch (error) {
-          console.error("Error checking server time for eligibility:", error);
-          return { eligible: false, reason: "Server Time Error" };
+        const hoursSinceApproval = (serverTime - approvalDate) / (1000 * 60 * 60);
+        if (hoursSinceApproval < HOURS_THRESHOLD) {
+          return { eligible: false, reason: `New Member (${hoursSinceApproval.toFixed(2)} hrs)` };
         }
+
+        const lastDistribution = member.lastDistribution?.toDate
+          ? member.lastDistribution.toDate()
+          : member.lastDistribution
+            ? new Date(member.lastDistribution)
+            : null;
+        if (lastDistribution && lastDistribution >= getPHTDayRange(serverTime).start) {
+          return { eligible: false, reason: "Already Received Today" };
+        }
+
+        return { eligible: true, reason: "Eligible" };
       }
 
       // Load Fund Balance
       async function loadFundBalance() {
-        try {
-          const fundSnapshot = await getDocs(collection(db, "fund"));
-          if (fundSnapshot.empty) {
-            await setDoc(doc(db, "fund", "main"), { balance: 0 });
-            elements.fundBalance.textContent = formatCurrency(0);
-            return 0;
-          }
-          const fundDoc = fundSnapshot.docs[0];
-          const balance = fundDoc.data().balance || 0;
-          elements.fundBalance.textContent = formatCurrency(balance);
-          return balance;
-        } catch (error) {
-          console.error("Error loading fund balance:", error);
-          showError(elements.profitError, `Nabigo sa pag-load ng fund balance: ${error.message}`);
+        const fundSnapshot = await getDocs(collection(db, "fund"));
+        if (fundSnapshot.empty) {
+          await setDoc(doc(db, "fund", "main"), { balance: 0 });
+          elements.fundBalance.textContent = formatCurrency(0);
           return 0;
         }
+        const balance = fundSnapshot.docs[0].data().balance || 0;
+        elements.fundBalance.textContent = formatCurrency(balance);
+        return balance;
       }
 
-      // Load Daily Distribution Report
-      async function loadDailyReport() {
-        showLoading(elements.dailyReportList, "Naglo-load ng daily report...");
-        try {
-          const now = await getServerTimeAsDate();
-          const { start, end } = getPHTDayRange(now);
-          const q = query(
-            collection(db, "member_distributions"),
-            orderBy("timestamp", "desc")
-          );
-          const snapshot = await getDocs(q);
-          const todayDistributions = snapshot.docs.filter((doc) => {
-            const timestamp = doc.data().timestamp?.toDate();
-            return timestamp && timestamp >= start && timestamp <= end;
-          });
+      // Initialize Chart
+      function initializeChart() {
+        if (fundChartInstance) fundChartInstance.destroy();
+        const ctx = document.getElementById("fundChart").getContext("2d");
+        fundChartInstance = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "Fund Balance",
+                data: [],
+                backgroundColor: "rgba(59, 130, 246, 0.2)",
+                borderColor: "rgba(59, 130, 246, 1)",
+                borderWidth: 2,
+                fill: true,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { labels: { color: "white" } } },
+            scales: {
+              x: { ticks: { color: "white" } },
+              y: { ticks: { color: "white", callback: (value) => `₱${formatCurrency(value)}` }, beginAtZero: true },
+            },
+          },
+        });
+      }
 
-          elements.dailyReportList.innerHTML = "";
-          if (todayDistributions.length === 0) {
-            elements.dailyReportList.innerHTML = '<p class="text-gray-400">Walang distribusyon ngayong araw.</p>';
-            return;
+      // Update Chart
+      async function updateChart() {
+        const q = query(collection(db, "profit_distributions"), orderBy("timestamp", "asc"));
+        const snapshot = await getDocs(q);
+        const labels = [];
+        const data = [];
+        let balance = (await loadFundBalance()) || 0;
+
+        snapshot.docs.forEach((doc) => {
+          const d = doc.data();
+          const date = d.timestamp.toDate().toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+          if (!labels.includes(date)) {
+            labels.push(date);
+            balance += d.type === "profit" ? d.amount : -d.amount;
+            data.push(balance);
           }
+        });
 
-          todayDistributions.forEach((doc) => {
-            const data = doc.data();
-            const div = document.createElement("div");
-            div.className = "bg-gray-700 p-4 rounded";
-            div.innerHTML = `
-              <p><strong>Miyembro:</strong> ${data.memberName || "N/A"}</p>
-              <p><strong>Uri:</strong> ${data.type === "profit" ? "Profit" : "Loss"}</p>
-              <p><strong>Halaga:</strong> ${data.type === "profit" ? "+" : "-"}₱${formatCurrency(data.amount)}</p>
-              <p><strong>Petsa:</strong> ${data.timestamp?.toDate().toLocaleString("en-PH") || "N/A"}</p>
-            `;
-            elements.dailyReportList.appendChild(div);
-          });
-        } catch (error) {
-          console.error("Error loading daily report:", error);
-          showError(elements.profitError, `Nabigo sa pag-load ng daily report: ${error.message}`);
-          elements.dailyReportList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng daily report.</p>';
+        if (labels.length === 0) {
+          const now = new Date();
+          labels.push(now.toLocaleDateString("en-PH", { month: "short", day: "numeric" }));
+          data.push(balance);
         }
+
+        fundChartInstance.data.labels = labels;
+        fundChartInstance.data.datasets[0].data = data;
+        fundChartInstance.update();
       }
-
-      // Authentication Check
-      onAuthStateChanged(auth, (user) => {
-        if (!user) {
-          showError(elements.profitError, "Hindi ka authenticated. Ire-redirect sa login...");
-          setTimeout(() => (window.location.href = "/login.html"), 2000);
-        } else {
-          loadFundBalance().then(() => {
-            loadMembers();
-            listenForRequests();
-            listenForTransactionHistory();
-            loadDailyReport();
-          });
-        }
-      });
 
       // Load Members
       async function loadMembers() {
-        showLoading(elements.membersList, "Naglo-load ng mga miyembro...");
-        showLoading(elements.topShareholders, "Naglo-load ng mga shareholder...");
-        elements.totalMembers.textContent = "Naglo-load...";
-        elements.totalShares.textContent = "Naglo-load...";
-        elements.totalBalance.textContent = "Naglo-load...";
+        showLoading(elements.membersList);
+        showLoading(elements.topShareholders);
+        const snapshot = await getDocs(collection(db, "users"));
+        allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
-        try {
-          const snapshot = await getDocs(collection(db, "users"));
-          allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          if (allMembers.length === 0) {
-            elements.membersList.innerHTML = '<p class="text-gray-400">Walang nahanap na miyembro.</p>';
-            elements.topShareholders.innerHTML = '<p class="text-gray-400">Walang shareholders.</p>';
-            elements.totalMembers.textContent = "0";
-            elements.totalShares.textContent = "0";
-            elements.totalBalance.textContent = formatCurrency(0);
-          } else {
-            console.log("Mga miyembrong nakuha mula sa users collection:", allMembers);
-            await displayMembers(allMembers);
-            updateTopShareholders();
-          }
-        } catch (error) {
-          console.error("Error sa pag-load ng mga miyembro mula sa users collection:", error);
-          showError(elements.profitError, `Nabigo sa pag-load ng mga miyembro: ${error.message}`);
-          elements.membersList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng mga miyembro.</p>';
-          elements.totalMembers.textContent = "0";
-          elements.totalShares.textContent = "0";
-          elements.totalBalance.textContent = formatCurrency(0);
-        }
-      }
-
-      // Display Members
-      async function displayMembers(members) {
-        const serverTime = await getServerTimeAsDate(); // Cache server time
         let memberCount = 0,
           shareTotal = 0,
           balanceTotal = 0;
         elements.membersList.innerHTML = "";
+        const serverTime = await getServerTime();
 
-        for (const m of members) {
+        for (const m of allMembers) {
           memberCount++;
           shareTotal += m.shares || 0;
           balanceTotal += m.balance || 0;
 
           const eligibility = await isMemberEligible(m, serverTime);
-          const lastDistributionText = m.lastDistribution
-            ? new Date(m.lastDistribution.toDate ? m.lastDistribution.toDate() : m.lastDistribution).toLocaleString("en-PH")
-            : "None";
-          const approvalDateText = m.approvalDate
-            ? new Date(m.approvalDate.toDate ? m.approvalDate.toDate() : m.approvalDate).toLocaleString("en-PH")
-            : "None";
-          const hoursSinceApproval = m.approvalDate
-            ? (serverTime - new Date(m.approvalDate.toDate ? m.approvalDate.toDate() : m.approvalDate)) / (1000 * 60 * 60)
-            : "N/A";
-
           const div = document.createElement("div");
-          div.className = "bg-gray-800 p-4 rounded shadow";
+          div.className = "bg-gray-800 p-4 rounded-lg shadow";
           div.innerHTML = `
-            <p><strong>Pangalan:</strong> ${m.name || "N/A"}</p>
+            <p><strong>Name:</strong> ${m.name || "N/A"}</p>
             <p><strong>Email:</strong> ${m.email || "N/A"}</p>
             <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${
               m.status === "approved"
@@ -492,15 +428,12 @@
             }">${m.status || "N/A"}</span></p>
             <p><strong>Shares:</strong> ${m.shares || 0}</p>
             <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
-            <p><strong>Approval Date:</strong> ${approvalDateText}</p>
-            <p><strong>Hours Since Approval:</strong> ${hoursSinceApproval === "N/A" ? "N/A" : hoursSinceApproval.toFixed(2)}</p>
-            <p><strong>Eligible for Profit/Loss:</strong> ${eligibility.eligible ? "Yes" : `No (${eligibility.reason})`}</p>
-            <p><strong>Last Distribution:</strong> ${lastDistributionText}</p>
+            <p><strong>Eligible:</strong> ${eligibility.eligible ? "Yes" : `No (${eligibility.reason})`}</p>
             <div class="flex space-x-2 mt-2">
-              <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm">I-edit</button>
+              <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-700">Edit</button>
               <button data-id="${m.id}" data-name="${
                 m.name || "Unknown"
-              }" class="delete-btn bg-red-600 px-3 py-1 rounded text-sm">I-delete</button>
+              }" class="delete-btn bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">Delete</button>
             </div>
           `;
           elements.membersList.appendChild(div);
@@ -509,30 +442,19 @@
         elements.totalMembers.textContent = memberCount;
         elements.totalShares.textContent = shareTotal;
         elements.totalBalance.textContent = formatCurrency(balanceTotal);
+        updateTopShareholders(serverTime);
       }
 
       // Update Top Shareholders
-      async function updateTopShareholders() {
-        const serverTime = await getServerTimeAsDate(); // Cache server time
-        const top = [];
-        for (const m of allMembers) {
-          const eligibility = await isMemberEligible(m, serverTime);
-          if (m.status === "approved" && eligibility.eligible) {
-            top.push(m);
-          }
-        }
-        top.sort((a, b) => (b.shares || 0) - (a.shares || 0)).slice(0, 5);
+      async function updateTopShareholders(serverTime) {
+        const top = allMembers
+          .filter(async (m) => m.status === "approved" && (await isMemberEligible(m, serverTime)).eligible)
+          .sort((a, b) => (b.shares || 0) - (a.shares || 0))
+          .slice(0, 5);
 
-        elements.topShareholders.innerHTML = "";
-        if (top.length === 0) {
-          elements.topShareholders.innerHTML = '<p class="text-gray-400">Walang eligible na shareholders.</p>';
-        } else {
-          top.forEach((m) => {
-            const li = document.createElement("li");
-            li.textContent = `${m.name || "N/A"} — ${m.shares || 0} shares`;
-            elements.topShareholders.appendChild(li);
-          });
-        }
+        elements.topShareholders.innerHTML = top.length
+          ? top.map((m) => `<li>${m.name || "N/A"} — ${m.shares || 0} shares</li>`).join("")
+          : '<p class="text-gray-400">No eligible shareholders.</p>';
       }
 
       // Search Members
@@ -540,97 +462,96 @@
         const query = elements.searchInput.value.toLowerCase();
         const filtered = allMembers.filter(
           (m) =>
-            (m.name || "").toLowerCase().includes(query) ||
-            (m.email || "").toLowerCase().includes(query) ||
-            (m.status || "").toLowerCase().includes(query)
+            m.name?.toLowerCase().includes(query) ||
+            m.email?.toLowerCase().includes(query) ||
+            m.status?.toLowerCase().includes(query)
         );
-        await displayMembers(filtered);
+        elements.membersList.innerHTML = "";
+        const serverTime = await getServerTime();
+
+        for (const m of filtered) {
+          const eligibility = await isMemberEligible(m, serverTime);
+          const div = document.createElement("div");
+          div.className = "bg-gray-800 p-4 rounded-lg shadow";
+          div.innerHTML = `
+            <p><strong>Name:</strong> ${m.name || "N/A"}</p>
+            <p><strong>Email:</strong> ${m.email || "N/A"}</p>
+            <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${
+              m.status === "approved"
+                ? "bg-green-600"
+                : m.status === "pending"
+                  ? "bg-yellow-600"
+                  : "bg-red-600"
+            }">${m.status}</span></p>
+            <p><strong>Shares:</strong> ${m.shares || 0}</p>
+            <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
+            <p><strong>Eligible:</strong> ${eligibility.eligible ? "Yes" : `No (${eligibility.reason})`}</p>
+            <div class="flex space-x-2 mt-2">
+              <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-700">Edit</button>
+              <button data-id="${m.id}" data-name="${
+                m.name || "Unknown"
+              }" class="delete-btn bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">Delete</button>
+            </div>
+          `;
+          elements.membersList.appendChild(div);
+        }
       });
 
-      // Listen for Transaction Requests
-      function listenForRequests() {
-        showLoading(elements.requestsList, "Naglo-load ng mga kahilingan...");
+      // Load Transaction Requests
+      function loadRequests() {
+        showLoading(elements.requestsList);
         const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
-        onSnapshot(
-          q,
-          (snapshot) => {
-            elements.requestsList.innerHTML = "";
-            const pendingRequests = snapshot.docs.filter((doc) => doc.data().status === "pending");
-            if (pendingRequests.length === 0) {
-              elements.requestsList.innerHTML = '<p class="text-gray-400">Walang pending na kahilingan.</p>';
-            } else {
-              pendingRequests.forEach((docSnap) => {
-                const data = docSnap.data();
-                const div = document.createElement("div");
-                div.className = "bg-gray-700 p-4 rounded";
-                div.innerHTML = `
-                  <p><strong>Miyembro:</strong> ${data.memberName || "N/A"}</p>
-                  <p><strong>Uri:</strong> ${data.type || "N/A"}</p>
-                  <p><strong>Halaga:</strong> ₱${formatCurrency(data.amount)}</p>
-                  <p><strong>Petsa:</strong> ${
-                    data.timestamp?.toDate().toLocaleString() || "N/A"
-                  }</p>
-                  <div class="flex space-x-2 mt-2">
-                    <button data-id="${docSnap.id}" class="approve-btn bg-green-600 px-3 py-1 rounded text-sm">Approve</button>
-                    <button data-id="${docSnap.id}" class="reject-btn bg-red-600 px-3 py-1 rounded text-sm">Reject</button>
-                  </div>
-                `;
-                elements.requestsList.appendChild(div);
-              });
-            }
-          },
-          (error) => {
-            console.error("Error sa pag-load ng mga kahilingan:", error);
-            showError(elements.profitError, `Nabigo sa pag-load ng mga kahilingan: ${error.message}`);
-            elements.requestsList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng mga kahilingan.</p>';
-          }
-        );
+        onSnapshot(q, (snapshot) => {
+          const pending = snapshot.docs.filter((doc) => doc.data().status === "pending");
+          elements.requestsList.innerHTML = pending.length
+            ? pending
+                .map(
+                  (doc) => `
+            <div class="bg-gray-700 p-4 rounded-lg">
+              <p><strong>Member:</strong> ${doc.data().memberName || "N/A"}</p>
+              <p><strong>Type:</strong> ${doc.data().type || "N/A"}</p>
+              <p><strong>Amount:</strong> ₱${formatCurrency(doc.data().amount)}</p>
+              <p><strong>Date:</strong> ${doc.data().timestamp?.toDate().toLocaleString("en-PH") || "N/A"}</p>
+              <div class="flex space-x-2 mt-2">
+                <button data-id="${doc.id}" class="approve-btn bg-green-600 px-3 py-1 rounded text-sm hover:bg-green-700">Approve</button>
+                <button data-id="${doc.id}" class="reject-btn bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">Reject</button>
+              </div>
+            </div>
+          `
+                )
+                .join("")
+            : '<p class="text-gray-400">No pending requests.</p>';
+        });
       }
 
-      // Listen for Transaction History
-      function listenForTransactionHistory() {
-        showLoading(elements.historyList, "Naglo-load ng kasaysayan ng transaksyon...");
-        const profitQuery = query(collection(db, "profit_distributions"), orderBy("timestamp", "desc"));
-        const transactionQuery = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
+      // Load Transaction History
+      function loadTransactionHistory() {
+        showLoading(elements.historyList);
+        const profitQ = query(collection(db, "profit_distributions"), orderBy("timestamp", "desc"));
+        const transactionQ = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
 
-        onSnapshot(profitQuery, (profitSnapshot) => {
-          onSnapshot(transactionQuery, (transactionSnapshot) => {
-            allTransactions = [];
-
-            profitSnapshot.docs.forEach((doc) => {
-              const data = doc.data();
-              allTransactions.push({
+        onSnapshot(profitQ, (profitSnap) => {
+          onSnapshot(transactionQ, (txnSnap) => {
+            allTransactions = [
+              ...profitSnap.docs.map((doc) => ({
                 id: doc.id,
-                type: data.type === "profit" ? "Profit Distribution" : "Loss Deduction",
-                filterType: data.type,
-                amount: data.amount,
-                timestamp: data.timestamp?.toDate() || new Date(),
-                details: `Distributed to ${data.eligibleMemberCount} of ${data.totalMemberCount} members, Total Shares: ${data.totalShares}`,
-              });
-            });
-
-            transactionSnapshot.docs.forEach((doc) => {
-              const data = doc.data();
-              allTransactions.push({
+                type: doc.data().type === "profit" ? "Profit Distribution" : "Loss Deduction",
+                filterType: doc.data().type,
+                amount: doc.data().amount,
+                timestamp: doc.data().timestamp?.toDate() || new Date(),
+                details: `To ${doc.data().eligibleMemberCount} of ${doc.data().totalMemberCount} members`,
+              })),
+              ...txnSnap.docs.map((doc) => ({
                 id: doc.id,
-                type: data.type === "deposit" ? "Deposit" : "Cash Out",
-                filterType: data.type === "deposit" ? "deposit" : "cashout",
-                amount: data.amount,
-                timestamp: data.timestamp?.toDate() || new Date(),
-                details: `Member: ${data.memberName || "N/A"}, Status: ${data.status || "N/A"}`,
-              });
-            });
-
+                type: doc.data().type === "deposit" ? "Deposit" : "Cash Out",
+                filterType: doc.data().type,
+                amount: doc.data().amount,
+                timestamp: doc.data().timestamp?.toDate() || new Date(),
+                details: `Member: ${doc.data().memberName || "N/A"}, Status: ${doc.data().status}`,
+              })),
+            ];
             displayTransactionHistory();
-          }, (error) => {
-            console.error("Error sa pag-load ng mga transaksyon:", error);
-            showError(elements.profitError, `Nabigo sa pag-load ng kasaysayan ng transaksyon: ${error.message}`);
-            elements.historyList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng kasaysayan ng transaksyon.</p>';
           });
-        }, (error) => {
-          console.error("Error sa pag-load ng mga pamimigay ng profit/loss:", error);
-          showError(elements.profitError, `Nabigo sa pag-load ng kasaysayan ng transaksyon: ${error.message}`);
-          elements.historyList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng kasaysayan ng transaksyon.</p>';
         });
       }
 
@@ -638,197 +559,137 @@
       function displayTransactionHistory() {
         const filter = elements.historyFilter.value;
         const sort = elements.historySort.value;
+        let filtered = filter === "all" ? allTransactions : allTransactions.filter((t) => t.filterType === filter);
+        filtered.sort((a, b) => (sort === "desc" ? b.timestamp - a.timestamp : a.timestamp - b.timestamp));
 
-        let filteredTransactions = allTransactions;
-        if (filter !== "all") {
-          filteredTransactions = allTransactions.filter((txn) => txn.filterType === filter);
-        }
-
-        filteredTransactions.sort((a, b) =>
-          sort === "desc" ? b.timestamp - a.timestamp : a.timestamp - b.timestamp
-        );
-
-        elements.historyList.innerHTML = "";
-        if (filteredTransactions.length === 0) {
-          elements.historyList.innerHTML = '<p class="text-gray-400">Walang kasaysayan ng transaksyon para sa napiling filter.</p>';
-          return;
-        }
-
-        filteredTransactions.forEach((txn) => {
-          const div = document.createElement("div");
-          div.className = "bg-gray-700 p-4 rounded";
-          div.innerHTML = `
-            <p><strong>Uri:</strong> ${txn.type}</p>
-            <p><strong>Halaga:</strong> ₱${formatCurrency(txn.amount)}</p>
-            <p><strong>Petsa:</strong> ${txn.timestamp.toLocaleString()}</p>
-            <p><strong>Mga Detalye:</strong> ${txn.details}</p>
-          `;
-          elements.historyList.appendChild(div);
-        });
+        elements.historyList.innerHTML = filtered.length
+          ? filtered
+              .map(
+                (t) => `
+            <div class="bg-gray-700 p-4 rounded-lg">
+              <p><strong>Type:</strong> ${t.type}</p>
+              <p><strong>Amount:</strong> ₱${formatCurrency(t.amount)}</p>
+              <p><strong>Date:</strong> ${t.timestamp.toLocaleString("en-PH")}</p>
+              <p><strong>Details:</strong> ${t.details}</p>
+            </div>
+          `
+              )
+              .join("")
+          : '<p class="text-gray-400">No transactions found.</p>';
       }
 
-      // Transaction History Filter and Sort
-      elements.historyFilter.addEventListener("change", displayTransactionHistory);
-      elements.historySort.addEventListener("change", displayTransactionHistory);
+      // Load Daily Report
+      async function loadDailyReport() {
+        showLoading(elements.dailyReportList);
+        const serverTime = await getServerTime();
+        const { start, end } = getPHTDayRange(serverTime);
+        const q = query(collection(db, "member_distributions"), orderBy("timestamp", "desc"));
+        const snapshot = await getDocs(q);
+        const todayDist = snapshot.docs.filter(
+          (doc) => doc.data().timestamp?.toDate() >= start && doc.data().timestamp?.toDate() <= end
+        );
 
-      // Logout Functionality
-      elements.logoutBtn.addEventListener("click", async () => {
-        try {
-          await signOut(auth);
-          console.log("Matagumpay na nag-logout ang user");
-          window.location.href = "/login.html";
-        } catch (error) {
-          console.error("Error sa pag-logout:", error);
-          showError(elements.profitError, `Nabigo sa pag-logout: ${error.message}`);
-        }
-      });
+        elements.dailyReportList.innerHTML = todayDist.length
+          ? todayDist
+              .map(
+                (doc) => `
+            <div class="bg-gray-700 p-4 rounded-lg">
+              <p><strong>Member:</strong> ${doc.data().memberName || "N/A"}</p>
+              <p><strong>Type:</strong> ${doc.data().type === "profit" ? "Profit" : "Loss"}</p>
+              <p><strong>Amount:</strong> ${doc.data().type === "profit" ? "+" : "-"}₱${formatCurrency(
+                  doc.data().amount
+                )}</p>
+              <p><strong>Date:</strong> ${doc.data().timestamp?.toDate().toLocaleString("en-PH") || "N/A"}</p>
+            </div>
+          `
+              )
+              .join("")
+          : '<p class="text-gray-400">No distributions today.</p>';
+      }
 
-      // Check Server Time
-      elements.serverTimeBtn.add eventListener("click", async () => {
-        try {
-          const serverTime = await getServerTimeAsDate();
-          alert(`Server Time: ${serverTime.toLocaleString()} (Local), ${serverTime.toISOString()} (UTC)`);
-        } catch (error) {
-          showError(elements.profitError, `Failed to retrieve server time: ${error.message}`);
-        }
-      });
-
-      // Distribute Profit/Loss Functionality
+      // Distribute Profit/Loss
       elements.profitForm.addEventListener("submit", async (e) => {
         e.preventDefault();
-
-        const currentTime = Date.now();
-        if (currentTime - lastSubmissionTime < SUBMISSION_COOLDOWN) {
-          showError(elements.profitError, `Maghintay ng ${Math.ceil((SUBMISSION_COOLDOWN - (currentTime - lastSubmissionTime)) / 1000)} segundo bago muling mag-submit.`);
+        const now = Date.now();
+        if (now - lastSubmissionTime < SUBMISSION_COOLDOWN) {
+          showError(`Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (now - lastSubmissionTime)) / 1000)} seconds.`);
           return;
         }
-        lastSubmissionTime = currentTime;
-
+        lastSubmissionTime = now;
         elements.distributeBtn.disabled = true;
-        elements.distributeBtn.textContent = "Pinoproseso...";
 
         try {
-          const transactionType = elements.transactionType.value;
+          const type = elements.transactionType.value;
           const amount = parseFloat(elements.profitAmount.value);
-          if (isNaN(amount) || amount <= 0) {
-            showError(elements.profitError, "Maglagay ng valid na halaga na higit sa 0.");
-            return;
-          }
+          if (amount <= 0) throw new Error("Amount must be greater than 0.");
 
-          const fundSnapshot = await getDocs(collection(db, "fund"));
-          if (fundSnapshot.empty) {
-            showError(elements.profitError, "Walang fund data. I-initialize ang fund balance.");
-            return;
-          }
-          const fundDoc = fundSnapshot.docs[0];
+          const fundSnap = await getDocs(collection(db, "fund"));
+          const fundDoc = fundSnap.docs[0];
           const fundBalance = fundDoc.data().balance || 0;
+          const serverTime = await getServerTime();
+          const eligibleMembers = (
+            await Promise.all(
+              allMembers.map(async (m) => ((await isMemberEligible(m, serverTime)).eligible ? m : null))
+            )
+          ).filter((m) => m && m.shares > 0);
+          const totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
 
-          // Calculate total shares from all members with positive shares
-          const serverTime = await getServerTimeAsDate();
-          const membersWithShares = allMembers.filter((m) => (m.shares || 0) > 0);
-          const totalShares = membersWithShares.reduce((sum, m) => sum + (m.shares || 0), 0);
-          if (totalShares === 0) {
-            showError(elements.profitError, "Walang miyembro na may shares.");
-            return;
-          }
-
+          if (!totalShares) throw new Error("No eligible members with shares.");
           const amountPerShare = amount / totalShares;
           const batch = writeBatch(db);
           let totalFundChange = 0;
-          let eligibleMemberCount = 0;
 
-          // Create a profit_distributions document first to get its ID
-          const distributionRef = doc(collection(db, "profit_distributions"));
-          const distributionId = distributionRef.id;
+          const distRef = doc(collection(db, "profit_distributions"));
+          eligibleMembers.forEach((m) => {
+            const memberDist = (m.shares || 0) * amountPerShare;
+            const newBalance = type === "profit" ? m.balance + memberDist : Math.max(0, m.balance - memberDist);
+            totalFundChange += type === "profit" ? memberDist : -memberDist;
 
-          // Process eligible members
-          for (const member of membersWithShares) {
-            const eligibility = await isMemberEligible(member, serverTime);
-            if (eligibility.eligible) {
-              const currentBalance = member.balance || 0;
-              let newBalance;
-              const memberDistributionAmount = (member.shares || 0) * amountPerShare;
-              if (transactionType === "profit") {
-                newBalance = currentBalance + memberDistributionAmount;
-                totalFundChange += memberDistributionAmount;
-              } else {
-                newBalance = currentBalance - memberDistributionAmount;
-                if (newBalance < 0) newBalance = 0;
-                totalFundChange -= memberDistributionAmount;
-              }
-              const userRef = doc(db, "users", member.id);
-              batch.update(userRef, {
-                balance: newBalance,
-                lastDistribution: serverTimestamp(),
-              });
+            batch.update(doc(db, "users", m.id), {
+              balance: newBalance,
+              lastDistribution: serverTimestamp(),
+            });
 
-              // Log individual member distribution
-              const memberDistRef = doc(collection(db, "member_distributions"));
-              batch.set(memberDistRef, {
-                memberId: member.id,
-                memberName: member.name || "N/A",
-                type: transactionType,
-                amount: memberDistributionAmount,
-                timestamp: serverTimestamp(),
-                distributionId: distributionId,
-              });
+            batch.set(doc(collection(db, "member_distributions")), {
+              memberId: m.id,
+              memberName: m.name,
+              type,
+              amount: memberDist,
+              timestamp: serverTimestamp(),
+              distributionId: distRef.id,
+            });
+          });
 
-              console.log(
-                `${transactionType === "profit" ? "Idinagdag" : "Ibinawas"} ₱${formatCurrency(
-                  memberDistributionAmount
-                )} sa ${member.name || "N/A"} (Bagong balance: ₱${formatCurrency(newBalance)})`
-              );
-              eligibleMemberCount++;
-            }
-          }
+          const newFundBalance = fundBalance + totalFundChange;
+          if (newFundBalance < 0) throw new Error("Insufficient fund balance.");
+          batch.update(doc(db, "fund", fundDoc.id), { balance: newFundBalance });
 
-          // Update fund balance
-          const fundRef = doc(db, "fund", fundDoc.id);
-          const newFundBalance = fundBalance + (transactionType === "profit" ? totalFundChange : -totalFundChange);
-          if (newFundBalance < 0) {
-            showError(elements.profitError, "Ang transaksyon ay magreresulta sa negatibong fund balance.");
-            return;
-          }
-          batch.update(fundRef, { balance: newFundBalance });
-
-          // Log distribution
-          batch.set(distributionRef, {
-            type: transactionType,
-            amount: amount,
+          batch.set(distRef, {
+            type,
+            amount,
             timestamp: serverTimestamp(),
-            adminId: auth.currentUser?.uid || "unknown",
-            eligibleMemberCount,
-            totalMemberCount: membersWithShares.length,
+            adminId: auth.currentUser.uid,
+            eligibleMemberCount: eligibleMembers.length,
+            totalMemberCount: allMembers.length,
             totalShares,
           });
 
           await batch.commit();
-
           elements.profitForm.reset();
           await loadMembers();
           await loadFundBalance();
           await loadDailyReport();
-          alert(
-            `Matagumpay na ${transactionType === "profit" ? "ipinadistribute" : "ibinawas"} ang ₱${formatCurrency(
-              amount
-            )} sa ${eligibleMemberCount} ng ${membersWithShares.length} miyembro!`
-          );
+          await updateChart();
+          alert(`Successfully ${type === "profit" ? "distributed profit" : "deducted loss"} of ₱${formatCurrency(amount)}!`);
         } catch (error) {
-          console.error(`Error ${transactionType === "profit" ? "distributing profit" : "deducting loss"}:`, error);
-          showError(elements.profitError, `Nabigo ang ${transactionType === "profit" ? "pamimigay ng profit" : "pagbabawas ng loss"}: ${error.message}`);
+          showError(error.message);
         } finally {
           elements.distributeBtn.disabled = false;
-          elements.distributeBtn.textContent = "Distribute";
         }
       });
 
-      // Edit Member Functions
+      // Edit Member
       function openEditModal(member) {
-        if (!member || !member.id) {
-          console.error("Invalid member data:", member);
-          showError(elements.profitError, "Hindi mae-edit: Invalid ang data ng miyembro.");
-          return;
-        }
         elements.editMemberId.value = member.id;
         elements.editName.value = member.name || "";
         elements.editEmail.value = member.email || "";
@@ -836,152 +697,99 @@
         elements.editShares.value = member.shares || 0;
         elements.editBalance.value = member.balance || 0;
         elements.editApprovalDate.value = member.approvalDate
-          ? new Date(member.approvalDate.toDate ? member.approvalDate.toDate() : member.approvalDate).toISOString().slice(0, 16)
+          ? new Date(member.approvalDate.toDate ? member.approvalDate.toDate() : member.approvalDate)
+              .toISOString()
+              .slice(0, 16)
           : new Date().toISOString().slice(0, 16);
-        elements.editLastDistribution.value = member.lastDistribution
-          ? new Date(member.lastDistribution.toDate ? member.lastDistribution.toDate() : member.lastDistribution).toISOString().slice(0, 16)
-          : "";
         elements.editModal.classList.remove("hidden");
       }
 
       elements.editForm.addEventListener("submit", async (e) => {
         e.preventDefault();
-        const id = elements.editMemberId.value;
-        const shares = parseInt(elements.editShares.value);
-        const balance = parseFloat(elements.editBalance.value);
-        const status = elements.editStatus.value;
-        const approvalDateInput = elements.editApprovalDate.value
-          ? new Date(elements.editApprovalDate.value).toISOString()
-          : new Date().toISOString();
-
-        if (isNaN(shares) || shares < 0 || isNaN(balance) || balance < 0) {
-          showError(elements.profitError, "Ang shares at balance ay dapat na hindi negatibo.");
-          return;
-        }
-
-        const memberRef = doc(db, "users", id);
-        const memberSnap = await getDoc(memberRef);
-        const currentMemberData = memberSnap.exists() ? memberSnap.data() : {};
-
-        let updatedApprovalDate = currentMemberData.approvalDate || approvalDateInput;
-        if (status === "approved" && !currentMemberData.approvalDate) {
-          updatedApprovalDate = serverTimestamp();
-        }
-
-        const updatedData = {
-          name: elements.editName.value,
-          email: elements.editEmail.value,
-          status: status,
-          shares,
-          balance,
-          approvalDate: updatedApprovalDate,
-          lastDistribution: currentMemberData.lastDistribution || null,
-        };
-
         try {
-          await updateDoc(memberRef, updatedData);
+          const id = elements.editMemberId.value;
+          const data = {
+            name: elements.editName.value,
+            email: elements.editEmail.value,
+            status: elements.editStatus.value,
+            shares: parseInt(elements.editShares.value),
+            balance: parseFloat(elements.editBalance.value),
+            approvalDate:
+              elements.editStatus.value === "approved"
+                ? serverTimestamp()
+                : new Date(elements.editApprovalDate.value),
+          };
+          if (data.shares < 0 || data.balance < 0) throw new Error("Shares and balance cannot be negative.");
+
+          await updateDoc(doc(db, "users", id), data);
           elements.editModal.classList.add("hidden");
           await loadMembers();
           await loadDailyReport();
-          alert("Matagumpay na na-update ang miyembro!");
+          alert("Member updated successfully!");
         } catch (error) {
-          console.error("Error sa pag-update ng miyembro sa users collection:", error);
-          showError(elements.profitError, `Nabigo sa pag-update ng miyembro: ${error.message}`);
+          showError(error.message);
         }
       });
 
-      elements.cancelEdit.addEventListener("click", () => {
-        elements.editModal.classList.add("hidden");
-      });
+      elements.cancelEdit.addEventListener("click", () => elements.editModal.classList.add("hidden"));
 
       // Delete Member
-      async function deleteMember(id, name) {
-        if (confirm(`Sigurado ka bang gusto mong i-delete si ${name || "miyembrong ito"}?`)) {
-          try {
-            await deleteDoc(doc(db, "users", id));
+      elements.membersList.addEventListener("click", async (e) => {
+        if (e.target.classList.contains("edit-btn")) {
+          const member = allMembers.find((m) => m.id === e.target.dataset.id);
+          if (member) openEditModal(member);
+        } else if (e.target.classList.contains("delete-btn")) {
+          if (confirm(`Delete ${e.target.dataset.name || "this member"}?`)) {
+            await deleteDoc(doc(db, "users", e.target.dataset.id));
             await loadMembers();
             await loadDailyReport();
-            alert("Matagumpay na na-delete ang miyembro!");
-          } catch (error) {
-            console.error("Error sa pag-delete ng miyembro mula sa users collection:", error);
-            showError(elements.profitError, `Nabigo sa pag-delete ng miyembro: ${error.message}`);
+            alert("Member deleted successfully!");
           }
         }
-      }
-
-      // Event Delegation for Edit, Delete, Approve, and Reject Buttons
-      elements.membersList.addEventListener("click", (e) => {
-        const target = e.target;
-        const id = target.dataset.id;
-        if (target.classList.contains("edit-btn") && id) {
-          const member = allMembers.find((m) => m.id === id);
-          if (member) openEditModal(member);
-          else showError(elements.profitError, "Hindi nahanap ang data ng miyembro.");
-        } else if (target.classList.contains("delete-btn") && id) {
-          const name = target.dataset.name;
-          deleteMember(id, name);
-        }
       });
 
+      // Transaction Actions
       elements.requestsList.addEventListener("click", async (e) => {
-        const target = e.target;
-        const id = target.dataset.id;
-
-        if (target.classList.contains("approve-btn") && id) {
-          await updateTransactionStatus(id, "approved");
-          alert("Matagumpay na naaprubahan ang kahilingan!");
-        } else if (target.classList.contains("reject-btn") && id) {
-          await updateTransactionStatus(id, "rejected");
-          alert("Matagumpay na na-reject ang kahilingan!");
+        const id = e.target.dataset.id;
+        if (e.target.classList.contains("approve-btn")) {
+          await updateDoc(doc(db, "transactions", id), { status: "approved" });
+          alert("Request approved!");
+        } else if (e.target.classList.contains("reject-btn")) {
+          await updateDoc(doc(db, "transactions", id), { status: "rejected" });
+          alert("Request rejected!");
         }
       });
 
-      // Update Transaction Status
-      async function updateTransactionStatus(transactionId, status) {
-        try {
-          const transactionRef = doc(db, "transactions", transactionId);
-          await updateDoc(transactionRef, { status: status });
-        } catch (error) {
-          console.error("Error sa pag-update ng status ng transaksyon:", error);
-          showError(elements.profitError, `Nabigo sa pag-update ng status: ${error.message}`);
-        }
-      }
+      // History Filter/Sort
+      elements.historyFilter.addEventListener("change", displayTransactionHistory);
+      elements.historySort.addEventListener("change", displayTransactionHistory);
 
-      // Initialize Chart
-      try {
-        const ctx = document.getElementById("fundChart").getContext("2d");
-        new Chart(ctx, {
-          type: "line",
-          data: {
-            labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-            datasets: [
-              {
-                label: "Fund Balance",
-                data: [15000, 18000, 21000, 25000, 29000, 34000],
-                backgroundColor: "rgba(59, 130, 246, 0.2)",
-                borderColor: "rgba(59, 130, 246, 1)",
-                borderWidth: 2,
-                fill: true,
-                tension: 0.3,
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            plugins: { legend: { labels: { color: "white" } } },
-            scales: {
-              x: { ticks: { color: "white" } },
-              y: { ticks: { color: "white" }, beginAtZero: true },
-            },
-          },
-        });
-        console.log("Matagumpay na na-initialize ang chart");
-      } catch (error) {
-        console.error("Error sa pag-initialize ng chart:", error);
-        document.getElementById("fundChart").parentElement.innerHTML =
-          '<p class="text-red-500">Nabigo sa pag-load ng chart.</p>';
-      }
+      // Logout
+      elements.logoutBtn.addEventListener("click", async () => {
+        await signOut(auth);
+        window.location.href = "/login.html";
+      });
+
+      // Server Time
+      elements.serverTimeBtn.addEventListener("click", async () => {
+        const time = await getServerTime();
+        alert(`Server Time: ${time.toLocaleString("en-PH")} (PHT)`);
+      });
+
+      // Auth Check
+      onAuthStateChanged(auth, (user) => {
+        if (!user) {
+          window.location.href = "/login.html";
+        } else {
+          initializeChart();
+          loadFundBalance();
+          loadMembers();
+          loadRequests();
+          loadTransactionHistory();
+          loadDailyReport();
+          updateChart();
+        }
+      });
     </script>
   </body>
 </html>
-
