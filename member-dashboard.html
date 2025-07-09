@@ -4,20 +4,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Baccarat Fund Member Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.5/dist/chart.umd.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.10/dist/tailwind.min.css" rel="stylesheet" />
   </head>
   <body class="bg-gray-900 text-white min-h-screen p-4">
     <!-- Header -->
     <header class="flex justify-between items-center mb-8">
       <h1 class="text-2xl font-bold flex items-center">
-        <span class="mr-2">👑</span> Baccarat Fund Member Dashboard
+        <span class="mr-2" aria-hidden="true">👑</span> Baccarat Fund Member Dashboard
       </h1>
       <div class="flex space-x-2">
-        <button id="serverTimeBtn" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 text-sm">
+        <button
+          id="serverTimeBtn"
+          class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label="Show server time"
+        >
           Server Time
         </button>
-        <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700 text-sm">
+        <button
+          id="logoutBtn"
+          class="bg-red-600 px-4 py-2 rounded hover:bg-red-700 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+          aria-label="Log out"
+        >
           Logout
         </button>
       </div>
@@ -26,7 +34,7 @@
     <!-- Member Details -->
     <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
       <h2 class="text-lg font-bold mb-4">👤 Your Account</h2>
-      <div id="memberDetails" class="space-y-2">
+      <div id="memberDetails" class="space-y-2" aria-live="polite">
         <p><strong>Name:</strong> <span id="memberName">Loading...</span></p>
         <p><strong>Email:</strong> <span id="memberEmail">Loading...</span></p>
         <p><strong>Status:</strong> <span id="memberStatus" class="px-2 py-1 rounded">Loading...</span></p>
@@ -40,69 +48,84 @@
     <!-- Fund Growth Chart -->
     <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
       <h2 class="text-lg font-bold mb-4">📊 Fund Growth</h2>
-      <canvas id="fundChart" height="100"></canvas>
+      <canvas id="fundChart" height="100" aria-label="Fund growth chart"></canvas>
     </div>
 
     <!-- Submit Transaction Request -->
     <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
       <h2 class="text-lg font-bold mb-4">💸 Submit Transaction Request</h2>
-      <form id="transactionForm" class="space-y-4">
+      <form id="transactionForm" class="space-y-4" novalidate>
         <div>
-          <label class="block text-sm mb-1">Transaction Type</label>
-          <select id="transactionType" class="w-full p-2 bg-gray-700 rounded text-white" required>
+          <label for="transactionType" class="block text-sm mb-1">Transaction Type</label>
+          <select
+            id="transactionType"
+            class="w-full p-2 bg-gray-700 rounded text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+            required
+            aria-required="true"
+          >
             <option value="deposit">Deposit</option>
             <option value="cashout">Cash Out</option>
           </select>
         </div>
         <div>
-          <label class="block text-sm mb-1">Amount (₱)</label>
+          <label for="transactionAmount" class="block text-sm mb-1">Amount (₱)</label>
           <input
             type="number"
             id="transactionAmount"
-            class="w-full p-2 bg-gray-700 rounded text-white"
+            class="w-full p-2 bg-gray-700 rounded text-white focus:outline-none focus:ring-2 focus:ring-green-500"
             placeholder="Enter amount"
             min="0.01"
             step="0.01"
             required
+            aria-required="true"
           />
         </div>
         <button
           type="submit"
           id="submitTransactionBtn"
-          class="w-full bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600"
+          class="w-full bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+          aria-label="Submit transaction request"
         >
           Submit Request
         </button>
       </form>
-      <p id="transactionError" class="text-red-500 text-sm mt-2 hidden"></p>
+      <p id="transactionError" class="text-red-500 text-sm mt-2 hidden" aria-live="assertive"></p>
+      <p id="cooldownMessage" class="text-yellow-500 text-sm mt-2 hidden" aria-live="polite"></p>
     </div>
 
     <!-- Transaction History -->
     <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
       <h2 class="text-lg font-bold mb-4">📜 Transaction History</h2>
       <div class="flex flex-col sm:flex-row justify-between mb-4 space-y-2 sm:space-y-0 sm:space-x-2">
-        <select id="historyFilter" class="p-2 bg-gray-700 rounded text-white">
+        <select
+          id="historyFilter"
+          class="p-2 bg-gray-700 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label="Filter transactions"
+        >
           <option value="all">All Transactions</option>
           <option value="deposit">Deposits</option>
           <option value="cashout">Cash Outs</option>
         </select>
-        <select id="historySort" class="p-2 bg-gray-700 rounded text-white">
+        <select
+          id="historySort"
+          class="p-2 bg-gray-700 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label="Sort transactions"
+        >
           <option value="desc">Newest First</option>
           <option value="asc">Oldest First</option>
         </select>
       </div>
-      <div id="historyList" class="space-y-4 max-h-80 overflow-y-auto"></div>
+      <div id="historyList" class="space-y-4 max-h-80 overflow-y-auto" aria-live="polite"></div>
     </div>
 
     <!-- Distribution History -->
     <div class="bg-gray-800 p-4 rounded-lg shadow">
       <h2 class="text-lg font-bold mb-4">📈 Distribution History</h2>
-      <div id="distributionList" class="space-y-4 max-h-80 overflow-y-auto"></div>
+      <div id="distributionList" class="space-y-4 max-h-80 overflow-y-auto" aria-live="polite"></div>
     </div>
 
     <script type="module">
-      // Firebase Imports
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
       import {
         getFirestore,
         collection,
@@ -115,18 +138,19 @@
         orderBy,
         onSnapshot,
         serverTimestamp,
-      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-      import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+      } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+      import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
-      // Firebase Config
+      // Firebase config should be stored securely (e.g., environment variables)
       const firebaseConfig = {
-        apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
-        authDomain: "bfc-tracker.firebaseapp.com",
-        projectId: "bfc-tracker",
-        storageBucket: "bfc-tracker.firebasestorage.app",
-        messagingSenderId: "127052459580",
-        appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
-        measurementId: "G-PNYRCFJHYM",
+        // Placeholder: Replace with secure configuration loading
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_AUTH_DOMAIN",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_STORAGE_BUCKET",
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+        appId: "YOUR_APP_ID",
+        measurementId: "YOUR_MEASUREMENT_ID",
       };
 
       // Initialize Firebase
@@ -148,6 +172,7 @@
         transactionAmount: document.getElementById("transactionAmount"),
         submitTransactionBtn: document.getElementById("submitTransactionBtn"),
         transactionError: document.getElementById("transactionError"),
+        cooldownMessage: document.getElementById("cooldownMessage"),
         historyList: document.getElementById("historyList"),
         historyFilter: document.getElementById("historyFilter"),
         historySort: document.getElementById("historySort"),
@@ -160,32 +185,52 @@
       let fundChartInstance = null;
       const SUBMISSION_COOLDOWN = 5000;
       let lastSubmissionTime = 0;
+      let cooldownTimer = null;
 
       // Utility Functions
       const formatCurrency = (value) =>
-        parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+        isNaN(value) ? "0.00" : parseFloat(value).toLocaleString("en-PH", { minimumFractionDigits: 2 });
 
       const showError = (message) => {
         elements.transactionError.textContent = message;
         elements.transactionError.classList.remove("hidden");
-        setTimeout(() => elements.transactionError.classList.add("hidden"), 5000);
-        console.error("Error:", message);
+      };
+
+      const clearError = () => {
+        elements.transactionError.textContent = "";
+        elements.transactionError.classList.add("hidden");
       };
 
       const showLoading = (element, message = "Loading...") => {
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
-      // Get Local Time (Adjusted to PHT)
-      function getLocalTime() {
-        const now = new Date();
-        return new Date(now.getTime() + 8 * 60 * 60 * 1000); // UTC+8 (PHT)
+      const updateCooldownMessage = (remaining) => {
+        if (remaining > 0) {
+          elements.cooldownMessage.textContent = `Please wait ${Math.ceil(remaining / 1000)} seconds before submitting again.`;
+          elements.cooldownMessage.classList.remove("hidden");
+          elements.submitTransactionBtn.disabled = true;
+        } else {
+          elements.cooldownMessage.textContent = "";
+          elements.cooldownMessage.classList.add("hidden");
+          elements.submitTransactionBtn.disabled = false;
+        }
+      };
+
+      // Get Server Time (PHT)
+      async function getServerTime() {
+        try {
+          const serverDoc = await getDoc(doc(db, "system", "time"));
+          return serverDoc.exists() ? serverDoc.data().time?.toDate() : new Date();
+        } catch {
+          return new Date(Date.now() + 8 * 60 * 60 * 1000); // Fallback to PHT
+        }
       }
 
       // Load Member Details
       async function loadMemberDetails(userId) {
         try {
-          console.log("Loading member details for userId:", userId);
+          showLoading(elements.memberDetails);
           const userDoc = await getDoc(doc(db, "users", userId));
           if (!userDoc.exists()) {
             showError("Member data not found.");
@@ -193,7 +238,6 @@
             return;
           }
           const data = userDoc.data();
-          console.log("Member data loaded:", data);
           elements.memberName.textContent = data.name || "N/A";
           elements.memberEmail.textContent = data.email || "N/A";
           elements.memberStatus.textContent = data.status || "N/A";
@@ -201,16 +245,16 @@
             data.status === "approved"
               ? "bg-green-600"
               : data.status === "pending"
-                ? "bg-yellow-600"
-                : "bg-red-600"
+              ? "bg-yellow-600"
+              : "bg-red-600"
           }`;
           elements.memberShares.textContent = data.shares || 0;
           elements.memberBalance.textContent = formatCurrency(data.balance);
           elements.memberApprovalDate.textContent = data.approvalDate
-            ? new Date(data.approvalDate.toDate ? data.approvalDate.toDate() : data.approvalDate).toLocaleString("en-PH")
+            ? new Date(data.approvalDate.toDate?.() || data.approvalDate).toLocaleString("en-PH")
             : "N/A";
           elements.memberLastDistribution.textContent = data.lastDistribution
-            ? new Date(data.lastDistribution.toDate ? data.lastDistribution.toDate() : data.lastDistribution).toLocaleString("en-PH")
+            ? new Date(data.lastDistribution.toDate?.() || data.lastDistribution).toLocaleString("en-PH")
             : "None";
         } catch (error) {
           showError("Failed to load member details: " + error.message);
@@ -225,11 +269,11 @@
         fundChartInstance = new Chart(ctx, {
           type: "line",
           data: {
-            labels: ["Jul 9", "Jul 10"], // Default labels
+            labels: [],
             datasets: [
               {
                 label: "Fund Balance",
-                data: [0, 0], // Default data
+                data: [],
                 backgroundColor: "rgba(59, 130, 246, 0.2)",
                 borderColor: "rgba(59, 130, 246, 1)",
                 borderWidth: 2,
@@ -242,52 +286,61 @@
             plugins: { legend: { labels: { color: "white" } } },
             scales: {
               x: { ticks: { color: "white" } },
-              y: { ticks: { color: "white", callback: (value) => `₱${formatCurrency(value)}` }, beginAtZero: true },
+              y: {
+                ticks: { color: "white", callback: (value) => `₱${formatCurrency(value)}` },
+                beginAtZero: true,
+              },
             },
           },
         });
       }
 
-      // Update Chart
-      async function updateChart() {
-        try {
-          console.log("Updating chart...");
-          const fundSnap = await getDocs(collection(db, "fund"));
-          const initialBalance = fundSnap.empty ? 0 : fundSnap.docs[0].data().balance || 0;
-          const q = query(collection(db, "profit_distributions"), orderBy("timestamp", "asc"));
-          const snapshot = await getDocs(q);
-          const labels = [];
-          const data = [];
-          let balance = initialBalance;
+      // Update Chart with Real-Time Data
+      function updateChart() {
+        const q = query(collection(db, "profit_distributions"), orderBy("timestamp", "asc"));
+        onSnapshot(
+          q,
+          async (snapshot) => {
+            try {
+              const fundSnap = await getDocs(collection(db, "fund"));
+              const initialBalance = fundSnap.empty ? 0 : fundSnap.docs[0].data().balance || 0;
+              const labels = [];
+              const data = [];
+              let balance = initialBalance;
 
-          snapshot.docs.forEach((doc) => {
-            const d = doc.data();
-            const date = d.timestamp.toDate().toLocaleDateString("en-PH", { month: "short", day: "numeric" });
-            if (!labels.includes(date)) {
-              labels.push(date);
-              balance += d.type === "profit" ? d.amount : -d.amount;
-              data.push(balance);
+              snapshot.docs.forEach((doc) => {
+                const d = doc.data();
+                const timestamp = d.timestamp?.toDate?.();
+                if (!timestamp) return;
+                const date = timestamp.toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+                if (!labels.includes(date)) {
+                  labels.push(date);
+                  balance += d.type === "profit" ? d.amount : -d.amount;
+                  data.push(balance);
+                }
+              });
+
+              if (labels.length === 0) {
+                const now = await getServerTime();
+                labels.push(now.toLocaleDateString("en-PH", { month: "short", day: "numeric" }));
+                data.push(initialBalance);
+              }
+
+              fundChartInstance.data.labels = labels;
+              fundChartInstance.data.datasets[0].data = data;
+              fundChartInstance.update();
+            } catch (error) {
+              showError("Failed to update chart: " + error.message);
+              const now = new Date();
+              fundChartInstance.data.labels = [now.toLocaleDateString("en-PH", { month: "short", day: "numeric" })];
+              fundChartInstance.data.datasets[0].data = [0];
+              fundChartInstance.update();
             }
-          });
-
-          if (labels.length === 0) {
-            const now = getLocalTime();
-            labels.push(now.toLocaleDateString("en-PH", { month: "short", day: "numeric" }));
-            data.push(initialBalance);
+          },
+          (error) => {
+            showError("Failed to load chart data: " + error.message);
           }
-
-          fundChartInstance.data.labels = labels;
-          fundChartInstance.data.datasets[0].data = data;
-          fundChartInstance.update();
-          console.log("Chart updated with labels:", labels, "data:", data);
-        } catch (error) {
-          console.error("Chart update failed:", error);
-          showError("Failed to load fund chart data. Displaying static data.");
-          const now = getLocalTime();
-          fundChartInstance.data.labels = [now.toLocaleDateString("en-PH", { month: "short", day: "numeric" })];
-          fundChartInstance.data.datasets[0].data = [0];
-          fundChartInstance.update();
-        }
+        );
       }
 
       // Load Transaction History
@@ -301,23 +354,29 @@
         onSnapshot(
           q,
           (snapshot) => {
-            console.log("Transaction snapshot for userId:", userId, "Documents:", snapshot.docs.length);
             allTransactions = snapshot.docs.map((doc) => ({
               id: doc.id,
               type: doc.data().type === "deposit" ? "Deposit" : "Cash Out",
               filterType: doc.data().type,
-              amount: doc.data().amount,
-              timestamp: doc.data().timestamp?.toDate() || new Date(),
-              status: doc.data().status,
+              amount: doc.data().amount || 0,
+              timestamp: doc.data().timestamp?.toDate?.() || new Date(),
+              status: doc.data().status || "N/A",
             }));
             displayTransactionHistory();
           },
           (error) => {
-            console.error("Transaction history error for userId:", userId, error);
             showError("Failed to load transaction history: " + error.message);
             elements.historyList.innerHTML = `
-              <p class="text-red-500">Error loading transaction history. <button class="text-blue-400 underline" onclick="retryLoad('transaction')">Retry</button></p>
-              <p class="text-gray-400 mt-2">Fallback: No transactions available.</p>
+              <p class="text-red-500">
+                Error loading transaction history.
+                <button
+                  class="text-blue-400 underline focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onclick="retryLoad('transaction')"
+                  aria-label="Retry loading transaction history"
+                >
+                  Retry
+                </button>
+              </p>
             `;
           }
         );
@@ -344,7 +403,7 @@
                   : t.status === "pending"
                     ? "bg-yellow-600"
                     : "bg-red-600"
-              }">${t.status || "N/A"}</span></p>
+              }">${t.status}</span></p>
             </div>
           `
               )
@@ -363,27 +422,35 @@
         onSnapshot(
           q,
           (snapshot) => {
-            console.log("Distribution snapshot for userId:", userId, "Documents:", snapshot.docs.length);
             elements.distributionList.innerHTML = snapshot.docs.length
               ? snapshot.docs
-                  .map(
-                    (doc) => `
+                  .map((doc) => {
+                    const data = doc.data();
+                    const timestamp = data.timestamp?.toDate?.();
+                    return `
             <div class="bg-gray-700 p-4 rounded-lg">
-              <p><strong>Type:</strong> ${doc.data().type === "profit" ? "Profit" : "Loss"}</p>
-              <p><strong>Amount:</strong> ${doc.data().type === "profit" ? "+" : "-"}₱${formatCurrency(doc.data().amount)}</p>
-              <p><strong>Date:</strong> ${doc.data().timestamp?.toDate().toLocaleString("en-PH") || "N/A"}</p>
+              <p><strong>Type:</strong> ${data.type === "profit" ? "Profit" : "Loss"}</p>
+              <p><strong>Amount:</strong> ${data.type === "profit" ? "+" : "-"}₱${formatCurrency(data.amount || 0)}</p>
+              <p><strong>Date:</strong> ${timestamp ? timestamp.toLocaleString("en-PH") : "N/A"}</p>
             </div>
-          `
-                  )
+          `;
+                  })
                   .join("")
               : '<p class="text-gray-400">No distributions found.</p>';
           },
           (error) => {
-            console.error("Distribution history error for userId:", userId, error);
             showError("Failed to load distribution history: " + error.message);
             elements.distributionList.innerHTML = `
-              <p class="text-red-500">Error loading distribution history. <button class="text-blue-400 underline" onclick="retryLoad('distribution')">Retry</button></p>
-              <p class="text-gray-400 mt-2">Fallback: No distributions available.</p>
+              <p class="text-red-500">
+                Error loading distribution history.
+                <button
+                  class="text-blue-400 underline focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onclick="retryLoad('distribution')"
+                  aria-label="Retry loading distribution history"
+                >
+                  Retry
+                </button>
+              </p>
             `;
           }
         );
@@ -392,9 +459,18 @@
       // Submit Transaction Request
       elements.transactionForm.addEventListener("submit", async (e) => {
         e.preventDefault();
+        clearError();
         const now = Date.now();
         if (now - lastSubmissionTime < SUBMISSION_COOLDOWN) {
-          showError(`Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (now - lastSubmissionTime)) / 1000)} seconds.`);
+          const remaining = SUBMISSION_COOLDOWN - (now - lastSubmissionTime);
+          updateCooldownMessage(remaining);
+          if (!cooldownTimer) {
+            cooldownTimer = setInterval(() => {
+              const timeLeft = SUBMISSION_COOLDOWN - (Date.now() - lastSubmissionTime);
+              updateCooldownMessage(timeLeft);
+              if (timeLeft <= 0) clearInterval(cooldownTimer);
+            }, 1000);
+          }
           return;
         }
         lastSubmissionTime = now;
@@ -403,10 +479,14 @@
         try {
           const type = elements.transactionType.value;
           const amount = parseFloat(elements.transactionAmount.value);
-          if (amount <= 0) throw new Error("Amount must be greater than 0.");
+          if (isNaN(amount) || amount <= 0) {
+            throw new Error("Amount must be a positive number.");
+          }
 
           const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-          if (!userDoc.exists()) throw new Error("Member data not found.");
+          if (!userDoc.exists()) {
+            throw new Error("Member data not found.");
+          }
 
           const userData = userDoc.data();
           if (type === "cashout" && (userData.balance || 0) < amount) {
@@ -424,7 +504,6 @@
 
           elements.transactionForm.reset();
           alert(`Transaction request (${type}) of ₱${formatCurrency(amount)} submitted successfully!`);
-          console.log("Transaction request submitted:", { type, amount });
         } catch (error) {
           showError(error.message);
         } finally {
@@ -447,26 +526,28 @@
       });
 
       // Server Time
-      elements.serverTimeBtn.addEventListener("click", () => {
-        const time = getLocalTime();
-        alert(`Server Time: ${time.toLocaleString("en-PH")} (PHT) - Note: Local fallback`);
+      elements.serverTimeBtn.addEventListener("click", async () => {
+        const time = await getServerTime();
+        alert(`Server Time: ${time.toLocaleString("en-PH")} (PHT)`);
       });
 
       // Retry Function
-      window.retryLoad = function (type) {
+      function retryLoad(type) {
         const user = auth.currentUser;
         if (user) {
           if (type === "transaction") loadTransactionHistory(user.uid);
           else if (type === "distribution") loadDistributionHistory(user.uid);
         }
-      };
+      }
+
+      // Expose retryLoad to window for button clicks
+      window.retryLoad = retryLoad;
 
       // Auth Check
       onAuthStateChanged(auth, (user) => {
         if (!user) {
           window.location.href = "/login.html";
         } else {
-          console.log("Authenticated user UID:", user.uid);
           initializeChart();
           loadMemberDetails(user.uid).then(() => {
             loadTransactionHistory(user.uid);
