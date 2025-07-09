@@ -678,6 +678,9 @@
           let eligibleMembers = [];
           let totalShares = 0;
 
+          // Create distRef outside the if-else block
+          const distRef = doc(collection(db, "profit_distributions"));
+
           if (type === "profit") {
             // Profit: Use isMemberEligible and 10% balance cap
             eligibleMembers = (
@@ -750,7 +753,6 @@
 
           batch.update(doc(db, "fund", fundDoc.id), { balance: newFundBalance });
 
-          const distRef = doc(collection(db, "profit_distributions"));
           batch.set(distRef, {
             type,
             amount: totalDistributed,
