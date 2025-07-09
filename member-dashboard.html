@@ -147,7 +147,7 @@
         transactionType: document.getElementById("transactionType"),
         transactionAmount: document.getElementById("transactionAmount"),
         submitTransactionBtn: document.getElementById("submitTransactionBtn"),
-        transaction WestwoodError: document.getElementById("transactionError"),
+        transactionError: document.getElementById("transactionError"),
         historyList: document.getElementById("historyList"),
         historyFilter: document.getElementById("historyFilter"),
         historySort: document.getElementById("historySort"),
@@ -169,30 +169,23 @@
         elements.transactionError.textContent = message;
         elements.transactionError.classList.remove("hidden");
         setTimeout(() => elements.transactionError.classList.add("hidden"), 5000);
+        console.error("Error:", message);
       };
 
       const showLoading = (element, message = "Loading...") => {
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
-      // Get Server Time
-      async function getServerTime() {
-        try {
-          const tempRef = doc(collection(db, "temp"));
-          await setDoc(tempRef, { timestamp: serverTimestamp() });
-          const docSnap = await getDoc(tempRef);
-          const serverTime = docSnap.exists() ? docSnap.data().timestamp.toDate() : new Date();
-          await deleteDoc(tempRef);
-          return serverTime;
-        } catch (error) {
-          showError("Failed to retrieve server time.");
-          return new Date();
-        }
+      // Get Local Time (Fallback since members can't write to temp)
+      function getLocalTime() {
+        const now = new Date();
+        return new Date(now.getTime() + 8 * 60 * 60 * 1000); // Adjust to PHT (UTC+8)
       }
 
       // Load Member Details
       async function loadMemberDetails(userId) {
         try {
+          console.log("Loading member details for userId:", userId);
           const userDoc = await getDoc(doc(db, "users", userId));
           if (!userDoc.exists()) {
             showError("Member data not found.");
@@ -200,6 +193,7 @@
             return;
           }
           const data = userDoc.data();
+          console.log("Member data loaded:", data);
           elements.memberName.textContent = data.name || "N/A";
           elements.memberEmail.textContent = data.email || "N/A";
           elements.memberStatus.textContent = data.status || "N/A";
@@ -219,7 +213,7 @@
             ? new Date(data.lastDistribution.toDate ? data.lastDistribution.toDate() : data.lastDistribution).toLocaleString("en-PH")
             : "None";
         } catch (error) {
-          showError("Failed to load member details.");
+          showError("Failed to load member details: " + error.message);
           elements.memberDetails.innerHTML = '<p class="text-red-500">Error loading member data.</p>';
         }
       }
@@ -231,11 +225,11 @@
         fundChartInstance = new Chart(ctx, {
           type: "line",
           data: {
-            labels: [],
+            labels: ["Jul 9", "Jul 10"], // Default labels for current date range
             datasets: [
               {
                 label: "Fund Balance",
-                data: [],
+                data: [0, 0], // Default data, will be updated
                 backgroundColor: "rgba(59, 130, 246, 0.2)",
                 borderColor: "rgba(59, 130, 246, 1)",
                 borderWidth: 2,
@@ -254,9 +248,10 @@
         });
       }
 
-      // Update Chart
+      // Update Chart (Fallback to static data if access denied)
       async function updateChart() {
         try {
+          console.log("Updating chart...");
           const fundSnap = await getDocs(collection(db, "fund"));
           const initialBalance = fundSnap.empty ? 0 : fundSnap.docs[0].data().balance || 0;
           const q = query(collection(db, "profit_distributions"), orderBy("timestamp", "asc"));
@@ -276,7 +271,7 @@
           });
 
           if (labels.length === 0) {
-            const now = new Date();
+            const now = getLocalTime();
             labels.push(now.toLocaleDateString("en-PH", { month: "short", day: "numeric" }));
             data.push(initialBalance);
           }
@@ -284,9 +279,14 @@
           fundChartInstance.data.labels = labels;
           fundChartInstance.data.datasets[0].data = data;
           fundChartInstance.update();
+          console.log("Chart updated with labels:", labels, "data:", data);
         } catch (error) {
-          showError("Failed to load fund chart data.");
-          document.getElementById("fundChart").parentElement.innerHTML = '<p class="text-red-500">Error loading chart.</p>';
+          console.error("Chart update failed:", error);
+          showError("Failed to load fund chart data. Displaying static data.");
+          const now = getLocalTime();
+          fundChartInstance.data.labels = [now.toLocaleDateString("en-PH", { month: "short", day: "numeric" })];
+          fundChartInstance.data.datasets[0].data = [0]; // Static fallback
+          fundChartInstance.update();
         }
       }
 
@@ -301,6 +301,7 @@
         onSnapshot(
           q,
           (snapshot) => {
+            console.log("Transaction snapshot received:", snapshot.docs.length, "documents");
             allTransactions = snapshot.docs.map((doc) => ({
               id: doc.id,
               type: doc.data().type === "deposit" ? "Deposit" : "Cash Out",
@@ -312,7 +313,7 @@
             displayTransactionHistory();
           },
           (error) => {
-            showError("Failed to load transaction history.");
+            showError("Failed to load transaction history: " + error.message);
             elements.historyList.innerHTML = '<p class="text-red-500">Error loading transaction history.</p>';
           }
         );
@@ -331,7 +332,7 @@
                 (t) => `
             <div class="bg-gray-700 p-4 rounded-lg">
               <p><strong>Type:</strong> ${t.type}</p>
-              < p><strong>Amount:</strong> ₱${formatCurrency(t.amount)}</p>
+              <p><strong>Amount:</strong> ₱${formatCurrency(t.amount)}</p>
               <p><strong>Date:</strong> ${t.timestamp.toLocaleString("en-PH")}</p>
               <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${
                 t.status === "approved"
@@ -339,7 +340,7 @@
                   : t.status === "pending"
                     ? "bg-yellow-600"
                     : "bg-red-600"
-              }">${t.status}</span></p>
+              }">${t.status || "N/A"}</span></p>
             </div>
           `
               )
@@ -358,6 +359,7 @@
         onSnapshot(
           q,
           (snapshot) => {
+            console.log("Distribution snapshot received:", snapshot.docs.length, "documents");
             elements.distributionList.innerHTML = snapshot.docs.length
               ? snapshot.docs
                   .map(
@@ -373,7 +375,7 @@
               : '<p class="text-gray-400">No distributions found.</p>';
           },
           (error) => {
-            showError("Failed to load distribution history.");
+            showError("Failed to load distribution history: " + error.message);
             elements.distributionList.innerHTML = '<p class="text-red-500">Error loading distribution history.</p>';
           }
         );
@@ -414,6 +416,7 @@
 
           elements.transactionForm.reset();
           alert(`Transaction request (${type}) of ₱${formatCurrency(amount)} submitted successfully!`);
+          console.log("Transaction request submitted:", { type, amount });
         } catch (error) {
           showError(error.message);
         } finally {
@@ -431,14 +434,14 @@
           await signOut(auth);
           window.location.href = "/login.html";
         } catch (error) {
-          showError("Failed to log out.");
+          showError("Failed to log out: " + error.message);
         }
       });
 
-      // Server Time
-      elements.serverTimeBtn.addEventListener("click", async () => {
-        const time = await getServerTime();
-        alert(`Server Time: ${time.toLocaleString("en-PH")} (PHT)`);
+      // Server Time (Fallback to local time adjusted to PHT)
+      elements.serverTimeBtn.addEventListener("click", () => {
+        const time = getLocalTime();
+        alert(`Server Time: ${time.toLocaleString("en-PH")} (PHT) - Note: Local fallback`);
       });
 
       // Auth Check
@@ -446,6 +449,7 @@
         if (!user) {
           window.location.href = "/login.html";
         } else {
+          console.log("User authenticated:", user.uid);
           initializeChart();
           loadMemberDetails(user.uid);
           loadTransactionHistory(user.uid);
