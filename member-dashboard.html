@@ -135,7 +135,6 @@
       <script type="module">
         import { auth, db } from "./firebase-config.js";
         import {
-          collection,
           getDocs,
           getDoc,
           doc,
@@ -161,9 +160,9 @@
           dailyReportList: document.getElementById("dailyReportList"),
           transactionForm: document.getElementById("transactionForm"),
           transactionAmount: document.getElementById("transactionAmount"),
-nun   submitTransactionBtn: document.getElementById("submitTransactionBtn"),
+          submitTransactionBtn: document.getElementById("submitTransactionBtn"),
           transactionError: document.getElementById("transactionError"),
-          transactionType: document.getElementById("transactionType"),
+          transactionType: document.getElementById="transactionType"),
           logoutBtn: document.getElementById("logoutBtn"),
           serverTimeBtn: document.getElementById("serverTimeBtn"),
           profileName: document.getElementById("profileName"),
@@ -187,6 +186,7 @@ nun   submitTransactionBtn: document.getElementById("submitTransactionBtn"),
         const showError = (element, message) => {
           element.textContent = message;
           element.classList.remove("hidden");
+          console.error(message);
           setTimeout(() => element.classList.add("hidden"), 5000);
         };
 
@@ -196,15 +196,20 @@ nun   submitTransactionBtn: document.getElementById("submitTransactionBtn"),
 
         // Get Firebase Server Time
         async function getServerTimeAsDate() {
-          const tempRef = doc(collection(db, "temp"));
-          await setDoc(tempRef, { timestamp: serverTimestamp() });
-          const docSnap = await getDoc(tempRef);
-          if (docSnap.exists()) {
-            const serverTime = docSnap.data().timestamp.toDate();
-            await deleteDoc(tempRef);
-            return serverTime;
+          try {
+            const tempRef = doc(collection(db, "temp"));
+            await setDoc(tempRef, { timestamp: serverTimestamp() });
+            const docSnap = await getDoc(tempRef);
+            if (docSnap.exists()) {
+              const serverTime = docSnap.data().timestamp.toDate();
+              await deleteDoc(tempRef);
+              return serverTime;
+            }
+            throw new Error("Failed to retrieve server time");
+          } catch (error) {
+            console.error("Error getting server time:", error);
+            throw error;
           }
-          throw new Error("Failed to retrieve server time");
         }
 
         // Get PHT Day Range
@@ -402,4 +407,165 @@ nun   submitTransactionBtn: document.getElementById("submitTransactionBtn"),
             const ctx = document.getElementById("balanceChart").getContext("2d");
             const profitQuery = query(
               collection(db, "member_distributions"),
-              where(" Lannisterization堕ados en el mensaje siguiente
+              where("memberId", "==", userId),
+              orderBy("timestamp", "asc")
+            );
+            const transactionQuery = query(
+              collection(db, "transactions"),
+              where("memberId", "==", userId),
+              where("status", "==", "approved"),
+              orderBy("timestamp", "asc")
+            );
+
+            const profitSnapshot = await getDocs(profitQuery);
+            const transactionSnapshot = await getDocs(transactionQuery);
+            const transactions = [];
+
+            profitSnapshot.docs.forEach((doc) => {
+              const data = doc.data();
+              transactions.push({
+                timestamp: data.timestamp?.toDate() || new Date(),
+                amount: data.type === "profit" ? data.amount : -data.amount,
+              });
+            });
+
+            transactionSnapshot.docs.forEach((doc) => {
+              const data = doc.data();
+              transactions.push({
+                timestamp: data.timestamp?.toDate() || new Date(),
+                amount: data.type === "deposit" ? data.amount : -data.amount,
+              });
+            });
+
+            transactions.sort((a, b) => a.timestamp - b.timestamp);
+
+            let runningBalance = 0;
+            const labels = [];
+            const data = [];
+            transactions.forEach((txn) => {
+              runningBalance += txn.amount;
+              labels.push(txn.timestamp.toLocaleDateString("en-PH"));
+              data.push(runningBalance);
+            });
+
+            new Chart(ctx, {
+              type: "line",
+              data: {
+                labels: labels.length > 0 ? labels : ["No Data"],
+                datasets: [{
+                  label: "Balance History",
+                  data: data.length > 0 ? data : [0],
+                  backgroundColor: "rgba(59, 130, 246, 0.2)",
+                  borderColor: "rgba(59, 130, 246, 1)",
+                  borderWidth: 2,
+                  fill: true,
+                  tension: 0.3,
+                }],
+              },
+              options: {
+                responsive: true,
+                plugins: { legend: { labels: { color: "white" } } },
+                scales: {
+                  x: { ticks: { color: "white" } },
+                  y: { ticks: { color: "white" }, beginAtZero: true },
+                },
+              },
+            });
+          } catch (error) {
+            showError(elements.transactionError, `Failed to load chart: ${error.message}`);
+            document.getElementById("balanceChart").parentElement.innerHTML = '<p class="text-red-500">Failed to load chart.</p>';
+          }
+        }
+
+        // Authentication Check
+        onAuthStateChanged(auth, (user) => {
+          if (!user) {
+            showError(elements.authError, "Not authenticated. Redirecting to login...");
+            setTimeout(() => (window.location.href = "/login.html"), 3000);
+          } else {
+            console.log("Authenticated user:", user.uid, user.email);
+            loadMemberData(user.uid);
+          }
+        }, (error) => {
+          console.error("Auth state change error:", error);
+          showError(elements.authError, `Authentication error: ${error.message}. Retrying in 5 seconds...`);
+          setTimeout(() => location.reload(), 5000);
+        });
+
+        // Submit Transaction Request
+        elements.transactionForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const currentTime = Date.now();
+          if (currentTime - lastSubmissionTime < SUBMISSION_COOLDOWN) {
+            showError(elements.transactionError, `Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (currentTime - lastSubmissionTime)) / 1000)} seconds before submitting again.`);
+            return;
+          }
+          lastSubmissionTime = currentTime;
+
+          elements.submitTransactionBtn.disabled = true;
+          elements.submitTransactionBtn.textContent = "Processing...";
+
+          try {
+            if (!currentMember) {
+              showError(elements.transactionError, "Member data not loaded. Please wait.");
+              return;
+            }
+            const transactionType = elements.transactionType.value;
+            const amount = parseFloat(elements.transactionAmount.value);
+            if (isNaN(amount) || amount <= 0) {
+              showError(elements.transactionError, "Please enter a valid amount greater than 0.");
+              return;
+            }
+
+            if (transactionType === "cashout" && (currentMember.balance || 0) < amount) {
+              showError(elements.transactionError, "Insufficient balance for cash out.");
+              return;
+            }
+
+            const transactionRef = doc(collection(db, "transactions"));
+            await setDoc(transactionRef, {
+              memberId: currentMember.id,
+              memberName: currentMember.name || "N/A",
+              type: transactionType,
+              amount: amount,
+              status: "pending",
+              timestamp: serverTimestamp(),
+            });
+
+            elements.transactionForm.reset();
+            alert(`Successfully submitted ${transactionType} request of ₱${formatCurrency(amount)}!`);
+          } catch (error) {
+            showError(elements.transactionError, `Failed to submit request: ${error.message}`);
+          } finally {
+            elements.submitTransactionBtn.disabled = false;
+            elements.submitTransactionBtn.textContent = "Submit";
+          }
+        });
+
+        // Transaction History Filter and Sort
+        elements.historyFilter.addEventListener("change", displayTransactionHistory);
+        elements.historySort.addEventListener("change", displayTransactionHistory);
+
+        // Logout Functionality
+        elements.logoutBtn.addEventListener("click", async () => {
+          try {
+            await signOut(auth);
+            window.location.href = "/login.html";
+          } catch (error) {
+            showError(elements.authError, `Failed to logout: ${error.message}`);
+          }
+        });
+
+        // Check Server Time
+        elements.serverTimeBtn.addEventListener("click", async () => {
+          try {
+            const serverTime = await getServerTimeAsDate();
+            alert(`Server Time: ${serverTime.toLocaleString()} (Local), ${serverTime.toISOString()} (UTC)`);
+          } catch (error) {
+            showError(elements.transactionError, `Failed to retrieve server time: ${error.message}`);
+          }
+        });
+      </script>
+    </body>
+</html>
