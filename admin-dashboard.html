@@ -296,7 +296,7 @@
         const endOfDay = new Date(phtTime).setHours(23, 59, 59, 999);
         return {
           start: new Date(startOfDay - 8 * 60 * 60 * 1000),
-          end: new Date(endOfDay - 8 * 60 * 60 * 1000),
+          end: new Date(endOfDay - 8 * 60 * 1000),
         };
       }
 
@@ -674,12 +674,14 @@
           const fundBalance = fundDoc.data().balance || 0;
           const serverTime = await getServerTime();
           const batch = writeBatch(db);
+
+          // Create distRef immediately after batch
+          const distRef = doc(collection(db, "profit_distributions"));
+          console.log("distRef created with ID:", distRef.id); // Debug log
+
           let totalDistributed = 0;
           let eligibleMembers = [];
           let totalShares = 0;
-
-          // Create distRef outside the if-else block
-          const distRef = doc(collection(db, "profit_distributions"));
 
           if (type === "profit") {
             // Profit: Use isMemberEligible and 10% balance cap
