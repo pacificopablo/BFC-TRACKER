@@ -34,7 +34,7 @@
     <!-- Financial Chart -->
     <div class="bg-gray-800 p-4 rounded shadow mb-6">
       <h2 class="text-xl font-bold mb-2">📊 Fund Growth</h2>
-      <canvas id="fundChart" height="100"></canvas>
+      <canvas id="fund Inspections" height="100"></canvas>
     </div>
     <!-- Distribute Profit/Loss Section -->
     <div class="bg-gray-800 p-4 rounded shadow mb-6">
@@ -206,7 +206,7 @@
         storageBucket: "bfc-tracker.firebasestorage.app",
         messagingSenderId: "127052459580",
         appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
-        measurementId: "G-PNYRCFJHYM"
+        measurementId: "G Lot-PNYRCFJHYM"
       };
 
       // Initialize Firebase
@@ -283,9 +283,10 @@
           if (docSnap.exists()) {
             const serverTime = docSnap.data().timestamp.toDate();
             await deleteDoc(tempRef); // Clean up
+            console.log("Server time retrieved:", serverTime.toISOString());
             return serverTime;
           }
-          throw new Error("Failed to retrieve server time");
+          throw new Error("Failed to retrieve server time: Document does not exist");
         } catch (error) {
           console.error("Error getting server time:", error);
           throw error;
@@ -306,19 +307,32 @@
       }
 
       // Check Member Eligibility
-      async function isMemberEligible(member) {
+      async function isMemberEligible(member, cachedServerTime) {
         if (member.status !== "approved") return { eligible: false, reason: "Not Approved" };
         if (!member.balance || member.balance <= 0) return { eligible: false, reason: "Zero/Negative Balance" };
-        const approvalDate = member.approvalDate ? new Date(member.approvalDate) : null;
-        if (!approvalDate) return { eligible: false, reason: "No Approval Date" };
+
+        // Handle Firestore Timestamp or ISO string
+        const approvalDate = member.approvalDate?.toDate
+          ? member.approvalDate.toDate()
+          : member.approvalDate
+            ? new Date(member.approvalDate)
+            : null;
+        if (!approvalDate || isNaN(approvalDate)) return { eligible: false, reason: "No Approval Date" };
 
         try {
-          const now = await getServerTimeAsDate();
-          const hoursSinceApproval = (now - approvalDate) / (1000 * 60 * 60);
-          if (hoursSinceApproval < HOURS_THRESHOLD) return { eligible: false, reason: "New Member (< 24 hrs)" };
+          const now = cachedServerTime || await getServerTimeAsDate();
+          const hoursSinceApproval = Math.max(0, (now - approvalDate) / (1000 * 60 * 60));
+          if (hoursSinceApproval < HOURS_THRESHOLD) {
+            console.log(`Member ${member.name || "Unknown"}: hoursSinceApproval = ${hoursSinceApproval}`);
+            return { eligible: false, reason: `New Member (${hoursSinceApproval.toFixed(2)} hrs < ${HOURS_THRESHOLD} hrs)` };
+          }
 
-          const lastDistribution = member.lastDistribution ? new Date(member.lastDistribution) : null;
-          if (lastDistribution) {
+          const lastDistribution = member.lastDistribution?.toDate
+            ? member.lastDistribution.toDate()
+            : member.lastDistribution
+              ? new Date(member.lastDistribution)
+              : null;
+          if (lastDistribution && !isNaN(lastDistribution)) {
             const { start } = getPHTDayRange(now);
             if (lastDistribution >= start) {
               return { eligible: false, reason: "Already Received Today" };
@@ -442,6 +456,7 @@
 
       // Display Members
       async function displayMembers(members) {
+        const serverTime = await getServerTimeAsDate(); // Cache server time
         let memberCount = 0,
           shareTotal = 0,
           balanceTotal = 0;
@@ -452,10 +467,16 @@
           shareTotal += m.shares || 0;
           balanceTotal += m.balance || 0;
 
-          const eligibility = await isMemberEligible(m);
+          const eligibility = await isMemberEligible(m, serverTime);
           const lastDistributionText = m.lastDistribution
-            ? new Date(m.lastDistribution).toLocaleString("en-PH")
+            ? new Date(m.lastDistribution.toDate ? m.lastDistribution.toDate() : m.lastDistribution).toLocaleString("en-PH")
             : "None";
+          const approvalDateText = m.approvalDate
+            ? new Date(m.approvalDate.toDate ? m.approvalDate.toDate() : m.approvalDate).toLocaleString("en-PH")
+            : "None";
+          const hoursSinceApproval = m.approvalDate
+            ? (serverTime - new Date(m.approvalDate.toDate ? m.approvalDate.toDate() : m.approvalDate)) / (1000 * 60 * 60)
+            : "N/A";
 
           const div = document.createElement("div");
           div.className = "bg-gray-800 p-4 rounded shadow";
@@ -466,11 +487,13 @@
               m.status === "approved"
                 ? "bg-green-600"
                 : m.status === "pending"
-                ? "bg-yellow-600"
-                : "bg-red-600"
+                  ? "bg-yellow-600"
+                  : "bg-red-600"
             }">${m.status || "N/A"}</span></p>
             <p><strong>Shares:</strong> ${m.shares || 0}</p>
             <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
+            <p><strong>Approval Date:</strong> ${approvalDateText}</p>
+            <p><strong>Hours Since Approval:</strong> ${hoursSinceApproval === "N/A" ? "N/A" : hoursSinceApproval.toFixed(2)}</p>
             <p><strong>Eligible for Profit/Loss:</strong> ${eligibility.eligible ? "Yes" : `No (${eligibility.reason})`}</p>
             <p><strong>Last Distribution:</strong> ${lastDistributionText}</p>
             <div class="flex space-x-2 mt-2">
@@ -490,9 +513,10 @@
 
       // Update Top Shareholders
       async function updateTopShareholders() {
+        const serverTime = await getServerTimeAsDate(); // Cache server time
         const top = [];
         for (const m of allMembers) {
-          const eligibility = await isMemberEligible(m);
+          const eligibility = await isMemberEligible(m, serverTime);
           if (m.status === "approved" && eligibility.eligible) {
             top.push(m);
           }
@@ -570,7 +594,7 @@
         const transactionQuery = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
 
         onSnapshot(profitQuery, (profitSnapshot) => {
-          onSnapshot(transactionSnapshot, (transactionSnapshot) => {
+          onSnapshot(transactionQuery, (transactionSnapshot) => {
             allTransactions = [];
 
             profitSnapshot.docs.forEach((doc) => {
@@ -660,7 +684,7 @@
       });
 
       // Check Server Time
-      elements.serverTimeBtn.addEventListener("click", async () => {
+      elements.serverTimeBtn.add eventListener("click", async () => {
         try {
           const serverTime = await getServerTimeAsDate();
           alert(`Server Time: ${serverTime.toLocaleString()} (Local), ${serverTime.toISOString()} (UTC)`);
@@ -700,6 +724,7 @@
           const fundBalance = fundDoc.data().balance || 0;
 
           // Calculate total shares from all members with positive shares
+          const serverTime = await getServerTimeAsDate();
           const membersWithShares = allMembers.filter((m) => (m.shares || 0) > 0);
           const totalShares = membersWithShares.reduce((sum, m) => sum + (m.shares || 0), 0);
           if (totalShares === 0) {
@@ -718,7 +743,7 @@
 
           // Process eligible members
           for (const member of membersWithShares) {
-            const eligibility = await isMemberEligible(member);
+            const eligibility = await isMemberEligible(member, serverTime);
             if (eligibility.eligible) {
               const currentBalance = member.balance || 0;
               let newBalance;
@@ -810,11 +835,11 @@
         elements.editStatus.value = member.status || "pending";
         elements.editShares.value = member.shares || 0;
         elements.editBalance.value = member.balance || 0;
-        elements.editApprovalDate.value = member.approvalDate 
-          ? new Date(member.approvalDate).toISOString().slice(0, 16)
+        elements.editApprovalDate.value = member.approvalDate
+          ? new Date(member.approvalDate.toDate ? member.approvalDate.toDate() : member.approvalDate).toISOString().slice(0, 16)
           : new Date().toISOString().slice(0, 16);
         elements.editLastDistribution.value = member.lastDistribution
-          ? new Date(member.lastDistribution).toISOString().slice(0, 16)
+          ? new Date(member.lastDistribution.toDate ? member.lastDistribution.toDate() : member.lastDistribution).toISOString().slice(0, 16)
           : "";
         elements.editModal.classList.remove("hidden");
       }
@@ -825,7 +850,7 @@
         const shares = parseInt(elements.editShares.value);
         const balance = parseFloat(elements.editBalance.value);
         const status = elements.editStatus.value;
-        const approvalDate = elements.editApprovalDate.value
+        const approvalDateInput = elements.editApprovalDate.value
           ? new Date(elements.editApprovalDate.value).toISOString()
           : new Date().toISOString();
 
@@ -838,9 +863,9 @@
         const memberSnap = await getDoc(memberRef);
         const currentMemberData = memberSnap.exists() ? memberSnap.data() : {};
 
-        let updatedApprovalDate = currentMemberData.approvalDate || approvalDate;
+        let updatedApprovalDate = currentMemberData.approvalDate || approvalDateInput;
         if (status === "approved" && !currentMemberData.approvalDate) {
-          updatedApprovalDate = new Date().toISOString();
+          updatedApprovalDate = serverTimestamp();
         }
 
         const updatedData = {
