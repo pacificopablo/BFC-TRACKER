@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign Up - Baccarat Fund</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+    <style>
+      body {
+        background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+      }
+      .btn-primary {
+        background: linear-gradient(to right, #3b82f6, #1d4ed8);
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        color: white;
+        font-weight: 500;
+      }
+      .btn-primary:hover {
+        background: linear-gradient(to right, #2563eb, #1e40af);
+      }
+      .error {
+        animation: fadeOut 5s forwards;
+      }
+      @keyframes fadeOut {
+        0% { opacity: 1; }
+        80% { opacity: 1; }
+        100% { opacity: 0; display: none; }
+      }
+    </style>
+  </head>
+  <body class="min-h-screen flex items-center justify-center text-white p-4">
+    <div class="max-w-md w-full bg-gray-800 p-6 rounded-md">
+      <h1 class="text-2xl font-bold mb-4 text-center">Sign Up</h1>
+      <form id="signupForm" class="space-y-4">
+        <div>
+          <label for="name" class="block text-sm font-medium">Name</label>
+          <input id="name" type="text" class="w-full bg-gray-700 p-2 rounded-md" required />
+        </div>
+        <div>
+          <label for="email" class="block text-sm font-medium">Email</label>
+          <input id="email" type="email" class="w-full bg-gray-700 p-2 rounded-md" required />
+        </div>
+        <div>
+          <label for="password" class="block text-sm font-medium">Password</label>
+          <input id="password" type="password" class="w-full bg-gray-700 p-2 rounded-md" required />
+        </div>
+        <button id="signupBtn" type="submit" class="w-full btn-primary">Sign Up</button>
+      </form>
+      <p id="signupError" class="text-red-500 mt-2 hidden error"></p>
+      <p class="mt-4 text-center">
+        <a href="/login.html" class="text-blue-400 hover:underline">Login</a>
+      </p>
+    </div>
+
+    <script type="module">
+      import { auth, db } from "./firebase-config.js";
+      import { createUserWithEmailAndPassword, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+      import { doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+      const signupForm = document.getElementById("signupForm");
+      const signupBtn = document.getElementById("signupBtn");
+      const signupError = document.getElementById("signupError");
+
+      const showError = (message) => {
+        signupError.textContent = message;
+        signupError.classList.remove("hidden");
+        console.error("Signup error:", message);
+        setTimeout(() => signupError.classList.add("hidden"), 5000);
+      };
+
+      signupForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        signupBtn.disabled = true;
+        signupBtn.textContent = "Signing up...";
+
+        const name = document.getElementById("name").value;
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+
+        try {
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          const user = userCredential.user;
+          await updateProfile(user, { displayName: name });
+          await setDoc(doc(db, "users", user.uid), {
+            name,
+            email,
+            status: "pending",
+            shares: 0,
+            balance: 0,
+            approvalDate: null,
+            lastDistribution: null,
+          });
+          console.log("User created:", user.uid);
+          window.location.href = "/index.html";
+        } catch (error) {
+          showError(`Sign up failed: ${error.message}`);
+        } finally {
+          signupBtn.disabled = false;
+          signupBtn.textContent = "Sign Up";
+        }
+      });
+    </script>
+  </body>
+</html>
