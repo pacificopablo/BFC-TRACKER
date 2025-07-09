@@ -1,178 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>User Login</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
-</head>
-<body class="bg-gray-900 flex items-center justify-center min-h-screen text-white">
-
-  <!-- Login Form -->
-  <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md">
-    <h2 class="text-2xl font-bold mb-6 text-center">Login to Your Account</h2>
-    
-    <form id="loginForm" class="space-y-4">
-      <div>
-        <label for="email" class="block mb-1">Email</label>
-        <input type="email" id="email" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
-      </div>
-      <div>
-        <label for="password" class="block mb-1">Password</label>
-        <input type="password" id="password" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
-      </div>
-      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded">Login</button>
-    </form>
-
-    <p id="errorMsg" class="text-red-400 text-center mt-4 hidden"></p>
-
-    <div class="mt-6 text-sm text-center space-y-2">
-      <button id="forgotPasswordBtn" class="text-blue-400 hover:underline">Forgot Password?</button><br />
-      <button id="signupBtn" class="text-green-400 hover:underline">Create an Account</button>
-    </div>
-  </div>
-
-  <!-- Signup Modal -->
-  <div id="signupModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden">
-    <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md">
-      <h2 class="text-xl font-bold mb-4 text-center">Sign Up</h2>
-      <form id="signupForm" class="space-y-4">
-        <input type="text" id="signupUsername" placeholder="Username" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
-        <input type="email" id="signupEmail" placeholder="Email" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
-        <input type="password" id="signupPassword" placeholder="Password" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
-        <input type="password" id="confirmPassword" placeholder="Confirm Password" class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600" required />
-        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 py-2 rounded">Sign Up</button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - Baccarat Fund</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+    <style>
+      body {
+        background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+      }
+      .btn-primary {
+        background: linear-gradient(to right, #3b82f6, #1d4ed8);
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        color: white;
+        font-weight: 500;
+      }
+      .btn-primary:hover {
+        background: linear-gradient(to right, #2563eb, #1e40af);
+      }
+      .error {
+        animation: fadeOut 5s forwards;
+      }
+      @keyframes fadeOut {
+        0% { opacity: 1; }
+        80% { opacity: 1; }
+        100% { opacity: 0; display: none; }
+      }
+    </style>
+  </head>
+  <body class="min-h-screen flex items-center justify-center text-white p-4">
+    <div class="max-w-md w-full bg-gray-800 p-6 rounded-md">
+      <h1 class="text-2xl font-bold mb-4 text-center">Login</h1>
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <label for="email" class="block text-sm font-medium">Email</label>
+          <input id="email" type="email" class="w-full bg-gray-700 p-2 rounded-md" required />
+        </div>
+        <div>
+          <label for="password" class="block text-sm font-medium">Password</label>
+          <input id="password" type="password" class="w-full bg-gray-700 p-2 rounded-md" required />
+        </div>
+        <button id="loginBtn" type="submit" class="w-full btn-primary">Login</button>
       </form>
-      <p id="signupError" class="text-red-400 text-center mt-2 hidden"></p>
-      <button class="mt-4 w-full text-sm text-gray-300 hover:underline" onclick="document.getElementById('signupModal').classList.add('hidden')">Cancel</button>
+      <p id="loginError" class="text-red-500 mt-2 hidden error"></p>
+      <p class="mt-4 text-center">
+        <a href="/signup.html" class="text-blue-400 hover:underline">Sign Up</a>
+      </p>
     </div>
-  </div>
 
-  <!-- Firebase Scripts -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { 
-      getAuth, signInWithEmailAndPassword, 
-      createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification 
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { 
-      getFirestore, doc, getDoc, setDoc 
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    <script type="module">
+      import { auth } from "./firebase-config.js";
+      import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-    // Your Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
-      authDomain: "bfc-tracker.firebaseapp.com",
-      projectId: "bfc-tracker",
-      storageBucket: "bfc-tracker.appspot.com",
-      messagingSenderId: "127052459580",
-      appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
-      measurementId: "G-PNYRCFJHYM"
-    };
+      const loginForm = document.getElementById("loginForm");
+      const loginBtn = document.getElementById("loginBtn");
+      const loginError = document.getElementById("loginError");
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+      const showError = (message) => {
+        loginError.textContent = message;
+        loginError.classList.remove("hidden");
+        console.error("Login error:", message);
+        setTimeout(() => loginError.classList.add("hidden"), 5000);
+      };
 
-    const loginForm = document.getElementById("loginForm");
-    const errorMsg = document.getElementById("errorMsg");
+      loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        loginBtn.disabled = true;
+        loginBtn.textContent = "Logging in...";
 
-    // Handle Login
-    loginForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      errorMsg.classList.add("hidden");
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
 
-      const email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value;
-
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          const role = userDoc.data().role;
-          if (role === "admin") {
-            window.location.href = "admin-dashboard.html";
-          } else if (role === "member") {
-            window.location.href = "member-dashboard.html";
-          } else {
-            throw new Error("User role is invalid.");
-          }
-        } else {
-          throw new Error("User data not found. Please contact support.");
-        }
-      } catch (error) {
-        errorMsg.textContent = error.message;
-        errorMsg.classList.remove("hidden");
-      }
-    });
-
-    // Handle Forgot Password
-    document.getElementById("forgotPasswordBtn").addEventListener("click", async () => {
-      const email = prompt("Enter your email to reset password:");
-      if (email) {
         try {
-          await sendPasswordResetEmail(auth, email);
-          alert("Password reset email sent. Check your inbox.");
-        } catch (err) {
-          alert("Error: " + err.message);
+          await signInWithEmailAndPassword(auth, email, password);
+          console.log("Login successful");
+          window.location.href = "/index.html";
+        } catch (error) {
+          showError(`Login failed: ${error.message}`);
+        } finally {
+          loginBtn.disabled = false;
+          loginBtn.textContent = "Login";
         }
-      }
-    });
-
-    // Show Signup Modal
-    document.getElementById("signupBtn").addEventListener("click", () => {
-      document.getElementById("signupModal").classList.remove("hidden");
-    });
-
-    // Handle Signup
-    document.getElementById("signupForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const username = document.getElementById("signupUsername").value.trim();
-      const email = document.getElementById("signupEmail").value.trim();
-      const password = document.getElementById("signupPassword").value;
-      const confirmPassword = document.getElementById("confirmPassword").value;
-      const signupError = document.getElementById("signupError");
-
-      signupError.classList.add("hidden");
-
-      // Basic validation
-      if (password !== confirmPassword) {
-        signupError.textContent = "Passwords do not match.";
-        signupError.classList.remove("hidden");
-        return;
-      }
-
-      // Password strength validation
-      if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
-        signupError.textContent = "Password must be at least 8 characters long and include an uppercase letter and a number.";
-        signupError.classList.remove("hidden");
-        return;
-      }
-
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-
-        // Save user with default role = "member" and username
-        await setDoc(doc(db, "users", user.uid), {
-          username: username,
-          email: email,
-          role: "member",
-          createdAt: new Date()
-        });
-
-        // Send email verification
-        await sendEmailVerification(user);
-        
-        alert("Account created successfully! Please check your email to verify your account.");
-        document.getElementById("signupModal").classList.add("hidden");
-      } catch (err) {
-        signupError.textContent = err.message;
-        signupError.classList.remove("hidden");
-      }
-    });
-  </script>
-</body>
+      });
+    </script>
+  </body>
 </html>
