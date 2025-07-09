@@ -176,10 +176,10 @@
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
-      // Get Local Time (Fallback since members can't write to temp)
+      // Get Local Time (Adjusted to PHT)
       function getLocalTime() {
         const now = new Date();
-        return new Date(now.getTime() + 8 * 60 * 60 * 1000); // Adjust to PHT (UTC+8)
+        return new Date(now.getTime() + 8 * 60 * 60 * 1000); // UTC+8 (PHT)
       }
 
       // Load Member Details
@@ -225,11 +225,11 @@
         fundChartInstance = new Chart(ctx, {
           type: "line",
           data: {
-            labels: ["Jul 9", "Jul 10"], // Default labels for current date range
+            labels: ["Jul 9", "Jul 10"], // Default labels
             datasets: [
               {
                 label: "Fund Balance",
-                data: [0, 0], // Default data, will be updated
+                data: [0, 0], // Default data
                 backgroundColor: "rgba(59, 130, 246, 0.2)",
                 borderColor: "rgba(59, 130, 246, 1)",
                 borderWidth: 2,
@@ -248,7 +248,7 @@
         });
       }
 
-      // Update Chart (Fallback to static data if access denied)
+      // Update Chart
       async function updateChart() {
         try {
           console.log("Updating chart...");
@@ -285,7 +285,7 @@
           showError("Failed to load fund chart data. Displaying static data.");
           const now = getLocalTime();
           fundChartInstance.data.labels = [now.toLocaleDateString("en-PH", { month: "short", day: "numeric" })];
-          fundChartInstance.data.datasets[0].data = [0]; // Static fallback
+          fundChartInstance.data.datasets[0].data = [0];
           fundChartInstance.update();
         }
       }
@@ -301,7 +301,7 @@
         onSnapshot(
           q,
           (snapshot) => {
-            console.log("Transaction snapshot received:", snapshot.docs.length, "documents");
+            console.log("Transaction snapshot for userId:", userId, "Documents:", snapshot.docs.length);
             allTransactions = snapshot.docs.map((doc) => ({
               id: doc.id,
               type: doc.data().type === "deposit" ? "Deposit" : "Cash Out",
@@ -313,8 +313,12 @@
             displayTransactionHistory();
           },
           (error) => {
+            console.error("Transaction history error for userId:", userId, error);
             showError("Failed to load transaction history: " + error.message);
-            elements.historyList.innerHTML = '<p class="text-red-500">Error loading transaction history.</p>';
+            elements.historyList.innerHTML = `
+              <p class="text-red-500">Error loading transaction history. <button class="text-blue-400 underline" onclick="retryLoad('transaction')">Retry</button></p>
+              <p class="text-gray-400 mt-2">Fallback: No transactions available.</p>
+            `;
           }
         );
       }
@@ -359,7 +363,7 @@
         onSnapshot(
           q,
           (snapshot) => {
-            console.log("Distribution snapshot received:", snapshot.docs.length, "documents");
+            console.log("Distribution snapshot for userId:", userId, "Documents:", snapshot.docs.length);
             elements.distributionList.innerHTML = snapshot.docs.length
               ? snapshot.docs
                   .map(
@@ -375,8 +379,12 @@
               : '<p class="text-gray-400">No distributions found.</p>';
           },
           (error) => {
+            console.error("Distribution history error for userId:", userId, error);
             showError("Failed to load distribution history: " + error.message);
-            elements.distributionList.innerHTML = '<p class="text-red-500">Error loading distribution history.</p>';
+            elements.distributionList.innerHTML = `
+              <p class="text-red-500">Error loading distribution history. <button class="text-blue-400 underline" onclick="retryLoad('distribution')">Retry</button></p>
+              <p class="text-gray-400 mt-2">Fallback: No distributions available.</p>
+            `;
           }
         );
       }
@@ -438,23 +446,33 @@
         }
       });
 
-      // Server Time (Fallback to local time adjusted to PHT)
+      // Server Time
       elements.serverTimeBtn.addEventListener("click", () => {
         const time = getLocalTime();
         alert(`Server Time: ${time.toLocaleString("en-PH")} (PHT) - Note: Local fallback`);
       });
+
+      // Retry Function
+      window.retryLoad = function (type) {
+        const user = auth.currentUser;
+        if (user) {
+          if (type === "transaction") loadTransactionHistory(user.uid);
+          else if (type === "distribution") loadDistributionHistory(user.uid);
+        }
+      };
 
       // Auth Check
       onAuthStateChanged(auth, (user) => {
         if (!user) {
           window.location.href = "/login.html";
         } else {
-          console.log("User authenticated:", user.uid);
+          console.log("Authenticated user UID:", user.uid);
           initializeChart();
-          loadMemberDetails(user.uid);
-          loadTransactionHistory(user.uid);
-          loadDistributionHistory(user.uid);
-          updateChart();
+          loadMemberDetails(user.uid).then(() => {
+            loadTransactionHistory(user.uid);
+            loadDistributionHistory(user.uid);
+            updateChart();
+          });
         }
       });
     </script>
