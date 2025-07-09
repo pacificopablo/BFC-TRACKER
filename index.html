@@ -26,6 +26,17 @@
       .btn-primary:hover {
         background: linear-gradient(to right, #2563eb, #1e40af);
       }
+      .btn-secondary {
+        background: linear-gradient(to right, #6b7280, #4b5563);
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        color: white;
+        font-weight: 500;
+        transition: background 0.3s;
+      }
+      .btn-secondary:hover {
+        background: linear-gradient(to right, #4b5563, #374151);
+      }
       .error {
         animation: fadeOut 5s forwards;
       }
@@ -39,7 +50,7 @@
   <body class="text-white min-h-screen flex items-center justify-center p-4 sm:p-6">
     <div class="max-w-md w-full">
       <!-- Error Message -->
-      <div id="errorMessage" class="text-red-500 text-center mb-4 hidden"></div>
+      <div id="errorMessage" class="text-red-500 text-center mb-4 hidden" aria-live="polite"></div>
 
       <!-- Card Container -->
       <div class="card">
@@ -55,6 +66,7 @@
                 id="loginEmail"
                 type="email"
                 required
+                aria-describedby="errorMessage"
                 class="w-full bg-gray-700 p-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter your email"
               />
@@ -65,15 +77,16 @@
                 id="loginPassword"
                 type="password"
                 required
+                aria-describedby="errorMessage"
                 class="w-full bg-gray-700 p-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter your password"
               />
             </div>
-            <button type="submit" class="btn-primary w-full">Login</button>
+            <button id="loginSubmit" type="submit" class="btn-primary w-full">Login</button>
           </form>
           <p class="text-center mt-4">
             Don't have an account? 
-            <button id="showSignUp" class="text-blue-400 hover:underline">Sign Up</button>
+            <button id="showSignUp" class="btn-secondary">Sign Up</button>
           </p>
         </div>
 
@@ -87,6 +100,7 @@
                 id="signUpName"
                 type="text"
                 required
+                aria-describedby="errorMessage"
                 class="w-full bg-gray-700 p-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter your full name"
               />
@@ -97,6 +111,7 @@
                 id="signUpEmail"
                 type="email"
                 required
+                aria-describedby="errorMessage"
                 class="w-full bg-gray-700 p-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter your email"
               />
@@ -108,15 +123,16 @@
                 type="password"
                 required
                 minlength="6"
+                aria-describedby="errorMessage"
                 class="w-full bg-gray-700 p-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Create a password"
               />
             </div>
-            <button type="submit" class="btn-primary w-full">Sign Up</button>
+            <button id="signUpSubmit" type="submit" class="btn-primary w-full">Sign Up</button>
           </form>
           <p class="text-center mt-4">
             Already have an account? 
-            <button id="showLogin" class="text-blue-400 hover:underline">Login</button>
+            <button id="showLogin" class="btn-secondary">Login</button>
           </p>
         </div>
       </div>
@@ -128,6 +144,7 @@
         createUserWithEmailAndPassword,
         signInWithEmailAndPassword,
         onAuthStateChanged,
+        deleteUser,
       } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
       import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -137,10 +154,12 @@
         loginForm: document.getElementById("loginForm"),
         loginEmail: document.getElementById("loginEmail"),
         loginPassword: document.getElementById("loginPassword"),
+        loginSubmit: document.getElementById("loginSubmit"),
         signUpForm: document.getElementById("signUpForm"),
         signUpName: document.getElementById("signUpName"),
         signUpEmail: document.getElementById("signUpEmail"),
         signUpPassword: document.getElementById("signUpPassword"),
+        signUpSubmit: document.getElementById("signUpSubmit"),
         loginFormContainer: document.getElementById("loginFormContainer"),
         signUpFormContainer: document.getElementById("signUpFormContainer"),
         showSignUp: document.getElementById("showSignUp"),
@@ -153,6 +172,32 @@
         elements.errorMessage.classList.remove("hidden");
         console.error("Error:", message);
         setTimeout(() => elements.errorMessage.classList.add("hidden"), 5000);
+      };
+
+      // Handle Firebase Authentication Errors
+      const handleAuthError = (error) => {
+        switch (error.code) {
+          case "auth/email-already-in-use":
+            return "This email is already registered.";
+          case "auth/invalid-email":
+            return "Invalid email format.";
+          case "auth/weak-password":
+            return "Password must be at least 6 characters.";
+          case "auth/wrong-password":
+            return "Incorrect password.";
+          case "auth/user-not-found":
+            return "No account found with this email.";
+          case "auth/too-many-requests":
+            return "Too many attempts. Please try again later.";
+          default:
+            return error.message;
+        }
+      };
+
+ conjectural      // Utility Function to Toggle Button State
+      const toggleButtonState = (button, isLoading) => {
+        button.disabled = isLoading;
+        button.textContent = isLoading ? "Processing..." : button.id === "loginSubmit" ? "Login" : "Sign Up";
       };
 
       // Toggle Forms
@@ -169,6 +214,8 @@
       // Login Form Submission
       elements.loginForm.addEventListener("submit", async (e) => {
         e.preventDefault();
+        toggleButtonState(elements.loginSubmit, true);
+
         const email = elements.loginEmail.value;
         const password = elements.loginPassword.value;
 
@@ -181,66 +228,78 @@
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            const role = userData.role || "member"; // Default to member if role is undefined
-            if (role === "admin") {
-              window.location.href = "/admin-dashboard.html";
-            } else {
-              window.location.href = "/member-dashboard.html";
-            }
+            const role = userData.role || "member"; // Default to member
+            window.location.href = role === "admin" ? "/admin-dashboard.html" : "/member-dashboard.html";
           } else {
             showError("User data not found. Please contact support.");
           }
         } catch (error) {
-          showError(`Login failed: ${error.message}`);
+          showError(`Login failed: ${handleAuthError(error)}`);
           console.error("Login error:", error);
+        } finally {
+          toggleButtonState(elements.loginSubmit, false);
         }
       });
 
       // Sign Up Form Submission
       elements.signUpForm.addEventListener("submit", async (e) => {
         e.preventDefault();
-        const name = elements.signUpName.value;
+        toggleButtonState(elements.signUpSubmit, true);
+
+        const name = elements.signUpName.value.trim();
         const email = elements.signUpEmail.value;
         const password = elements.signUpPassword.value;
 
         try {
+          // Validate name
+          if (!name) {
+            showError("Please enter a valid full name.");
+            return;
+          }
+
+          // Create Firebase Auth user
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           const user = userCredential.user;
 
-          // Create user document in Firestore with default role as 'member'
-          await setDoc(doc(db, "users", user.uid), {
-            name: name || "New Member",
-            email: email,
-            status: "pending",
-            role: "member", // Default role for new users
-            shares: 0,
-            balance: 0,
-            approvalDate: null,
-            lastDistribution: null,
-          });
+          try {
+            // Create Firestore user document
+            await setDoc(doc(db, "users", user.uid), {
+              name: name,
+              email: email,
+              status: "pending", // Matches member-dashboard.html
+              role: "member", // Default role for new users
+              shares: 0,
+              balance: 0,
+              approvalDate: null,
+              lastDistribution: null,
+            });
 
-          console.log("User signed up:", email);
-          window.location.href = "/member-dashboard.html"; // New users go to member dashboard
+            console.log("User signed up:", email);
+            window.location.href = "/member-dashboard.html";
+          } catch (firestoreError) {
+            // Rollback: Delete Firebase Auth user if Firestore fails
+            await deleteUser(user);
+            showError(`Failed to create user profile: ${firestoreError.message}`);
+            console.error("Firestore error:", firestoreError);
+          }
         } catch (error) {
-          showError(`Sign up failed: ${error.message}`);
+          showError(`Sign up failed: ${handleAuthError(error)}`);
           console.error("Sign up error:", error);
+        } finally {
+          toggleButtonState(elements.signUpSubmit, false);
         }
       });
 
       // Redirect authenticated users to appropriate dashboard
       onAuthStateChanged(auth, async (user) => {
-        if (user) {
+        if (user && window.location.pathname === "/index.html") {
           console.log("Authenticated user:", user.uid, user.email);
           try {
             const userDoc = await getDoc(doc(db, "users", user.uid));
             if (userDoc.exists()) {
               const userData = userDoc.data();
               const role = userData.role || "member";
-              if (role === "admin") {
-                window.location.href = "/admin-dashboard.html";
-              } else {
-                window.location.href = "/member-dashboard.html";
-              }
+              window.location.href = role === "admin" ? "/admin-dashboard.html" : "/member-dashboard.html";
             } else {
               showError("User data not found. Please contact support.");
             }
@@ -251,7 +310,7 @@
         }
       }, (error) => {
         console.error("Auth error:", error);
-        showError(`Authentication error: ${error.message}`);
+        showError(`Authentication error: ${handleAuthError(error)}`);
       });
     </script>
   </body>
