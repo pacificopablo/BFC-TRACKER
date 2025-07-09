@@ -3,18 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Login - Baccarat Fund</title>
+    <title>Baccarat Fund - Login & Sign Up</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
     <style>
       body {
         background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
       }
+      .card {
+        background: rgba(31, 41, 55, 0.95);
+        border-radius: 0.5rem;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
       .btn-primary {
         background: linear-gradient(to right, #3b82f6, #1d4ed8);
-        padding: 0.5rem 1rem;
+        padding: 0.75rem 1.5rem;
         border-radius: 0.375rem;
         color: white;
         font-weight: 500;
+        transition: background 0.3s;
       }
       .btn-primary:hover {
         background: linear-gradient(to right, #2563eb, #1e40af);
@@ -29,59 +36,222 @@
       }
     </style>
   </head>
-  <body class="min-h-screen flex items-center justify-center text-white p-4">
-    <div class="max-w-md w-full bg-gray-800 p-6 rounded-md">
-      <h1 class="text-2xl font-bold mb-4 text-center">Login</h1>
-      <form id="loginForm" class="space-y-4">
-        <div>
-          <label for="email" class="block text-sm font-medium">Email</label>
-          <input id="email" type="email" class="w-full bg-gray-700 p-2 rounded-md" required />
+  <body class="text-white min-h-screen flex items-center justify-center p-4 sm:p-6">
+    <div class="max-w-md w-full">
+      <!-- Error Message -->
+      <div id="errorMessage" class="text-red-500 text-center mb-4 hidden"></div>
+
+      <!-- Card Container -->
+      <div class="card">
+        <h1 class="text-2xl font-bold text-center mb-6">Baccarat Fund</h1>
+
+        <!-- Login Form -->
+        <div id="loginFormContainer">
+          <h2 class="text-lg font-semibold mb-4">Login</h2>
+          <form id="loginForm" class="space-y-4">
+            <div>
+              <label for="loginEmail" class="block text-sm font-medium">Email</label>
+              <input
+                id="loginEmail"
+                type="email"
+                required
+                class="w-full bg-gray-700 p-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your email"
+              />
+            </div>
+            <div>
+              <label for="loginPassword" class="block text-sm font-medium">Password</label>
+              <input
+                id="loginPassword"
+                type="password"
+                required
+                class="w-full bg-gray-700 p-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your password"
+              />
+            </div>
+            <button type="submit" class="btn-primary w-full">Login</button>
+          </form>
+          <p class="text-center mt-4">
+            Don't have an account? 
+            <button id="showSignUp" class="text-blue-400 hover:underline">Sign Up</button>
+          </p>
         </div>
-        <div>
-          <label for="password" class="block text-sm font-medium">Password</label>
-          <input id="password" type="password" class="w-full bg-gray-700 p-2 rounded-md" required />
+
+        <!-- Sign Up Form -->
+        <div id="signUpFormContainer" class="hidden">
+          <h2 class="text-lg font-semibold mb-4">Sign Up</h2>
+          <form id="signUpForm" class="space-y-4">
+            <div>
+              <label for="signUpName" class="block text-sm font-medium">Full Name</label>
+              <input
+                id="signUpName"
+                type="text"
+                required
+                class="w-full bg-gray-700 p-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your full name"
+              />
+            </div>
+            <div>
+              <label for="signUpEmail" class="block text-sm font-medium">Email</label>
+              <input
+                id="signUpEmail"
+                type="email"
+                required
+                class="w-full bg-gray-700 p-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your email"
+              />
+            </div>
+            <div>
+              <label for="signUpPassword" class="block text-sm font-medium">Password</label>
+              <input
+                id="signUpPassword"
+                type="password"
+                required
+                minlength="6"
+                class="w-full bg-gray-700 p-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Create a password"
+              />
+            </div>
+            <button type="submit" class="btn-primary w-full">Sign Up</button>
+          </form>
+          <p class="text-center mt-4">
+            Already have an account? 
+            <button id="showLogin" class="text-blue-400 hover:underline">Login</button>
+          </p>
         </div>
-        <button id="loginBtn" type="submit" class="w-full btn-primary">Login</button>
-      </form>
-      <p id="loginError" class="text-red-500 mt-2 hidden error"></p>
-      <p class="mt-4 text-center">
-        <a href="/signup.html" class="text-blue-400 hover:underline">Sign Up</a>
-      </p>
+      </div>
     </div>
 
     <script type="module">
-      import { auth } from "./firebase-config.js";
-      import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+      import { auth, db } from "./firebase-config.js";
+      import {
+        createUserWithEmailAndPassword,
+        signInWithEmailAndPassword,
+        onAuthStateChanged,
+      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+      import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-      const loginForm = document.getElementById("loginForm");
-      const loginBtn = document.getElementById("loginBtn");
-      const loginError = document.getElementById("loginError");
-
-      const showError = (message) => {
-        loginError.textContent = message;
-        loginError.classList.remove("hidden");
-        console.error("Login error:", message);
-        setTimeout(() => loginError.classList.add("hidden"), 5000);
+      // DOM Elements
+      const elements = {
+        errorMessage: document.getElementById("errorMessage"),
+        loginForm: document.getElementById("loginForm"),
+        loginEmail: document.getElementById("loginEmail"),
+        loginPassword: document.getElementById("loginPassword"),
+        signUpForm: document.getElementById("signUpForm"),
+        signUpName: document.getElementById("signUpName"),
+        signUpEmail: document.getElementById("signUpEmail"),
+        signUpPassword: document.getElementById("signUpPassword"),
+        loginFormContainer: document.getElementById("loginFormContainer"),
+        signUpFormContainer: document.getElementById("signUpFormContainer"),
+        showSignUp: document.getElementById("showSignUp"),
+        showLogin: document.getElementById("showLogin"),
       };
 
-      loginForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        loginBtn.disabled = true;
-        loginBtn.textContent = "Logging in...";
+      // Utility Function to Show Error
+      const showError = (message) => {
+        elements.errorMessage.textContent = message;
+        elements.errorMessage.classList.remove("hidden");
+        console.error("Error:", message);
+        setTimeout(() => elements.errorMessage.classList.add("hidden"), 5000);
+      };
 
-        const email = document.getElementById("email").value;
-        const password = document.getElementById("password").value;
+      // Toggle Forms
+      elements.showSignUp.addEventListener("click", () => {
+        elements.loginFormContainer.classList.add("hidden");
+        elements.signUpFormContainer.classList.remove("hidden");
+      });
+
+      elements.showLogin.addEventListener("click", () => {
+        elements.signUpFormContainer.classList.add("hidden");
+        elements.loginFormContainer.classList.remove("hidden");
+      });
+
+      // Login Form Submission
+      elements.loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = elements.loginEmail.value;
+        const password = elements.loginPassword.value;
 
         try {
-          await signInWithEmailAndPassword(auth, email, password);
-          console.log("Login successful");
-          window.location.href = "/index.html";
+          const userCredential = await signInWithEmailAndPassword(auth, email, password);
+          const user = userCredential.user;
+          console.log("User logged in:", email);
+
+          // Check user role
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            const role = userData.role || "member"; // Default to member if role is undefined
+            if (role === "admin") {
+              window.location.href = "/admin-dashboard.html";
+            } else {
+              window.location.href = "/member-dashboard.html";
+            }
+          } else {
+            showError("User data not found. Please contact support.");
+          }
         } catch (error) {
           showError(`Login failed: ${error.message}`);
-        } finally {
-          loginBtn.disabled = false;
-          loginBtn.textContent = "Login";
+          console.error("Login error:", error);
         }
+      });
+
+      // Sign Up Form Submission
+      elements.signUpForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = elements.signUpName.value;
+        const email = elements.signUpEmail.value;
+        const password = elements.signUpPassword.value;
+
+        try {
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          const user = userCredential.user;
+
+          // Create user document in Firestore with default role as 'member'
+          await setDoc(doc(db, "users", user.uid), {
+            name: name || "New Member",
+            email: email,
+            status: "pending",
+            role: "member", // Default role for new users
+            shares: 0,
+            balance: 0,
+            approvalDate: null,
+            lastDistribution: null,
+          });
+
+          console.log("User signed up:", email);
+          window.location.href = "/member-dashboard.html"; // New users go to member dashboard
+        } catch (error) {
+          showError(`Sign up failed: ${error.message}`);
+          console.error("Sign up error:", error);
+        }
+      });
+
+      // Redirect authenticated users to appropriate dashboard
+      onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          console.log("Authenticated user:", user.uid, user.email);
+          try {
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              const role = userData.role || "member";
+              if (role === "admin") {
+                window.location.href = "/admin-dashboard.html";
+              } else {
+                window.location.href = "/member-dashboard.html";
+              }
+            } else {
+              showError("User data not found. Please contact support.");
+            }
+          } catch (error) {
+            showError(`Error checking user role: ${error.message}`);
+            console.error("Role check error:", error);
+          }
+        }
+      }, (error) => {
+        console.error("Auth error:", error);
+        showError(`Authentication error: ${error.message}`);
       });
     </script>
   </body>
