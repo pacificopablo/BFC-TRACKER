@@ -12,15 +12,16 @@
       }
       .card {
         background: rgba(31, 41, 55, 0.95);
-        backdrop-filter: blur(10px);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-      }
-      .card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       }
       .btn-primary {
         background: linear-gradient(to right, #3b82f6, #1d4ed8);
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        color: white;
+        font-weight: 500;
       }
       .btn-primary:hover {
         background: linear-gradient(to right, #2563eb, #1e40af);
@@ -36,20 +37,20 @@
     </style>
   </head>
   <body class="text-white min-h-screen p-4 sm:p-6">
-    <div id="authError" class="text-red-500 text-center mb-4 hidden"></div>
-    <div class="max-w-7xl mx-auto">
+    <div id="errorMessage" class="text-red-500 text-center mb-4 hidden"></div>
+    <div class="max-w-6xl mx-auto">
       <!-- Header -->
-      <header class="flex flex-col sm:flex-row justify-between items-center mb-8">
-        <h1 class="text-3xl font-bold tracking-tight">Member Dashboard</h1>
+      <header class="flex flex-col sm:flex-row justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">Member Dashboard</h1>
         <div class="mt-4 sm:mt-0 flex space-x-4">
-          <button id="serverTimeBtn" class="btn-primary px-4 py-2 rounded-lg font-medium">Server Time</button>
-          <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded-lg font-medium hover:bg-red-700">Logout</button>
+          <button id="serverTimeBtn" class="btn-primary">Server Time</button>
+          <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded-md hover:bg-red-700">Logout</button>
         </div>
       </header>
 
-      <!-- Profile Card -->
-      <div class="card p-6 rounded-lg shadow-lg mb-8">
-        <h2 class="text-xl font-semibold mb-4">Your Profile</h2>
+      <!-- Profile -->
+      <div class="card mb-6">
+        <h2 class="text-lg font-semibold mb-4">Profile</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <p><strong>Name:</strong> <span id="profileName">Loading...</span></p>
           <p><strong>Email:</strong> <span id="profileEmail">Loading...</span></p>
@@ -58,33 +59,27 @@
         </div>
       </div>
 
-      <!-- Summary Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-        <div class="card p-6 rounded-lg shadow-lg">
-          <h2 class="text-lg font-semibold">Your Shares</h2>
-          <p id="memberShares" class="text-3xl font-bold">0</p>
+      <!-- Summary -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div class="card">
+          <h3 class="text-md font-semibold">Shares</h3>
+          <p id="shares" class="text-2xl font-bold">0</p>
         </div>
-        <div class="card p-6 rounded-lg shadow-lg">
-          <h2 class="text-lg font-semibold">Your Balance</h2>
-          <p id="memberBalance" class="text-3xl font-bold">₱0.00</p>
+        <div class="card">
+          <h3 class="text-md font-semibold">Balance</h3>
+          <p id="balance" class="text-2xl font-bold">₱0.00</p>
         </div>
-        <div class="card p-6 rounded-lg shadow-lg">
-          <h2 class="text-lg font-semibold">Last Distribution</h2>
-          <p id="profileLastDistribution" class="text-lg">None</p>
+        <div class="card">
+          <h3 class="text-md font-semibold">Last Distribution</h3>
+          <p id="lastDistribution" class="text-md">None</p>
         </div>
-      </div>
-
-      <!-- Balance Chart -->
-      <div class="card p-6 rounded-lg shadow-lg mb-8">
-        <h2 class="text-xl font-semibold mb-4">Balance History</h2>
-        <canvas id="balanceChart" class="w-full h-64"></canvas>
       </div>
 
       <!-- Transaction Form -->
-      <div class="card p-6 rounded-lg shadow-lg mb-8">
-        <h2 class="text-xl font-semibold mb-4">Transaction Request</h2>
+      <div class="card mb-6">
+        <h2 class="text-lg font-semibold mb-4">Transaction Request</h2>
         <form id="transactionForm" class="flex flex-col sm:flex-row gap-4">
-          <select id="transactionType" class="bg-gray-700 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <select id="transactionType" class="bg-gray-700 p-2 rounded-md">
             <option value="deposit">Deposit</option>
             <option value="cashout">Cash Out</option>
           </select>
@@ -94,87 +89,62 @@
             step="0.01"
             min="0"
             placeholder="Amount (₱)"
-            class="bg-gray-700 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="bg-gray-700 p-2 rounded-md"
           />
-          <button
-            id="submitTransactionBtn"
-            type="submit"
-            class="btn-primary px-4 py-2 rounded-lg font-medium"
-          >
-            Submit
-          </button>
+          <button id="submitTransaction" type="submit" class="btn-primary">Submit</button>
         </form>
         <p id="transactionError" class="text-red-500 mt-2 hidden error"></p>
       </div>
 
       <!-- Transaction History -->
-      <div class="card p-6 rounded-lg shadow-lg mb-8">
-        <h2 class="text-xl font-semibold mb-4">Transaction History</h2>
-        <div class="flex flex-col sm:flex-row gap-4 mb-4">
-          <select id="historyFilter" class="bg-gray-700 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="all">All Transactions</option>
-            <option value="profit">Profit Distributions</option>
-            <option value="loss">Loss Deductions</option>
-            <option value="deposit">Deposits</option>
-            <option value="cashout">Cash Outs</option>
-          </select>
-          <select id="historySort" class="bg-gray-700 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="desc">Newest First</option>
-            <option value="asc">Oldest First</option>
-          </select>
-        </div>
-        <div id="historyList" class="space-y-4"></div>
+      <div class="card mb-6">
+        <h2 class="text-lg font-semibold mb-4">Transaction History</h2>
+        <div id="transactionHistory" class="space-y-2"></div>
       </div>
 
       <!-- Daily Distribution Report -->
-      <div class="card p-6 rounded-lg shadow-lg">
-        <h2 class="text-xl font-semibold mb-4">Daily Distribution Report</h2>
-        <div id="dailyReportList" class="space-y-4"></div>
+      <div class="card">
+        <h2 class="text-lg font-semibold mb-4">Daily Distribution Report</h2>
+        <div id="dailyReport" class="space-y-2"></div>
       </div>
-
+    </body>
       <script type="module">
         import { auth, db } from "./firebase-config.js";
         import {
-          getDocs,
-          getDoc,
           doc,
+          getDoc,
           setDoc,
-          serverTimestamp,
+          collection,
           query,
-          orderBy,
           where,
-          onSnapshot,
-          deleteDoc,
+          orderBy,
+          getDocs,
+          serverTimestamp,
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-        import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
         // DOM Elements
         const elements = {
-          authError: document.getElementById("authError"),
-          memberShares: document.getElementById("memberShares"),
-          memberBalance: document.getElementById("memberBalance"),
-          profileLastDistribution: document.getElementById("profileLastDistribution"),
-          historyList: document.getElementById("historyList"),
-          historyFilter: document.getElementById("historyFilter"),
-          historySort: document.getElementById("historySort"),
-          dailyReportList: document.getElementById("dailyReportList"),
-          transactionForm: document.getElementById("transactionForm"),
-          transactionAmount: document.getElementById("transactionAmount"),
-          submitTransactionBtn: document.getElementById("submitTransactionBtn"),
-          transactionError: document.getElementById("transactionError"),
-          transactionType: document.getElementById("transactionType"),
-          logoutBtn: document.getElementById("logoutBtn"),
-          serverTimeBtn: document.getElementById("serverTimeBtn"),
+          errorMessage: document.getElementById("errorMessage"),
           profileName: document.getElementById("profileName"),
           profileEmail: document.getElementById("profileEmail"),
           profileStatus: document.getElementById("profileStatus"),
           profileApprovalDate: document.getElementById("profileApprovalDate"),
+          shares: document.getElementById("shares"),
+          balance: document.getElementById("balance"),
+          lastDistribution: document.getElementById("lastDistribution"),
+          transactionForm: document.getElementById("transactionForm"),
+          transactionType: document.getElementById("transactionType"),
+          transactionAmount: document.getElementById("transactionAmount"),
+          submitTransaction: document.getElementById("submitTransaction"),
+          transactionError: document.getElementById("transactionError"),
+          transactionHistory: document.getElementById("transactionHistory"),
+          dailyReport: document.getElementById("dailyReport"),
+          serverTimeBtn: document.getElementById("serverTimeBtn"),
+          logoutBtn: document.getElementById("logoutBtn"),
         };
 
-        let currentMember = null;
-        let allTransactions = [];
-        let lastSubmissionTime = 0;
-        const SUBMISSION_COOLDOWN = 5000; // 5 seconds
+        let currentUser = null;
 
         // Utility Functions
         const formatCurrency = (value) =>
@@ -183,413 +153,269 @@
         const formatDate = (date) =>
           date && !isNaN(new Date(date).getTime()) ? new Date(date).toLocaleString("en-PH") : "None";
 
-        const showError = (element, message) => {
-          element.textContent = message;
-          element.classList.remove("hidden");
-          console.error(message);
-          setTimeout(() => element.classList.add("hidden"), 5000);
+        const showError = (message) => {
+          elements.errorMessage.textContent = message;
+          elements.errorMessage.classList.remove("hidden");
+          console.error("Error:", message);
+          setTimeout(() => elements.errorMessage.classList.add("hidden"), 5000);
         };
 
         const showLoading = (element, message = "Loading...") => {
           element.innerHTML = `<p class="text-gray-400">${message}</p>`;
         };
 
-        // Get Firebase Server Time
-        async function getServerTimeAsDate() {
-          try {
-            const tempRef = doc(collection(db, "temp"));
-            await setDoc(tempRef, { timestamp: serverTimestamp() });
-            const docSnap = await getDoc(tempRef);
-            if (docSnap.exists()) {
-              const serverTime = docSnap.data().timestamp.toDate();
-              await deleteDoc(tempRef);
-              console.log("Server time retrieved:", serverTime);
-              return serverTime;
-            }
-            throw new Error("Failed to retrieve server time");
-          } catch (error) {
-            console.error("Error getting server time:", error);
-            throw error;
-          }
-        }
-
-        // Get PHT Day Range
-        function getPHTDayRange(serverTime) {
-          const phtTime = new Date(serverTime.getTime() + 8 * 60 * 60 * 1000);
-          const startOfDay = new Date(phtTime.setHours(0, 0, 0, 0));
-          const endOfDay = new Date(phtTime.setHours(23, 59, 59, 999));
-          return {
-            start: new Date(startOfDay.getTime() - 8 * 60 * 60 * 1000),
-            end: new Date(endOfDay.getTime() - 8 * 60 * 60 * 1000),
-          };
-        }
-
-        // Load Member Data
-        async function loadMemberData(userId) {
-          console.log("Attempting to load member data for userId:", userId);
-          showLoading(elements.historyList, "Loading transaction history...");
-          showLoading(elements.dailyReportList, "Loading daily report...");
-          Object.values(elements).forEach((el) => {
-            if (["memberShares", "memberBalance", "profileLastDistribution", "profileName", "profileEmail", "profileStatus", "profileApprovalDate"].includes(el.id)) {
-              el.textContent = "Loading...";
-            }
-          });
+        // Load User Data
+        async function loadUserData(userId) {
+          console.log("Loading data for userId:", userId);
+          showLoading(elements.transactionHistory, "Loading transactions...");
+          showLoading(elements.dailyReport, "Loading daily report...");
+          elements.profileName.textContent = "Loading...";
+          elements.profileEmail.textContent = "Loading...";
+          elements.profileStatus.textContent = "Loading...";
+          elements.profileApprovalDate.textContent = "Loading...";
+          elements.shares.textContent = "0";
+          elements.balance.textContent = "₱0.00";
+          elements.lastDistribution.textContent = "None";
 
           try {
-            const memberRef = doc(db, "users", userId);
-            const memberSnap = await getDoc(memberRef);
-            console.log("Member snapshot exists:", memberSnap.exists());
-            if (!memberSnap.exists()) {
-              console.log("No member document found, creating default...");
-              const now = await getServerTimeAsDate();
-              await setDoc(memberRef, {
+            const userRef = doc(db, "users", userId);
+            const userSnap = await getDoc(userRef);
+            console.log("User snapshot exists:", userSnap.exists());
+
+            if (!userSnap.exists()) {
+              console.log("Creating default user document...");
+              await setDoc(userRef, {
                 name: "New Member",
-                email: "no-email@default.com",
+                email: auth.currentUser.email || "no-email@default.com",
                 status: "pending",
                 shares: 0,
                 balance: 0,
                 approvalDate: null,
                 lastDistribution: null,
               });
-              currentMember = { id: userId, name: "New Member", email: "no-email@default.com", status: "pending", shares: 0, balance: 0, approvalDate: null, lastDistribution: null };
+              currentUser = {
+                id: userId,
+                name: "New Member",
+                email: auth.currentUser.email || "no-email@default.com",
+                status: "pending",
+                shares: 0,
+                balance: 0,
+                approvalDate: null,
+                lastDistribution: null,
+              };
             } else {
-              currentMember = { id: memberSnap.id, ...memberSnap.data() };
-              console.log("Member data loaded:", currentMember);
+              currentUser = { id: userSnap.id, ...userSnap.data() };
+              console.log("User data:", currentUser);
             }
 
-            elements.memberShares.textContent = currentMember.shares || 0;
-            elements.memberBalance.textContent = formatCurrency(currentMember.balance);
-            elements.profileLastDistribution.textContent = formatDate(currentMember.lastDistribution);
-            elements.profileName.textContent = currentMember.name || "N/A";
-            elements.profileEmail.textContent = currentMember.email || "N/A";
-            elements.profileStatus.textContent = currentMember.status || "Pending";
+            elements.profileName.textContent = currentUser.name || "N/A";
+            elements.profileEmail.textContent = currentUser.email || "N/A";
+            elements.profileStatus.textContent = currentUser.status || "Pending";
             elements.profileStatus.className = `px-2 py-1 rounded ${
-              currentMember.status === "approved" ? "bg-green-600" : currentMember.status === "pending" ? "bg-yellow-600" : "bg-red-600"
+              currentUser.status === "approved" ? "bg-green-600" : "bg-yellow-600"
             }`;
-            elements.profileApprovalDate.textContent = formatDate(currentMember.approvalDate);
+            elements.profileApprovalDate.textContent = formatDate(currentUser.approvalDate);
+            elements.shares.textContent = currentUser.shares || 0;
+            elements.balance.textContent = formatCurrency(currentUser.balance);
+            elements.lastDistribution.textContent = formatDate(currentUser.lastDistribution);
 
-            await loadDailyReport(userId);
             await loadTransactionHistory(userId);
-            await initializeChart(userId);
+            await loadDailyReport(userId);
           } catch (error) {
-            console.error("Error loading member data:", error);
-            showError(elements.authError, `Failed to load member data: ${error.message} (Check Firestore rules or network)`);
-            Object.values(elements).forEach((el) => {
-              if (["memberShares", "memberBalance"].includes(el.id)) el.textContent = "0";
-              if (["profileLastDistribution", "profileName", "profileEmail", "profileStatus", "profileApprovalDate"].includes(el.id)) el.textContent = "N/A";
-            });
-          }
-        }
-
-        // Load Daily Distribution Report
-        async function loadDailyReport(userId) {
-          console.log("Loading daily report for userId:", userId);
-          showLoading(elements.dailyReportList, "Loading daily report...");
-          try {
-            const now = await getServerTimeAsDate();
-            const { start, end } = getPHTDayRange(now);
-            const q = query(
-              collection(db, "member_distributions"),
-              where("memberId", "==", userId),
-              orderBy("timestamp", "desc")
-            );
-            const snapshot = await getDocs(q);
-            console.log("Daily report snapshot size:", snapshot.size);
-            const todayDistributions = snapshot.docs.filter((doc) => {
-              const timestamp = doc.data().timestamp?.toDate();
-              return timestamp && timestamp >= start && timestamp <= end;
-            });
-            console.log("Today’s distributions:", todayDistributions.map(doc => doc.data()));
-
-            elements.dailyReportList.innerHTML = "";
-            if (todayDistributions.length === 0) {
-              elements.dailyReportList.innerHTML = '<p class="text-gray-400">No distributions today.</p>';
-              return;
-            }
-
-            todayDistributions.forEach((doc) => {
-              const data = doc.data();
-              const div = document.createElement("div");
-              div.className = "bg-gray-700 p-4 rounded-lg";
-              div.innerHTML = `
-                <p><strong>Type:</strong> ${data.type === "profit" ? "Profit" : "Loss"}</p>
-                <p><strong>Amount:</strong> ${data.type === "profit" ? "+" : "-"}₱${formatCurrency(data.amount)}</p>
-                <p><strong>Date:</strong> ${data.timestamp?.toDate().toLocaleString("en-PH") || "N/A"}</p>
-              `;
-              elements.dailyReportList.appendChild(div);
-            });
-          } catch (error) {
-            console.error("Error loading daily report:", error);
-            showError(elements.transactionError, `Failed to load daily report: ${error.message}`);
-            elements.dailyReportList.innerHTML = '<p class="text-red-500">Failed to load daily report.</p>';
+            showError(`Failed to load user data: ${error.message}`);
+            console.error("Load user data error:", error);
           }
         }
 
         // Load Transaction History
         async function loadTransactionHistory(userId) {
-          console.log("Loading transaction history for userId:", userId);
-          showLoading(elements.historyList, "Loading transaction history...");
-          const profitQuery = query(
-            collection(db, "member_distributions"),
-            where("memberId", "==", userId),
-            orderBy("timestamp", "desc")
-          );
-          const transactionQuery = query(
-            collection(db, "transactions"),
-            where("memberId", "==", userId),
-            orderBy("timestamp", "desc")
-          );
-
-          onSnapshot(profitQuery, (profitSnapshot) => {
-            console.log("Profit snapshot size:", profitSnapshot.size, profitSnapshot.docs.map(doc => doc.data()));
-            onSnapshot(transactionQuery, (transactionSnapshot) => {
-              console.log("Transaction snapshot size:", transactionSnapshot.size, transactionSnapshot.docs.map(doc => doc.data()));
-              allTransactions = [];
-
-              profitSnapshot.docs.forEach((doc) => {
-                const data = doc.data();
-                allTransactions.push({
-                  id: doc.id,
-                  type: data.type === "profit" ? "Profit Distribution" : "Loss Deduction",
-                  filterType: data.type,
-                  amount: data.amount,
-                  timestamp: data.timestamp?.toDate() || new Date(),
-                  details: `Shares: ${data.sharesAdded || 0}`,
-                });
-              });
-
-              transactionSnapshot.docs.forEach((doc) => {
-                const data = doc.data();
-                allTransactions.push({
-                  id: doc.id,
-                  type: data.type === "deposit" ? "Deposit" : "Cash Out",
-                  filterType: data.type,
-                  amount: data.amount,
-                  timestamp: data.timestamp?.toDate() || new Date(),
-                  details: `Status: ${data.status || "N/A"}`,
-                });
-              });
-
-              displayTransactionHistory();
-            }, (error) => {
-              console.error("Error loading transactions:", error);
-              showError(elements.transactionError, `Failed to load transaction history: ${error.message}`);
-              elements.historyList.innerHTML = '<p class="text-red-500">Failed to load transaction history.</p>';
-            });
-          }, (error) => {
-            console.error("Error loading profit/loss distributions:", error);
-            showError(elements.transactionError, `Failed to load transaction history: ${error.message}`);
-            elements.historyList.innerHTML = '<p class="text-red-500">Failed to load transaction history.</p>';
-          });
-        }
-
-        // Display Transaction History
-        function displayTransactionHistory() {
-          console.log("Displaying transaction history, total transactions:", allTransactions.length);
-          const filter = elements.historyFilter.value;
-          const sort = elements.historySort.value;
-
-          let filteredTransactions = allTransactions;
-          if (filter !== "all") {
-            filteredTransactions = allTransactions.filter((txn) => txn.filterType === filter);
-          }
-
-          filteredTransactions.sort((a, b) =>
-            sort === "desc" ? b.timestamp - a.timestamp : a.timestamp - b.timestamp
-          );
-
-          elements.historyList.innerHTML = "";
-          if (filteredTransactions.length === 0) {
-            elements.historyList.innerHTML = '<p class="text-gray-400">No transaction history for selected filter.</p>';
-            return;
-          }
-
-          filteredTransactions.forEach((txn) => {
-            const div = document.createElement("div");
-            div.className = "bg-gray-700 p-4 rounded-lg";
-            div.innerHTML = `
-              <p><strong>Type:</strong> ${txn.type}</p>
-              <p><strong>Amount:</strong> ₱${formatCurrency(txn.amount)}</p>
-              <p><strong>Date:</strong> ${txn.timestamp.toLocaleString()}</p>
-              <p><strong>Details:</strong> ${txn.details}</p>
-            `;
-            elements.historyList.appendChild(div);
-          });
-        }
-
-        // Initialize Balance Chart
-        async function initializeChart(userId) {
-          console.log("Initializing chart for userId:", userId);
+          showLoading(elements.transactionHistory, "Loading transactions...");
           try {
-            const ctx = document.getElementById("balanceChart").getContext("2d");
-            const profitQuery = query(
-              collection(db, "member_distributions"),
-              where("memberId", "==", userId),
-              orderBy("timestamp", "asc")
-            );
-            const transactionQuery = query(
+            const transactionsQuery = query(
               collection(db, "transactions"),
               where("memberId", "==", userId),
-              where("status", "==", "approved"),
-              orderBy("timestamp", "asc")
+              orderBy("timestamp", "desc")
+            );
+            const distributionsQuery = query(
+              collection(db, "member_distributions"),
+              where("memberId", "==", userId),
+              orderBy("timestamp", "desc")
             );
 
-            const profitSnapshot = await getDocs(profitQuery);
-            const transactionSnapshot = await getDocs(transactionQuery);
-            console.log("Profit snapshot size:", profitSnapshot.size);
-            console.log("Transaction snapshot size:", transactionSnapshot.size);
+            const [transactionSnap, distributionSnap] = await Promise.all([
+              getDocs(transactionsQuery),
+              getDocs(distributionsQuery),
+            ]);
+            console.log("Transactions found:", transactionSnap.size);
+            console.log("Distributions found:", distributionSnap.size);
 
             const transactions = [];
-            profitSnapshot.docs.forEach((doc) => {
+            transactionSnap.docs.forEach((doc) => {
               const data = doc.data();
               transactions.push({
+                id: doc.id,
+                type: data.type === "deposit" ? "Deposit" : "Cash Out",
+                amount: data.amount,
                 timestamp: data.timestamp?.toDate() || new Date(),
-                amount: data.type === "profit" ? data.amount : -data.amount,
+                status: data.status || "N/A",
+              });
+            });
+            distributionSnap.docs.forEach((doc) => {
+              const data = doc.data();
+              transactions.push({
+                id: doc.id,
+                type: data.type === "profit" ? "Profit Distribution" : "Loss Deduction",
+                amount: data.amount,
+                timestamp: data.timestamp?.toDate() || new Date(),
+                status: `Shares: ${data.sharesAdded || 0}`,
               });
             });
 
-            transactionSnapshot.docs.forEach((doc) => {
-              const data = doc.data();
-              transactions.push({
-                timestamp: data.timestamp?.toDate() || new Date(),
-                amount: data.type === "deposit" ? data.amount : -data.amount,
-              });
-            });
+            transactions.sort((a, b) => b.timestamp - a.timestamp);
+            elements.transactionHistory.innerHTML = "";
+            if (transactions.length === 0) {
+              elements.transactionHistory.innerHTML = '<p class="text-gray-400">No transactions found.</p>';
+              return;
+            }
 
-            transactions.sort((a, b) => a.timestamp - b.timestamp);
-            console.log("Chart transactions:", transactions);
-
-            let runningBalance = 0;
-            const labels = [];
-            const data = [];
             transactions.forEach((txn) => {
-              runningBalance += txn.amount;
-              labels.push(txn.timestamp.toLocaleDateString("en-PH"));
-              data.push(runningBalance);
-            });
-
-            new Chart(ctx, {
-              type: "line",
-              data: {
-                labels: labels.length > 0 ? labels : ["No Data"],
-                datasets: [{
-                  label: "Balance History",
-                  data: data.length > 0 ? data : [0],
-                  backgroundColor: "rgba(59, 130, 246, 0.2)",
-                  borderColor: "rgba(59, 130, 246, 1)",
-                  borderWidth: 2,
-                  fill: true,
-                  tension: 0.3,
-                }],
-              },
-              options: {
-                responsive: true,
-                plugins: { legend: { labels: { color: "white" } } },
-                scales: {
-                  x: { ticks: { color: "white" } },
-                  y: { ticks: { color: "white" }, beginAtZero: true },
-                },
-              },
+              const div = document.createElement("div");
+              div.className = "bg-gray-700 p-3 rounded-md";
+              div.innerHTML = `
+                <p><strong>Type:</strong> ${txn.type}</p>
+                <p><strong>Amount:</strong> ₱${formatCurrency(txn.amount)}</p>
+                <p><strong>Date:</strong> ${formatDate(txn.timestamp)}</p>
+                <p><strong>Details:</strong> ${txn.status}</p>
+              `;
+              elements.transactionHistory.appendChild(div);
             });
           } catch (error) {
-            console.error("Error initializing chart:", error);
-            showError(elements.transactionError, `Failed to load chart: ${error.message}`);
-            document.getElementById("balanceChart").parentElement.innerHTML = '<p class="text-red-500">Failed to load chart.</p>';
+            showError(`Failed to load transaction history: ${error.message}`);
+            console.error("Transaction history error:", error);
+            elements.transactionHistory.innerHTML = '<p class="text-red-500">Failed to load transactions.</p>';
           }
         }
 
-        // Authentication Check
-        onAuthStateChanged(auth, (user) => {
-          if (!user) {
-            console.log("No authenticated user detected");
-            showError(elements.authError, "Not authenticated. Redirecting to login...");
-            setTimeout(() => (window.location.href = "/login.html"), 3000);
-          } else {
-            console.log("Authenticated user:", user.uid, user.email);
-            loadMemberData(user.uid);
-          }
-        }, (error) => {
-          console.error("Auth state change error:", error);
-          showError(elements.authError, `Authentication error: ${error.message}. Retrying in 5 seconds...`);
-          setTimeout(() => location.reload(), 5000);
-        });
+        // Load Daily Distribution Report
+        async function loadDailyReport(userId) {
+          showLoading(elements.dailyReport, "Loading daily report...");
+          try {
+            const now = new Date();
+            const startOfDay = new Date(now.setHours(0, 0, 0, 0));
+            const endOfDay = new Date(now.setHours(23, 59, 59, 999));
 
-        // Submit Transaction Request
+            const q = query(
+              collection(db, "member_distributions"),
+              where("memberId", "==", userId),
+              where("timestamp", ">=", startOfDay),
+              where("timestamp", "<=", endOfDay),
+              orderBy("timestamp", "desc")
+            );
+            const snapshot = await getDocs(q);
+            console.log("Daily distributions found:", snapshot.size);
+
+            elements.dailyReport.innerHTML = "";
+            if (snapshot.empty) {
+              elements.dailyReport.innerHTML = '<p class="text-gray-400">No distributions today.</p>';
+              return;
+            }
+
+            snapshot.docs.forEach((doc) => {
+              const data = doc.data();
+              const div = document.createElement("div");
+              div.className = "bg-gray-700 p-3 rounded-md";
+              div.innerHTML = `
+                <p><strong>Type:</strong> ${data.type === "profit" ? "Profit" : "Loss"}</p>
+                <p><strong>Amount:</strong> ${data.type === "profit" ? "+" : "-"}₱${formatCurrency(data.amount)}</p>
+                <p><strong>Date:</strong> ${formatDate(data.timestamp)}</p>
+              `;
+              elements.dailyReport.appendChild(div);
+            });
+          } catch (error) {
+            showError(`Failed to load daily report: ${error.message}`);
+            console.error("Daily report error:", error);
+            elements.dailyReport.innerHTML = '<p class="text-red-500">Failed to load daily report.</p>';
+          }
+        }
+
+        // Submit Transaction
         elements.transactionForm.addEventListener("submit", async (e) => {
           e.preventDefault();
-
-          const currentTime = Date.now();
-          if (currentTime - lastSubmissionTime < SUBMISSION_COOLDOWN) {
-            showError(elements.transactionError, `Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (currentTime - lastSubmissionTime)) / 1000)} seconds before submitting again.`);
-            return;
-          }
-          lastSubmissionTime = currentTime;
-
-          elements.submitTransactionBtn.disabled = true;
-          elements.submitTransactionBtn.textContent = "Processing...";
+          elements.submitTransaction.disabled = true;
+          elements.submitTransaction.textContent = "Processing...";
 
           try {
-            if (!currentMember) {
-              showError(elements.transactionError, "Member data not loaded. Please wait.");
-              return;
-            }
-            const transactionType = elements.transactionType.value;
+            const type = elements.transactionType.value;
             const amount = parseFloat(elements.transactionAmount.value);
-            if (isNaN(amount) || amount <= 0) {
-              showError(elements.transactionError, "Please enter a valid amount greater than 0.");
+            if (!amount || amount <= 0) {
+              showError("Please enter a valid amount.");
+              return;
+            }
+            if (type === "cashout" && (currentUser.balance || 0) < amount) {
+              showError("Insufficient balance for cash out.");
               return;
             }
 
-            if (transactionType === "cashout" && (currentMember.balance || 0) < amount) {
-              showError(elements.transactionError, "Insufficient balance for cash out.");
-              return;
-            }
-
-            const transactionRef = doc(collection(db, "transactions"));
-            await setDoc(transactionRef, {
-              memberId: currentMember.id,
-              memberName: currentMember.name || "N/A",
-              type: transactionType,
-              amount: amount,
+            await setDoc(doc(collection(db, "transactions")), {
+              memberId: currentUser.id,
+              memberName: currentUser.name || "N/A",
+              type,
+              amount,
               status: "pending",
               timestamp: serverTimestamp(),
             });
 
             elements.transactionForm.reset();
-            alert(`Successfully submitted ${transactionType} request of ₱${formatCurrency(amount)}!`);
+            alert(`Submitted ${type} request of ₱${formatCurrency(amount)}`);
+            await loadTransactionHistory(currentUser.id);
           } catch (error) {
-            console.error("Error submitting transaction:", error);
-            showError(elements.transactionError, `Failed to submit request: ${error.message}`);
+            showError(`Failed to submit transaction: ${error.message}`);
+            console.error("Transaction error:", error);
           } finally {
-            elements.submitTransactionBtn.disabled = false;
-            elements.submitTransactionBtn.textContent = "Submit";
+            elements.submitTransaction.disabled = false;
+            elements.submitTransaction.textContent = "Submit";
           }
         });
 
-        // Transaction History Filter and Sort
-        elements.historyFilter.addEventListener("change", displayTransactionHistory);
-        elements.historySort.addEventListener("change", displayTransactionHistory);
+        // Authentication Check
+        onAuthStateChanged(auth, (user) => {
+          if (!user) {
+            console.log("No user authenticated");
+            showError("Not authenticated. Redirecting to login...");
+            setTimeout(() => (window.location.href = "/login.html"), 3000);
+          } else {
+            console.log("Authenticated user:", user.uid, user.email);
+            loadUserData(user.uid);
+          }
+        }, (error) => {
+          console.error("Auth error:", error);
+          showError(`Authentication error: ${error.message}`);
+        });
 
-        // Logout Functionality
+        // Logout
         elements.logoutBtn.addEventListener("click", async () => {
           try {
             await signOut(auth);
-            console.log("User logged out successfully");
+            console.log("Logged out");
             window.location.href = "/login.html";
           } catch (error) {
-            console.error("Error logging out:", error);
-            showError(elements.authError, `Failed to logout: ${error.message}`);
+            showError(`Logout failed: ${error.message}`);
+            console.error("Logout error:", error);
           }
         });
 
-        // Check Server Time
+        // Server Time
         elements.serverTimeBtn.addEventListener("click", async () => {
           try {
-            const serverTime = await getServerTimeAsDate();
-            alert(`Server Time: ${serverTime.toLocaleString()} (Local), ${serverTime.toISOString()} (UTC)`);
+            const tempRef = doc(collection(db, "temp"));
+            await setDoc(tempRef, { timestamp: serverTimestamp() });
+            const docSnap = await getDoc(tempRef);
+            const time = docSnap.exists() ? docSnap.data().timestamp.toDate() : new Date();
+            await deleteDoc(tempRef);
+            alert(`Server Time: ${time.toLocaleString()}`);
           } catch (error) {
-            console.error("Error retrieving server time:", error);
-            showError(elements.transactionError, `Failed to retrieve server time: ${error.message}`);
+            showError(`Failed to get server time: ${error.message}`);
+            console.error("Server time error:", error);
           }
         });
       </script>
