@@ -162,7 +162,7 @@
           transactionAmount: document.getElementById("transactionAmount"),
           submitTransactionBtn: document.getElementById("submitTransactionBtn"),
           transactionError: document.getElementById("transactionError"),
-          transactionType: document.getElementById="transactionType"),
+          transactionType: document.getElementById("transactionType"),
           logoutBtn: document.getElementById("logoutBtn"),
           serverTimeBtn: document.getElementById("serverTimeBtn"),
           profileName: document.getElementById("profileName"),
@@ -203,6 +203,7 @@
             if (docSnap.exists()) {
               const serverTime = docSnap.data().timestamp.toDate();
               await deleteDoc(tempRef);
+              console.log("Server time retrieved:", serverTime);
               return serverTime;
             }
             throw new Error("Failed to retrieve server time");
@@ -225,8 +226,9 @@
 
         // Load Member Data
         async function loadMemberData(userId) {
-          showLoading(elements.historyList);
-          showLoading(elements.dailyReportList);
+          console.log("Attempting to load member data for userId:", userId);
+          showLoading(elements.historyList, "Loading transaction history...");
+          showLoading(elements.dailyReportList, "Loading daily report...");
           Object.values(elements).forEach((el) => {
             if (["memberShares", "memberBalance", "profileLastDistribution", "profileName", "profileEmail", "profileStatus", "profileApprovalDate"].includes(el.id)) {
               el.textContent = "Loading...";
@@ -236,7 +238,9 @@
           try {
             const memberRef = doc(db, "users", userId);
             const memberSnap = await getDoc(memberRef);
+            console.log("Member snapshot exists:", memberSnap.exists());
             if (!memberSnap.exists()) {
+              console.log("No member document found, creating default...");
               const now = await getServerTimeAsDate();
               await setDoc(memberRef, {
                 name: "New Member",
@@ -250,6 +254,7 @@
               currentMember = { id: userId, name: "New Member", email: "no-email@default.com", status: "pending", shares: 0, balance: 0, approvalDate: null, lastDistribution: null };
             } else {
               currentMember = { id: memberSnap.id, ...memberSnap.data() };
+              console.log("Member data loaded:", currentMember);
             }
 
             elements.memberShares.textContent = currentMember.shares || 0;
@@ -267,7 +272,8 @@
             await loadTransactionHistory(userId);
             await initializeChart(userId);
           } catch (error) {
-            showError(elements.authError, `Failed to load member data: ${error.message}`);
+            console.error("Error loading member data:", error);
+            showError(elements.authError, `Failed to load member data: ${error.message} (Check Firestore rules or network)`);
             Object.values(elements).forEach((el) => {
               if (["memberShares", "memberBalance"].includes(el.id)) el.textContent = "0";
               if (["profileLastDistribution", "profileName", "profileEmail", "profileStatus", "profileApprovalDate"].includes(el.id)) el.textContent = "N/A";
@@ -277,7 +283,8 @@
 
         // Load Daily Distribution Report
         async function loadDailyReport(userId) {
-          showLoading(elements.dailyReportList);
+          console.log("Loading daily report for userId:", userId);
+          showLoading(elements.dailyReportList, "Loading daily report...");
           try {
             const now = await getServerTimeAsDate();
             const { start, end } = getPHTDayRange(now);
@@ -287,10 +294,12 @@
               orderBy("timestamp", "desc")
             );
             const snapshot = await getDocs(q);
+            console.log("Daily report snapshot size:", snapshot.size);
             const todayDistributions = snapshot.docs.filter((doc) => {
               const timestamp = doc.data().timestamp?.toDate();
               return timestamp && timestamp >= start && timestamp <= end;
             });
+            console.log("Today’s distributions:", todayDistributions.map(doc => doc.data()));
 
             elements.dailyReportList.innerHTML = "";
             if (todayDistributions.length === 0) {
@@ -310,6 +319,7 @@
               elements.dailyReportList.appendChild(div);
             });
           } catch (error) {
+            console.error("Error loading daily report:", error);
             showError(elements.transactionError, `Failed to load daily report: ${error.message}`);
             elements.dailyReportList.innerHTML = '<p class="text-red-500">Failed to load daily report.</p>';
           }
@@ -317,7 +327,8 @@
 
         // Load Transaction History
         async function loadTransactionHistory(userId) {
-          showLoading(elements.historyList);
+          console.log("Loading transaction history for userId:", userId);
+          showLoading(elements.historyList, "Loading transaction history...");
           const profitQuery = query(
             collection(db, "member_distributions"),
             where("memberId", "==", userId),
@@ -330,7 +341,9 @@
           );
 
           onSnapshot(profitQuery, (profitSnapshot) => {
+            console.log("Profit snapshot size:", profitSnapshot.size, profitSnapshot.docs.map(doc => doc.data()));
             onSnapshot(transactionQuery, (transactionSnapshot) => {
+              console.log("Transaction snapshot size:", transactionSnapshot.size, transactionSnapshot.docs.map(doc => doc.data()));
               allTransactions = [];
 
               profitSnapshot.docs.forEach((doc) => {
@@ -359,10 +372,12 @@
 
               displayTransactionHistory();
             }, (error) => {
+              console.error("Error loading transactions:", error);
               showError(elements.transactionError, `Failed to load transaction history: ${error.message}`);
               elements.historyList.innerHTML = '<p class="text-red-500">Failed to load transaction history.</p>';
             });
           }, (error) => {
+            console.error("Error loading profit/loss distributions:", error);
             showError(elements.transactionError, `Failed to load transaction history: ${error.message}`);
             elements.historyList.innerHTML = '<p class="text-red-500">Failed to load transaction history.</p>';
           });
@@ -370,6 +385,7 @@
 
         // Display Transaction History
         function displayTransactionHistory() {
+          console.log("Displaying transaction history, total transactions:", allTransactions.length);
           const filter = elements.historyFilter.value;
           const sort = elements.historySort.value;
 
@@ -403,6 +419,7 @@
 
         // Initialize Balance Chart
         async function initializeChart(userId) {
+          console.log("Initializing chart for userId:", userId);
           try {
             const ctx = document.getElementById("balanceChart").getContext("2d");
             const profitQuery = query(
@@ -419,8 +436,10 @@
 
             const profitSnapshot = await getDocs(profitQuery);
             const transactionSnapshot = await getDocs(transactionQuery);
-            const transactions = [];
+            console.log("Profit snapshot size:", profitSnapshot.size);
+            console.log("Transaction snapshot size:", transactionSnapshot.size);
 
+            const transactions = [];
             profitSnapshot.docs.forEach((doc) => {
               const data = doc.data();
               transactions.push({
@@ -438,6 +457,7 @@
             });
 
             transactions.sort((a, b) => a.timestamp - b.timestamp);
+            console.log("Chart transactions:", transactions);
 
             let runningBalance = 0;
             const labels = [];
@@ -472,6 +492,7 @@
               },
             });
           } catch (error) {
+            console.error("Error initializing chart:", error);
             showError(elements.transactionError, `Failed to load chart: ${error.message}`);
             document.getElementById("balanceChart").parentElement.innerHTML = '<p class="text-red-500">Failed to load chart.</p>';
           }
@@ -480,6 +501,7 @@
         // Authentication Check
         onAuthStateChanged(auth, (user) => {
           if (!user) {
+            console.log("No authenticated user detected");
             showError(elements.authError, "Not authenticated. Redirecting to login...");
             setTimeout(() => (window.location.href = "/login.html"), 3000);
           } else {
@@ -536,6 +558,7 @@
             elements.transactionForm.reset();
             alert(`Successfully submitted ${transactionType} request of ₱${formatCurrency(amount)}!`);
           } catch (error) {
+            console.error("Error submitting transaction:", error);
             showError(elements.transactionError, `Failed to submit request: ${error.message}`);
           } finally {
             elements.submitTransactionBtn.disabled = false;
@@ -551,8 +574,10 @@
         elements.logoutBtn.addEventListener("click", async () => {
           try {
             await signOut(auth);
+            console.log("User logged out successfully");
             window.location.href = "/login.html";
           } catch (error) {
+            console.error("Error logging out:", error);
             showError(elements.authError, `Failed to logout: ${error.message}`);
           }
         });
@@ -563,6 +588,7 @@
             const serverTime = await getServerTimeAsDate();
             alert(`Server Time: ${serverTime.toLocaleString()} (Local), ${serverTime.toISOString()} (UTC)`);
           } catch (error) {
+            console.error("Error retrieving server time:", error);
             showError(elements.transactionError, `Failed to retrieve server time: ${error.message}`);
           }
         });
