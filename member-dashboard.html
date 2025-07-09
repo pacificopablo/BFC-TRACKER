@@ -4,177 +4,105 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Baccarat Fund Member Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.5/dist/chart.umd.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.10/dist/tailwind.min.css" rel="stylesheet" />
-    <style>
-      .animate-fade-in { animation: fadeIn 0.5s ease-in; }
-      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-      .skeleton { background: linear-gradient(90deg, #4a5568, #718096, #4a5568); background-size: 200%; animation: skeleton-loading 1.5s infinite; }
-      @keyframes skeleton-loading { 0% { background-position: 200%; } 100% { background-position: -200%; } }
-      .toast { transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out; }
-      .toast-hidden { opacity: 0; transform: translateY(-20px); }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   </head>
-  <body class="bg-gradient-to-br from-gray-900 to-gray-800 text-white min-h-screen p-4 sm:p-6">
-    <!-- Loading Screen -->
-    <div id="authLoading" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
-      <div class="flex flex-col items-center">
-        <svg class="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-        </svg>
-        <p class="mt-4 text-lg">Authenticating...</p>
-      </div>
-    </div>
-
-    <!-- Toast Notification -->
-    <div id="toast" class="fixed top-4 right-4 max-w-sm p-4 rounded-lg shadow-lg text-white toast toast-hidden" role="alert"></div>
-
+  <body class="bg-gray-900 text-white min-h-screen p-4">
     <!-- Header -->
-    <header class="flex flex-col sm:flex-row justify-between items-center mb-8 animate-fade-in">
-      <h1 class="text-3xl font-bold flex items-center">
-        <span class="mr-2" aria-hidden="true">👑</span> Baccarat Fund Dashboard
+    <header class="flex justify-between items-center mb-8">
+      <h1 class="text-2xl font-bold flex items-center">
+        <span class="mr-2">👑</span> Baccarat Fund Member Dashboard
       </h1>
-      <div class="flex space-x-2 mt-4 sm:mt-0">
-        <button
-          id="serverTimeBtn"
-          class="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-          aria-label="Show server time"
-        >
+      <div class="flex space-x-2">
+        <button id="serverTimeBtn" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 text-sm">
           Server Time
         </button>
-        <button
-          id="logoutBtn"
-          class="bg-red-600 px-4 py-2 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition duration-200"
-          aria-label="Log out"
-        >
+        <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700 text-sm">
           Logout
         </button>
       </div>
     </header>
 
     <!-- Member Details -->
-    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8 animate-fade-in">
-      <h2 class="text-xl font-bold mb-4">👤 Your Account</h2>
-      <div id="memberDetails" class="space-y-3" aria-live="polite">
-        <p><strong>Name:</strong> <span id="memberName" class="skeleton inline-block w-32 h-5 rounded"></span></p>
-        <p><strong>Email:</strong> <span id="memberEmail" class="skeleton inline-block w-48 h-5 rounded"></span></p>
-        <p><strong>Status:</strong> <span id="memberStatus" class="skeleton inline-block w-24 h-5 rounded"></span></p>
-        <p><strong>Shares:</strong> <span id="memberShares" class="skeleton inline-block w-16 h-5 rounded"></span></p>
-        <p><strong>Balance:</strong> ₱<span id="memberBalance" class="skeleton inline-block w-20 h-5 rounded"></span></p>
-        <p><strong>Approval Date:</strong> <span id="memberApprovalDate" class="skeleton inline-block w-32 h-5 rounded"></span></p>
-        <p><strong>Last Distribution:</strong> <span id="memberLastDistribution" class="skeleton inline-block w-32 h-5 rounded"></span></p>
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">👤 Your Account</h2>
+      <div id="memberDetails" class="space-y-2">
+        <p><strong>Name:</strong> <span id="memberName">Loading...</span></p>
+        <p><strong>Email:</strong> <span id="memberEmail">Loading...</span></p>
+        <p><strong>Status:</strong> <span id="memberStatus" class="px-2 py-1 rounded">Loading...</span></p>
+        <p><strong>Shares:</strong> <span id="memberShares">Loading...</span></p>
+        <p><strong>Balance:</strong> ₱<span id="memberBalance">Loading...</span></p>
+        <p><strong>Approval Date:</strong> <span id="memberApprovalDate">Loading...</span></p>
+        <p><strong>Last Distribution:</strong> <span id="memberLastDistribution">Loading...</span></p>
       </div>
     </div>
 
     <!-- Fund Growth Chart -->
-    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8 animate-fade-in">
-      <h2 class="text-xl font-bold mb-4">📊 Fund Growth</h2>
-      <canvas id="fundChart" height="100" aria-label="Fund growth chart"></canvas>
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">📊 Fund Growth</h2>
+      <canvas id="fundChart" height="100"></canvas>
     </div>
 
     <!-- Submit Transaction Request -->
-    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8 animate-fade-in">
-      <h2 class="text-xl font-bold mb-4">💸 Submit Transaction Request</h2>
-      <form id="transactionForm" class="space-y-4" novalidate>
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">💸 Submit Transaction Request</h2>
+      <form id="transactionForm" class="space-y-4">
         <div>
-          <label for="transactionType" class="block text-sm font-medium mb-1">Transaction Type</label>
-          <select
-            id="transactionType"
-            class="w-full p-2 bg-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200"
-            required
-            aria-required="true"
-          >
+          <label class="block text-sm mb-1">Transaction Type</label>
+          <select id="transactionType" class="w-full p-2 bg-gray-700 rounded text-white" required>
             <option value="deposit">Deposit</option>
             <option value="cashout">Cash Out</option>
           </select>
         </div>
         <div>
-          <label for="transactionAmount" class="block text-sm font-medium mb-1">Amount (₱)</label>
+          <label class="block text-sm mb-1">Amount (₱)</label>
           <input
             type="number"
             id="transactionAmount"
-            class="w-full p-2 bg-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200"
+            class="w-full p-2 bg-gray-700 rounded text-white"
             placeholder="Enter amount"
             min="0.01"
             step="0.01"
             required
-            aria-required="true"
           />
         </div>
         <button
           type="submit"
           id="submitTransactionBtn"
-          class="w-full bg-green-600 px-4 py-2 rounded-lg hover:bg-green-700 disabled:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200"
-          aria-label="Submit transaction request"
+          class="w-full bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600"
         >
           Submit Request
         </button>
       </form>
-      <p id="cooldownMessage" class="text-yellow-500 text-sm mt-2 hidden" aria-live="polite"></p>
+      <p id="transactionError" class="text-red-500 text-sm mt-2 hidden"></p>
     </div>
 
     <!-- Transaction History -->
-    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8 animate-fade-in">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-xl font-bold">📜 Transaction History</h2>
-        <button
-          id="refreshTransactionsBtn"
-          class="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-          aria-label="Refresh transaction history"
-        >
-          Refresh
-        </button>
-      </div>
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">📜 Transaction History</h2>
       <div class="flex flex-col sm:flex-row justify-between mb-4 space-y-2 sm:space-y-0 sm:space-x-2">
-        <select
-          id="historyFilter"
-          class="p-2 bg-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-          aria-label="Filter transactions"
-        >
+        <select id="historyFilter" class="p-2 bg-gray-700 rounded text-white">
           <option value="all">All Transactions</option>
           <option value="deposit">Deposits</option>
           <option value="cashout">Cash Outs</option>
         </select>
-        <select
-          id="historySort"
-          class="p-2 bg-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-          aria-label="Sort transactions"
-        >
+        <select id="historySort" class="p-2 bg-gray-700 rounded text-white">
           <option value="desc">Newest First</option>
           <option value="asc">Oldest First</option>
         </select>
       </div>
-      <div id="historyList" class="space-y-4 max-h-80 overflow-y-auto" aria-live="polite">
-        <div class="space-y-2">
-          <div class="skeleton h-24 rounded-lg"></div>
-          <div class="skeleton h-24 rounded-lg"></div>
-        </div>
-      </div>
+      <div id="historyList" class="space-y-4 max-h-80 overflow-y-auto"></div>
     </div>
 
     <!-- Distribution History -->
-    <div class="bg-gray-800 p-6 rounded-lg shadow-lg animate-fade-in">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-xl font-bold">📈 Distribution History</h2>
-        <button
-          id="refreshDistributionsBtn"
-          class="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-          aria-label="Refresh distribution history"
-        >
-          Refresh
-        </button>
-      </div>
-      <div id="distributionList" class="space-y-4 max-h-80 overflow-y-auto" aria-live="polite">
-        <div class="space-y-2">
-          <div class="skeleton h-16 rounded-lg"></div>
-          <div class="skeleton h-16 rounded-lg"></div>
-        </div>
-      </div>
+    <div class="bg-gray-800 p-4 rounded-lg shadow">
+      <h2 class="text-lg font-bold mb-4">📈 Distribution History</h2>
+      <div id="distributionList" class="space-y-4 max-h-80 overflow-y-auto"></div>
     </div>
 
     <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+      // Firebase Imports
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
       import {
         getFirestore,
         collection,
@@ -185,55 +113,29 @@
         query,
         where,
         orderBy,
+        onSnapshot,
         serverTimestamp,
-      } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-      import {
-        getAuth,
-        onAuthStateChanged,
-        signOut,
-        setPersistence,
-        browserSessionPersistence,
-      } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+      import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-      // Firebase config (replace with your actual configuration)
+      // Firebase Config
       const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_AUTH_DOMAIN",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_STORAGE_BUCKET",
-        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-        appId: "YOUR_APP_ID",
-        measurementId: "YOUR_MEASUREMENT_ID",
+        apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
+        authDomain: "bfc-tracker.firebaseapp.com",
+        projectId: "bfc-tracker",
+        storageBucket: "bfc-tracker.firebasestorage.app",
+        messagingSenderId: "127052459580",
+        appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
+        measurementId: "G-PNYRCFJHYM",
       };
 
       // Initialize Firebase
-      let app;
-      let db;
-      let auth;
-      try {
-        app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-      } catch (error) {
-        console.error("Firebase initialization failed:", error.message);
-        document.body.innerHTML = `
-          <div class="text-red-500 p-4 text-center">
-            Failed to initialize application. Please check your Firebase configuration and try again.
-          </div>
-        `;
-        throw error;
-      }
-
-      // Set session persistence
-      setPersistence(auth, browserSessionPersistence).catch((error) => {
-        console.error("Failed to set session persistence:", error.message);
-      });
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      const auth = getAuth(app);
 
       // DOM Elements
       const elements = {
-        authLoading: document.getElementById("authLoading"),
-        toast: document.getElementById("toast"),
-        memberDetails: document.getElementById("memberDetails"),
         memberName: document.getElementById("memberName"),
         memberEmail: document.getElementById("memberEmail"),
         memberStatus: document.getElementById("memberStatus"),
@@ -245,13 +147,11 @@
         transactionType: document.getElementById("transactionType"),
         transactionAmount: document.getElementById("transactionAmount"),
         submitTransactionBtn: document.getElementById("submitTransactionBtn"),
-        cooldownMessage: document.getElementById("cooldownMessage"),
+        transactionError: document.getElementById("transactionError"),
         historyList: document.getElementById("historyList"),
         historyFilter: document.getElementById("historyFilter"),
         historySort: document.getElementById("historySort"),
-        refreshTransactionsBtn: document.getElementById("refreshTransactionsBtn"),
         distributionList: document.getElementById("distributionList"),
-        refreshDistributionsBtn: document.getElementById("refreshDistributionsBtn"),
         logoutBtn: document.getElementById("logoutBtn"),
         serverTimeBtn: document.getElementById("serverTimeBtn"),
       };
@@ -260,127 +160,62 @@
       let fundChartInstance = null;
       const SUBMISSION_COOLDOWN = 5000;
       let lastSubmissionTime = 0;
-      let cooldownTimer = null;
-      let isRedirecting = false;
-      let isAuthInitializing = true;
 
       // Utility Functions
       const formatCurrency = (value) =>
-        isNaN(value) ? "0.00" : parseFloat(value).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+        parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
 
-      const showToast = (message, type = "error") => {
-        elements.toast.textContent = message;
-        elements.toast.className = `fixed top-4 right-4 max-w-sm p-4 rounded-lg shadow-lg text-white toast ${
-          type === "error" ? "bg-red-600" : "bg-green-600"
-        }`;
-        elements.toast.classList.remove("toast-hidden");
-        setTimeout(() => {
-          elements.toast.classList.add("toast-hidden");
-        }, 5000);
+      const showError = (message) => {
+        elements.transactionError.textContent = message;
+        elements.transactionError.classList.remove("hidden");
+        setTimeout(() => elements.transactionError.classList.add("hidden"), 5000);
+        console.error("Error:", message);
       };
 
-      const showError = (element, message, retryCallback) => {
-        element.innerHTML = `
-          <div class="text-red-500 p-4 rounded-lg bg-gray-700 animate-fade-in">
-            ${message}
-            <button
-              class="text-blue-400 underline ml-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              aria-label="Retry loading"
-            >
-              Retry
-            </button>
-          </div>
-        `;
-        const retryBtn = element.querySelector("button");
-        if (retryBtn && retryCallback) {
-          retryBtn.addEventListener("click", retryCallback);
-        }
+      const showLoading = (element, message = "Loading...") => {
+        element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
-      const showLoading = (element) => {
-        element.innerHTML = `
-          <div class="space-y-2">
-            <div class="skeleton h-24 rounded-lg"></div>
-            <div class="skeleton h-24 rounded-lg"></div>
-          </div>
-        `;
-      };
-
-      const formatTimestamp = (timestamp) => {
-        try {
-          return timestamp?.toDate?.()?.toLocaleString("en-PH") || "N/A";
-        } catch {
-          return "N/A";
-        }
-      };
-
-      // Cache Management
-      const cacheData = (key, data) => {
-        localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
-      };
-
-      const getCachedData = (key, maxAge = 5 * 60 * 1000) => {
-        const cached = localStorage.getItem(key);
-        if (!cached) return null;
-        const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp > maxAge) {
-          localStorage.removeItem(key);
-          return null;
-        }
-        return data;
-      };
-
-      // Get Server Time (PHT)
-      async function getServerTime() {
-        try {
-          const serverDoc = await getDoc(doc(db, "system", "time"));
-          return serverDoc.exists() ? serverDoc.data().time?.toDate() : new Date();
-        } catch {
-          return new Date(Date.now() + 8 * 60 * 60 * 1000); // Fallback to PHT
-        }
+      // Get Local Time (Fallback since members can't write to temp)
+      function getLocalTime() {
+        const now = new Date();
+        return new Date(now.getTime() + 8 * 60 * 60 * 1000); // Adjust to PHT (UTC+8)
       }
 
       // Load Member Details
       async function loadMemberDetails(userId) {
-        const cacheKey = `member_${userId}`;
-        const cachedData = getCachedData(cacheKey);
-        if (cachedData) {
-          updateMemberDetails(cachedData);
-          return;
-        }
-
         try {
+          console.log("Loading member details for userId:", userId);
           const userDoc = await getDoc(doc(db, "users", userId));
           if (!userDoc.exists()) {
-            showError(elements.memberDetails, "Member data not found.", () => loadMemberDetails(userId));
+            showError("Member data not found.");
+            elements.memberDetails.innerHTML = '<p class="text-red-500">No member data available.</p>';
             return;
           }
           const data = userDoc.data();
-          cacheData(cacheKey, data);
-          updateMemberDetails(data);
+          console.log("Member data loaded:", data);
+          elements.memberName.textContent = data.name || "N/A";
+          elements.memberEmail.textContent = data.email || "N/A";
+          elements.memberStatus.textContent = data.status || "N/A";
+          elements.memberStatus.className = `px-2 py-1 rounded ${
+            data.status === "approved"
+              ? "bg-green-600"
+              : data.status === "pending"
+                ? "bg-yellow-600"
+                : "bg-red-600"
+          }`;
+          elements.memberShares.textContent = data.shares || 0;
+          elements.memberBalance.textContent = formatCurrency(data.balance);
+          elements.memberApprovalDate.textContent = data.approvalDate
+            ? new Date(data.approvalDate.toDate ? data.approvalDate.toDate() : data.approvalDate).toLocaleString("en-PH")
+            : "N/A";
+          elements.memberLastDistribution.textContent = data.lastDistribution
+            ? new Date(data.lastDistribution.toDate ? data.lastDistribution.toDate() : data.lastDistribution).toLocaleString("en-PH")
+            : "None";
         } catch (error) {
-          showError(elements.memberDetails, `Failed to load member details: ${error.message}`, () => loadMemberDetails(userId));
+          showError("Failed to load member details: " + error.message);
+          elements.memberDetails.innerHTML = '<p class="text-red-500">Error loading member data.</p>';
         }
-      }
-
-      function updateMemberDetails(data) {
-        elements.memberName.textContent = data.name || "N/A";
-        elements.memberName.classList.remove("skeleton");
-        elements.memberEmail.textContent = data.email || "N/A";
-        elements.memberEmail.classList.remove("skeleton");
-        elements.memberStatus.textContent = data.status || "N/A";
-        elements.memberStatus.className = `px-2 py-1 rounded ${
-          data.status === "approved" ? "bg-green-600" : data.status === "pending" ? "bg-yellow-600" : "bg-red-600"
-        }`;
-        elements.memberStatus.classList.remove("skeleton");
-        elements.memberShares.textContent = data.shares || 0;
-        elements.memberShares.classList.remove("skeleton");
-        elements.memberBalance.textContent = formatCurrency(data.balance);
-        elements.memberBalance.classList.remove("skeleton");
-        elements.memberApprovalDate.textContent = formatTimestamp(data.approvalDate);
-        elements.memberApprovalDate.classList.remove("skeleton");
-        elements.memberLastDistribution.textContent = formatTimestamp(data.lastDistribution);
-        elements.memberLastDistribution.classList.remove("skeleton");
       }
 
       // Initialize Chart
@@ -390,11 +225,11 @@
         fundChartInstance = new Chart(ctx, {
           type: "line",
           data: {
-            labels: [],
+            labels: ["Jul 9", "Jul 10"], // Default labels for current date range
             datasets: [
               {
                 label: "Fund Balance",
-                data: [],
+                data: [0, 0], // Default data, will be updated
                 backgroundColor: "rgba(59, 130, 246, 0.2)",
                 borderColor: "rgba(59, 130, 246, 1)",
                 borderWidth: 2,
@@ -407,27 +242,16 @@
             plugins: { legend: { labels: { color: "white" } } },
             scales: {
               x: { ticks: { color: "white" } },
-              y: {
-                ticks: { color: "white", callback: (value) => `₱${formatCurrency(value)}` },
-                beginAtZero: true,
-              },
+              y: { ticks: { color: "white", callback: (value) => `₱${formatCurrency(value)}` }, beginAtZero: true },
             },
           },
         });
       }
 
-      // Update Chart
+      // Update Chart (Fallback to static data if access denied)
       async function updateChart() {
-        const cacheKey = "fund_chart";
-        const cachedData = getCachedData(cacheKey);
-        if (cachedData) {
-          fundChartInstance.data.labels = cachedData.labels;
-          fundChartInstance.data.datasets[0].data = cachedData.data;
-          fundChartInstance.update();
-          return;
-        }
-
         try {
+          console.log("Updating chart...");
           const fundSnap = await getDocs(collection(db, "fund"));
           const initialBalance = fundSnap.empty ? 0 : fundSnap.docs[0].data().balance || 0;
           const q = query(collection(db, "profit_distributions"), orderBy("timestamp", "asc"));
@@ -438,9 +262,7 @@
 
           snapshot.docs.forEach((doc) => {
             const d = doc.data();
-            const timestamp = d.timestamp?.toDate?.();
-            if (!timestamp) return;
-            const date = timestamp.toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+            const date = d.timestamp.toDate().toLocaleDateString("en-PH", { month: "short", day: "numeric" });
             if (!labels.includes(date)) {
               labels.push(date);
               balance += d.type === "profit" ? d.amount : -d.amount;
@@ -449,54 +271,52 @@
           });
 
           if (labels.length === 0) {
-            const now = await getServerTime();
+            const now = getLocalTime();
             labels.push(now.toLocaleDateString("en-PH", { month: "short", day: "numeric" }));
             data.push(initialBalance);
           }
 
-          cacheData(cacheKey, { labels, data });
           fundChartInstance.data.labels = labels;
           fundChartInstance.data.datasets[0].data = data;
           fundChartInstance.update();
+          console.log("Chart updated with labels:", labels, "data:", data);
         } catch (error) {
-          showToast(`Failed to update chart: ${error.message}`);
+          console.error("Chart update failed:", error);
+          showError("Failed to load fund chart data. Displaying static data.");
+          const now = getLocalTime();
+          fundChartInstance.data.labels = [now.toLocaleDateString("en-PH", { month: "short", day: "numeric" })];
+          fundChartInstance.data.datasets[0].data = [0]; // Static fallback
+          fundChartInstance.update();
         }
       }
 
       // Load Transaction History
-      async function loadTransactionHistory(userId) {
-        const cacheKey = `transactions_${userId}`;
-        const cachedData = getCachedData(cacheKey);
-        if (cachedData) {
-          allTransactions = cachedData;
-          displayTransactionHistory();
-          return;
-        }
-
+      function loadTransactionHistory(userId) {
         showLoading(elements.historyList);
-        try {
-          const q = query(
-            collection(db, "transactions"),
-            where("memberId", "==", userId),
-            orderBy("timestamp", "desc")
-          );
-          const snapshot = await getDocs(q);
-          allTransactions = snapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
+        const q = query(
+          collection(db, "transactions"),
+          where("memberId", "==", userId),
+          orderBy("timestamp", "desc")
+        );
+        onSnapshot(
+          q,
+          (snapshot) => {
+            console.log("Transaction snapshot received:", snapshot.docs.length, "documents");
+            allTransactions = snapshot.docs.map((doc) => ({
               id: doc.id,
-              type: data.type === "deposit" ? "Deposit" : data.type === "cashout" ? "Cash Out" : "Unknown",
-              filterType: data.type || "unknown",
-              amount: data.amount || 0,
-              timestamp: data.timestamp || null,
-              status: data.status || "N/A",
-            };
-          });
-          cacheData(cacheKey, allTransactions);
-          displayTransactionHistory();
-        } catch (error) {
-          showError(elements.historyList, `Failed to load transaction history: ${error.message}`, () => loadTransactionHistory(userId));
-        }
+              type: doc.data().type === "deposit" ? "Deposit" : "Cash Out",
+              filterType: doc.data().type,
+              amount: doc.data().amount,
+              timestamp: doc.data().timestamp?.toDate() || new Date(),
+              status: doc.data().status,
+            }));
+            displayTransactionHistory();
+          },
+          (error) => {
+            showError("Failed to load transaction history: " + error.message);
+            elements.historyList.innerHTML = '<p class="text-red-500">Error loading transaction history.</p>';
+          }
+        );
       }
 
       // Display Transaction History
@@ -504,81 +324,61 @@
         const filter = elements.historyFilter.value;
         const sort = elements.historySort.value;
         let filtered = filter === "all" ? allTransactions : allTransactions.filter((t) => t.filterType === filter);
-        filtered = filtered.sort((a, b) => {
-          const aTime = a.timestamp ? a.timestamp : new Date(0);
-          const bTime = b.timestamp ? b.timestamp : new Date(0);
-          return sort === "desc" ? bTime - aTime : aTime - bTime;
-        });
+        filtered.sort((a, b) => (sort === "desc" ? b.timestamp - a.timestamp : a.timestamp - b.timestamp));
 
         elements.historyList.innerHTML = filtered.length
           ? filtered
               .map(
                 (t) => `
-            <div class="bg-gray-700 p-4 rounded-lg shadow-sm animate-fade-in">
+            <div class="bg-gray-700 p-4 rounded-lg">
               <p><strong>Type:</strong> ${t.type}</p>
               <p><strong>Amount:</strong> ₱${formatCurrency(t.amount)}</p>
-              <p><strong>Date:</strong> ${formatTimestamp(t.timestamp)}</p>
+              <p><strong>Date:</strong> ${t.timestamp.toLocaleString("en-PH")}</p>
               <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${
                 t.status === "approved"
                   ? "bg-green-600"
                   : t.status === "pending"
-                  ? "bg-yellow-600"
-                  : "bg-red-600"
-              }">${t.status}</span></p>
+                    ? "bg-yellow-600"
+                    : "bg-red-600"
+              }">${t.status || "N/A"}</span></p>
             </div>
           `
               )
               .join("")
-          : '<p class="text-gray-400 p-4">No transactions found.</p>';
+          : '<p class="text-gray-400">No transactions found.</p>';
       }
 
       // Load Distribution History
-      async function loadDistributionHistory(userId) {
-        const cacheKey = `distributions_${userId}`;
-        const cachedData = getCachedData(cacheKey);
-        if (cachedData) {
-          displayDistributionHistory(cachedData);
-          return;
-        }
-
+      function loadDistributionHistory(userId) {
         showLoading(elements.distributionList);
-        try {
-          const q = query(
-            collection(db, "member_distributions"),
-            where("memberId", "==", userId),
-            orderBy("timestamp", "desc")
-          );
-          const snapshot = await getDocs(q);
-          const distributions = snapshot.docs.map((doc) => doc.data());
-          cacheData(cacheKey, distributions);
-          displayDistributionHistory(distributions);
-        } catch (error) {
-          showError(elements.distributionList, `Failed to load distribution history: ${error.message}`, () => loadDistributionHistory(userId));
-        }
-      }
-
-      // Display Distribution History
-      function displayDistributionHistory(distributions) {
-        elements.distributionList.innerHTML = distributions.length
-          ? distributions
-              .map(
-                (data) => `
-            <div class="bg-gray-700 p-4 rounded-lg shadow-sm animate-fade-in">
-              <p><strong>Type:</strong> ${data.type === "profit" ? "Profit" : data.type === "loss" ? "Loss" : "Unknown"}</p>
-              <p><strong>Amount:</strong> ${data.type === "profit" ? "+" : "-"}₱${formatCurrency(data.amount || 0)}</p>
-              <p><strong>Date:</strong> ${formatTimestamp(data.timestamp)}</p>
+        const q = query(
+          collection(db, "member_distributions"),
+          where("memberId", "==", userId),
+          orderBy("timestamp", "desc")
+        );
+        onSnapshot(
+          q,
+          (snapshot) => {
+            console.log("Distribution snapshot received:", snapshot.docs.length, "documents");
+            elements.distributionList.innerHTML = snapshot.docs.length
+              ? snapshot.docs
+                  .map(
+                    (doc) => `
+            <div class="bg-gray-700 p-4 rounded-lg">
+              <p><strong>Type:</strong> ${doc.data().type === "profit" ? "Profit" : "Loss"}</p>
+              <p><strong>Amount:</strong> ${doc.data().type === "profit" ? "+" : "-"}₱${formatCurrency(doc.data().amount)}</p>
+              <p><strong>Date:</strong> ${doc.data().timestamp?.toDate().toLocaleString("en-PH") || "N/A"}</p>
             </div>
           `
-              )
-              .join("")
-          : '<p class="text-gray-400 p-4">No distributions found.</p>';
-      }
-
-      // Debounce Filter/Sort Changes
-      let debounceTimeout;
-      function debounceDisplayTransactionHistory() {
-        clearTimeout(debounceTimeout);
-        debounceTimeout = setTimeout(displayTransactionHistory, 300);
+                  )
+                  .join("")
+              : '<p class="text-gray-400">No distributions found.</p>';
+          },
+          (error) => {
+            showError("Failed to load distribution history: " + error.message);
+            elements.distributionList.innerHTML = '<p class="text-red-500">Error loading distribution history.</p>';
+          }
+        );
       }
 
       // Submit Transaction Request
@@ -586,24 +386,7 @@
         e.preventDefault();
         const now = Date.now();
         if (now - lastSubmissionTime < SUBMISSION_COOLDOWN) {
-          const remaining = SUBMISSION_COOLDOWN - (now - lastSubmissionTime);
-          elements.cooldownMessage.textContent = `Please wait ${Math.ceil(remaining / 1000)} seconds before submitting again.`;
-          elements.cooldownMessage.classList.remove("hidden");
-          elements.submitTransactionBtn.disabled = true;
-          if (!cooldownTimer) {
-            cooldownTimer = setInterval(() => {
-              const timeLeft = SUBMISSION_COOLDOWN - (Date.now() - lastSubmissionTime);
-              if (timeLeft <= 0) {
-                elements.cooldownMessage.textContent = "";
-                elements.cooldownMessage.classList.add("hidden");
-                elements.submitTransactionBtn.disabled = false;
-                clearInterval(cooldownTimer);
-                cooldownTimer = null;
-              } else {
-                elements.cooldownMessage.textContent = `Please wait ${Math.ceil(timeLeft / 1000)} seconds before submitting again.`;
-              }
-            }, 1000);
-          }
+          showError(`Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (now - lastSubmissionTime)) / 1000)} seconds.`);
           return;
         }
         lastSubmissionTime = now;
@@ -612,14 +395,10 @@
         try {
           const type = elements.transactionType.value;
           const amount = parseFloat(elements.transactionAmount.value);
-          if (isNaN(amount) || amount <= 0) {
-            throw new Error("Amount must be a positive number.");
-          }
+          if (amount <= 0) throw new Error("Amount must be greater than 0.");
 
           const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-          if (!userDoc.exists()) {
-            throw new Error("Member data not found.");
-          }
+          if (!userDoc.exists()) throw new Error("Member data not found.");
 
           const userData = userDoc.data();
           if (type === "cashout" && (userData.balance || 0) < amount) {
@@ -636,97 +415,48 @@
           });
 
           elements.transactionForm.reset();
-          showToast(`Transaction request (${type}) of ₱${formatCurrency(amount)} submitted successfully!`, "success");
-          // Clear cache to ensure fresh transaction data
-          localStorage.removeItem(`transactions_${auth.currentUser.uid}`);
-          loadTransactionHistory(auth.currentUser.uid);
+          alert(`Transaction request (${type}) of ₱${formatCurrency(amount)} submitted successfully!`);
+          console.log("Transaction request submitted:", { type, amount });
         } catch (error) {
-          showToast(error.message);
+          showError(error.message);
         } finally {
           elements.submitTransactionBtn.disabled = false;
         }
       });
 
-      // Event Listeners
-      elements.historyFilter.addEventListener("change", debounceDisplayTransactionHistory);
-      elements.historySort.addEventListener("change", debounceDisplayTransactionHistory);
-      elements.refreshTransactionsBtn.addEventListener("click", () => {
-        localStorage.removeItem(`transactions_${auth.currentUser.uid}`);
-        loadTransactionHistory(auth.currentUser.uid);
-      });
-      elements.refreshDistributionsBtn.addEventListener("click", () => {
-        localStorage.removeItem(`distributions_${auth.currentUser.uid}`);
-        loadDistributionHistory(auth.currentUser.uid);
-      });
+      // History Filter/Sort
+      elements.historyFilter.addEventListener("change", displayTransactionHistory);
+      elements.historySort.addEventListener("change", displayTransactionHistory);
 
+      // Logout
       elements.logoutBtn.addEventListener("click", async () => {
         try {
           await signOut(auth);
-          isRedirecting = true;
-          window.location.href = "/signin.html";
+          window.location.href = "/login.html";
         } catch (error) {
-          showToast("Failed to log out: " + error.message);
+          showError("Failed to log out: " + error.message);
         }
       });
 
-      elements.serverTimeBtn.addEventListener("click", async () => {
-        const time = await getServerTime();
-        showToast(`Server Time: ${time.toLocaleString("en-PH")} (PHT)`, "success");
+      // Server Time (Fallback to local time adjusted to PHT)
+      elements.serverTimeBtn.addEventListener("click", () => {
+        const time = getLocalTime();
+        alert(`Server Time: ${time.toLocaleString("en-PH")} (PHT) - Note: Local fallback`);
       });
 
-      // Auth Check with Robust Initialization
-      function initializeAuth() {
-        return new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            isAuthInitializing = false;
-            reject(new Error("Authentication initialization timed out"));
-          }, 10000);
-
-          const unsubscribe = onAuthStateChanged(
-            auth,
-            (user) => {
-              clearTimeout(timeout);
-              isAuthInitializing = false;
-              if (user) {
-                user.getIdToken(true).catch((error) => {
-                  console.error("Token refresh failed:", error.message);
-                });
-                resolve(user);
-              } else if (!isRedirecting) {
-                isRedirecting = true;
-                showToast("Session expired or not logged in. Redirecting to sign-in page...");
-                setTimeout(() => {
-                  window.location.href = "/signin.html";
-                }, 5000);
-              }
-              unsubscribe();
-            },
-            (error) => {
-              clearTimeout(timeout);
-              isAuthInitializing = false;
-              reject(error);
-            }
-          );
-        });
-      }
-
-      // Initialize Dashboard
-      elements.authLoading.classList.remove("hidden");
-      initializeAuth()
-        .then((user) => {
-          elements.authLoading.classList.add("hidden");
+      // Auth Check
+      onAuthStateChanged(auth, (user) => {
+        if (!user) {
+          window.location.href = "/login.html";
+        } else {
+          console.log("User authenticated:", user.uid);
           initializeChart();
-          loadMemberDetails(user.uid).then(() => {
-            loadTransactionHistory(user.uid);
-            loadDistributionHistory(user.uid);
-            updateChart();
-          });
-        })
-        .catch((error) => {
-          elements.authLoading.classList.add("hidden");
-          showToast(`Authentication error: ${error.message}. Please try refreshing the page or signing in again.`);
-          console.error("Auth initialization error:", error.message);
-        });
+          loadMemberDetails(user.uid);
+          loadTransactionHistory(user.uid);
+          loadDistributionHistory(user.uid);
+          updateChart();
+        }
+      });
     </script>
   </body>
 </html>
