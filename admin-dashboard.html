@@ -17,6 +17,9 @@
         <button id="serverTimeBtn" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 text-sm">
           Server Time
         </button>
+        <button id="adjustBalanceBtn" class="bg-purplemedia-purple-600 px-4 py-2 rounded hover:bg-purple-700 text-sm">
+          Adjust Balances
+        </button>
         <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700 text-sm">
           Logout
         </button>
@@ -252,6 +255,7 @@
         cancelEdit: document.getElementById("cancelEdit"),
         logoutBtn: document.getElementById("logoutBtn"),
         serverTimeBtn: document.getElementById("serverTimeBtn"),
+        adjustBalanceBtn: document.getElementById("adjustBalanceBtn"),
       };
 
       let allMembers = [];
@@ -323,15 +327,43 @@
         return { eligible: true, reason: "Eligible" };
       }
 
+      // Adjust Balances (1 share = ₱10)
+      async function adjustBalances() {
+        try {
+          const batch = writeBatch(db);
+          const serverTime = await getServerTime();
+
+          for (const member of allMembers) {
+            const eligibility = await isMemberEligible(member, serverTime);
+            if (!eligibility.eligible) continue; // Skip ineligible members
+
+            const newBalance = (member.shares || 0) * 10; // 1 share = ₱10
+            batch.update(doc(db, "users", member.id), { balance: newBalance });
+          }
+
+          await batch.commit();
+          console.log("Balances adjusted successfully: 1 share = ₱10");
+        } catch (error) {
+          showError("Failed to adjust balances: " + error.message);
+        }
+      }
+
       // Load Fund Balance
       async function loadFundBalance() {
         const fundSnapshot = await getDocs(collection(db, "fund"));
+        let balance = 0;
+
+        // Calculate total balance from members
+        const snapshot = await getDocs(collection(db, "users"));
+        allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        balance = allMembers.reduce((sum, m) => sum + (m.balance || 0), 0);
+
         if (fundSnapshot.empty) {
-          await setDoc(doc(db, "fund", "main"), { balance: 0 });
-          elements.fundBalance.textContent = formatCurrency(0);
-          return 0;
+          await setDoc(doc(db, "fund", "main"), { balance });
+        } else {
+          await updateDoc(doc(db, "fund", fundSnapshot.docs[0].id), { balance });
         }
-        const balance = fundSnapshot.docs[0].data().balance || 0;
+
         elements.fundBalance.textContent = formatCurrency(balance);
         return balance;
       }
@@ -402,9 +434,12 @@
         const snapshot = await getDocs(collection(db, "users"));
         allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
+        // Adjust balances before rendering
+        await adjustBalances();
+
         let memberCount = 0,
-          shareTotal = 0,
-          balanceTotal = 0;
+            shareTotal = 0,
+            balanceTotal = 0;
         elements.membersList.innerHTML = "";
         const serverTime = await getServerTime();
 
@@ -643,7 +678,7 @@
           eligibleMembers.forEach((m) => {
             const memberDist = (m.shares || 0) * amountPerShare;
             const newBalance = type === "profit" ? m.balance + memberDist : Math.max(0, m.balance - memberDist);
-            totalFundChange += type === "profit" ? memberDist : -memberDist;
+            totalFundChange += type === "profit" ? memberDist : -m.balance;
 
             batch.update(doc(db, "users", m.id), {
               balance: newBalance,
@@ -676,6 +711,7 @@
 
           await batch.commit();
           elements.profitForm.reset();
+          await adjustBalances(); // Adjust balances after distribution
           await loadMembers();
           await loadFundBalance();
           await loadDailyReport();
@@ -708,12 +744,13 @@
         e.preventDefault();
         try {
           const id = elements.editMemberId.value;
+          const shares = parseInt(elements.editShares.value);
           const data = {
             name: elements.editName.value,
             email: elements.editEmail.value,
             status: elements.editStatus.value,
-            shares: parseInt(elements.editShares.value),
-            balance: parseFloat(elements.editBalance.value),
+            shares: shares,
+            balance: shares * 10, // Auto-adjust balance: 1 share = ₱10
             approvalDate:
               elements.editStatus.value === "approved"
                 ? serverTimestamp()
@@ -723,7 +760,7 @@
 
           await updateDoc(doc(db, "users", id), data);
           elements.editModal.classList.add("hidden");
-          await loadMembers();
+          await loadMembers(); // This will call adjustBalances internally
           await loadDailyReport();
           alert("Member updated successfully!");
         } catch (error) {
@@ -753,10 +790,22 @@
         const id = e.target.dataset.id;
         if (e.target.classList.contains("approve-btn")) {
           await updateDoc(doc(db, "transactions", id), { status: "approved" });
+          await adjustBalances(); // Adjust balances after approving transaction
           alert("Request approved!");
         } else if (e.target.classList.contains("reject-btn")) {
           await updateDoc(doc(db, "transactions", id), { status: "rejected" });
           alert("Request rejected!");
+        }
+      });
+
+      // Adjust Balances Button
+      elements.adjustBalanceBtn.addEventListener("click", async () => {
+        if (confirm("Adjust all member balances to match shares (1 share = ₱10)?")) {
+          await adjustBalances();
+          await loadMembers();
+          await loadDailyReport();
+          await loadFundBalance();
+          alert("Balances adjusted successfully!");
         }
       });
 
