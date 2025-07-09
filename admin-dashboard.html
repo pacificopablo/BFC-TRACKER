@@ -8,10 +8,13 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   </head>
   <body class="bg-gray-900 text-white p-4">
-    <!-- Header with Logout Button -->
+    <!-- Header with Logout and Server Time Buttons -->
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-3xl font-bold">👑 Baccarat Fund Admin Dashboard</h1>
-      <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded text-sm hover:bg-red-700">Logout</button>
+      <div class="flex space-x-2">
+        <button id="serverTimeBtn" class="bg-blue-600 px-4 py-2 rounded text-sm hover:bg-blue-700">Check Server Time</button>
+        <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded text-sm hover:bg-red-700">Logout</button>
+      </div>
     </div>
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -86,6 +89,13 @@
     <div id="requestsList" class="space-y-4 max-h-96 overflow-auto bg-gray-800 p-4 rounded">
       Loading requests...
     </div>
+    <!-- Daily Distribution Report -->
+    <h2 class="text-2xl font-bold mt-10 mb-4">📈 Daily Distribution Report (Today)</h2>
+    <div id="dailyReport" class="bg-gray-800 p-4 rounded shadow mb-6">
+      <div id="dailyReportList" class="space-y-4 max-h-96 overflow-auto">
+        Loading daily report...
+      </div>
+    </div>
     <!-- Transaction History -->
     <h2 class="text-2xl font-bold mt-10 mb-4">📜 Transaction History</h2>
     <div class="bg-gray-800 p-4 rounded shadow mb-6">
@@ -152,6 +162,15 @@
               required
             />
           </div>
+          <div class="mb-4">
+            <label class="block text-sm">Last Distribution</label>
+            <input
+              type="datetime-local"
+              id="editLastDistribution"
+              class="w-full p-2 rounded bg-gray-700 text-white"
+              readonly
+            />
+          </div>
           <div class="flex justify-end space-x-2">
             <button type="button" id="cancelEdit" class="bg-gray-600 px-4 py-2 rounded">Cancel</button>
             <button type="submit" class="bg-blue-600 px-4 py-2 rounded">Save</button>
@@ -166,6 +185,7 @@
         getFirestore,
         collection,
         getDocs,
+        getDoc,
         doc,
         updateDoc,
         deleteDoc,
@@ -212,6 +232,7 @@
         historyList: document.getElementById("historyList"),
         historyFilter: document.getElementById("historyFilter"),
         historySort: document.getElementById("historySort"),
+        dailyReportList: document.getElementById("dailyReportList"),
         editModal: document.getElementById("editModal"),
         editForm: document.getElementById("editForm"),
         editMemberId: document.getElementById("editMemberId"),
@@ -221,8 +242,10 @@
         editShares: document.getElementById("editShares"),
         editBalance: document.getElementById("editBalance"),
         editApprovalDate: document.getElementById("editApprovalDate"),
+        editLastDistribution: document.getElementById("editLastDistribution"),
         cancelEdit: document.getElementById("cancelEdit"),
         logoutBtn: document.getElementById("logoutBtn"),
+        serverTimeBtn: document.getElementById("serverTimeBtn"),
         profitForm: document.getElementById("profitForm"),
         profitAmount: document.getElementById("profitAmount"),
         distributeBtn: document.getElementById("distributeBtn"),
@@ -251,6 +274,64 @@
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
+      // Get Firebase Server Time
+      async function getServerTimeAsDate() {
+        try {
+          const tempRef = doc(collection(db, "temp"));
+          await setDoc(tempRef, { timestamp: serverTimestamp() });
+          const docSnap = await getDoc(tempRef);
+          if (docSnap.exists()) {
+            const serverTime = docSnap.data().timestamp.toDate();
+            await deleteDoc(tempRef); // Clean up
+            return serverTime;
+          }
+          throw new Error("Failed to retrieve server time");
+        } catch (error) {
+          console.error("Error getting server time:", error);
+          throw error;
+        }
+      }
+
+      // Get start and end of current day in PHT (00:00 to 23:59 PHT)
+      function getPHTDayRange(serverTime) {
+        const phtTime = new Date(serverTime.getTime() + 8 * 60 * 60 * 1000); // Convert UTC to PHT
+        const startOfDay = new Date(phtTime);
+        startOfDay.setHours(0, 0, 0, 0); // 00:00 PHT
+        const endOfDay = new Date(phtTime);
+        endOfDay.setHours(23, 59, 59, 999); // 23:59 PHT
+        return {
+          start: new Date(startOfDay.getTime() - 8 * 60 * 60 * 1000), // UTC
+          end: new Date(endOfDay.getTime() - 8 * 60 * 60 * 1000), // UTC
+        };
+      }
+
+      // Check Member Eligibility
+      async function isMemberEligible(member) {
+        if (member.status !== "approved") return { eligible: false, reason: "Not Approved" };
+        if (!member.balance || member.balance <= 0) return { eligible: false, reason: "Zero/Negative Balance" };
+        const approvalDate = member.approvalDate ? new Date(member.approvalDate) : null;
+        if (!approvalDate) return { eligible: false, reason: "No Approval Date" };
+
+        try {
+          const now = await getServerTimeAsDate();
+          const hoursSinceApproval = (now - approvalDate) / (1000 * 60 * 60);
+          if (hoursSinceApproval < HOURS_THRESHOLD) return { eligible: false, reason: "New Member (< 24 hrs)" };
+
+          const lastDistribution = member.lastDistribution ? new Date(member.lastDistribution) : null;
+          if (lastDistribution) {
+            const { start } = getPHTDayRange(now);
+            if (lastDistribution >= start) {
+              return { eligible: false, reason: "Already Received Today" };
+            }
+          }
+
+          return { eligible: true, reason: "Eligible" };
+        } catch (error) {
+          console.error("Error checking server time for eligibility:", error);
+          return { eligible: false, reason: "Server Time Error" };
+        }
+      }
+
       // Load Fund Balance
       async function loadFundBalance() {
         try {
@@ -271,6 +352,47 @@
         }
       }
 
+      // Load Daily Distribution Report
+      async function loadDailyReport() {
+        showLoading(elements.dailyReportList, "Naglo-load ng daily report...");
+        try {
+          const now = await getServerTimeAsDate();
+          const { start, end } = getPHTDayRange(now);
+          const q = query(
+            collection(db, "member_distributions"),
+            orderBy("timestamp", "desc")
+          );
+          const snapshot = await getDocs(q);
+          const todayDistributions = snapshot.docs.filter((doc) => {
+            const timestamp = doc.data().timestamp?.toDate();
+            return timestamp && timestamp >= start && timestamp <= end;
+          });
+
+          elements.dailyReportList.innerHTML = "";
+          if (todayDistributions.length === 0) {
+            elements.dailyReportList.innerHTML = '<p class="text-gray-400">Walang distribusyon ngayong araw.</p>';
+            return;
+          }
+
+          todayDistributions.forEach((doc) => {
+            const data = doc.data();
+            const div = document.createElement("div");
+            div.className = "bg-gray-700 p-4 rounded";
+            div.innerHTML = `
+              <p><strong>Miyembro:</strong> ${data.memberName || "N/A"}</p>
+              <p><strong>Uri:</strong> ${data.type === "profit" ? "Profit" : "Loss"}</p>
+              <p><strong>Halaga:</strong> ${data.type === "profit" ? "+" : "-"}₱${formatCurrency(data.amount)}</p>
+              <p><strong>Petsa:</strong> ${data.timestamp?.toDate().toLocaleString("en-PH") || "N/A"}</p>
+            `;
+            elements.dailyReportList.appendChild(div);
+          });
+        } catch (error) {
+          console.error("Error loading daily report:", error);
+          showError(elements.profitError, `Nabigo sa pag-load ng daily report: ${error.message}`);
+          elements.dailyReportList.innerHTML = '<p class="text-red-500">Nabigo sa pag-load ng daily report.</p>';
+        }
+      }
+
       // Authentication Check
       onAuthStateChanged(auth, (user) => {
         if (!user) {
@@ -281,20 +403,12 @@
             loadMembers();
             listenForRequests();
             listenForTransactionHistory();
+            loadDailyReport();
           });
         }
       });
 
-      // Check if member is eligible (approved for at least 24 hours)
-      function isMemberEligible(member) {
-        const approvalDate = member.approvalDate ? new Date(member.approvalDate) : null;
-        if (!approvalDate) return false; // No approval date, not eligible
-        const now = new Date("2025-07-07T12:12:00-07:00"); // Current time: 12:12 PM PST, July 07, 2025
-        const hoursSinceApproval = (now - approvalDate) / (1000 * 60 * 60); // Convert to hours
-        return hoursSinceApproval >= HOURS_THRESHOLD;
-      }
-
-      // Load Members from 'users' collection
+      // Load Members
       async function loadMembers() {
         showLoading(elements.membersList, "Naglo-load ng mga miyembro...");
         showLoading(elements.topShareholders, "Naglo-load ng mga shareholder...");
@@ -313,7 +427,7 @@
             elements.totalBalance.textContent = formatCurrency(0);
           } else {
             console.log("Mga miyembrong nakuha mula sa users collection:", allMembers);
-            displayMembers(allMembers);
+            await displayMembers(allMembers);
             updateTopShareholders();
           }
         } catch (error) {
@@ -327,16 +441,21 @@
       }
 
       // Display Members
-      function displayMembers(members) {
+      async function displayMembers(members) {
         let memberCount = 0,
           shareTotal = 0,
           balanceTotal = 0;
         elements.membersList.innerHTML = "";
 
-        members.forEach((m) => {
+        for (const m of members) {
           memberCount++;
           shareTotal += m.shares || 0;
           balanceTotal += m.balance || 0;
+
+          const eligibility = await isMemberEligible(m);
+          const lastDistributionText = m.lastDistribution
+            ? new Date(m.lastDistribution).toLocaleString("en-PH")
+            : "None";
 
           const div = document.createElement("div");
           div.className = "bg-gray-800 p-4 rounded shadow";
@@ -352,7 +471,8 @@
             }">${m.status || "N/A"}</span></p>
             <p><strong>Shares:</strong> ${m.shares || 0}</p>
             <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
-            <p><strong>Eligible for Profit/Loss:</strong> ${isMemberEligible(m) ? "Yes" : "No (Less than 24 hrs)"}</p>
+            <p><strong>Eligible for Profit/Loss:</strong> ${eligibility.eligible ? "Yes" : `No (${eligibility.reason})`}</p>
+            <p><strong>Last Distribution:</strong> ${lastDistributionText}</p>
             <div class="flex space-x-2 mt-2">
               <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm">I-edit</button>
               <button data-id="${m.id}" data-name="${
@@ -361,7 +481,7 @@
             </div>
           `;
           elements.membersList.appendChild(div);
-        });
+        }
 
         elements.totalMembers.textContent = memberCount;
         elements.totalShares.textContent = shareTotal;
@@ -369,11 +489,15 @@
       }
 
       // Update Top Shareholders
-      function updateTopShareholders() {
-        const top = [...allMembers]
-          .filter((m) => m.status === "approved" && isMemberEligible(m))
-          .sort((a, b) => (b.shares || 0) - (a.shares || 0))
-          .slice(0, 5);
+      async function updateTopShareholders() {
+        const top = [];
+        for (const m of allMembers) {
+          const eligibility = await isMemberEligible(m);
+          if (m.status === "approved" && eligibility.eligible) {
+            top.push(m);
+          }
+        }
+        top.sort((a, b) => (b.shares || 0) - (a.shares || 0)).slice(0, 5);
 
         elements.topShareholders.innerHTML = "";
         if (top.length === 0) {
@@ -388,7 +512,7 @@
       }
 
       // Search Members
-      elements.searchInput.addEventListener("input", () => {
+      elements.searchInput.addEventListener("input", async () => {
         const query = elements.searchInput.value.toLowerCase();
         const filtered = allMembers.filter(
           (m) =>
@@ -396,7 +520,7 @@
             (m.email || "").toLowerCase().includes(query) ||
             (m.status || "").toLowerCase().includes(query)
         );
-        displayMembers(filtered);
+        await displayMembers(filtered);
       });
 
       // Listen for Transaction Requests
@@ -442,14 +566,13 @@
       // Listen for Transaction History
       function listenForTransactionHistory() {
         showLoading(elements.historyList, "Naglo-load ng kasaysayan ng transaksyon...");
-        const profitQuery = query(collection(db, "profit_distributions"), orderBy("timestamp", "desc"), limit(50));
-        const transactionQuery = query(collection(db, "transactions"), orderBy("timestamp", "desc"), limit(50));
+        const profitQuery = query(collection(db, "profit_distributions"), orderBy("timestamp", "desc"));
+        const transactionQuery = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
 
         onSnapshot(profitQuery, (profitSnapshot) => {
-          onSnapshot(transactionQuery, (transactionSnapshot) => {
+          onSnapshot(transactionSnapshot, (transactionSnapshot) => {
             allTransactions = [];
 
-            // Process profit/loss distributions
             profitSnapshot.docs.forEach((doc) => {
               const data = doc.data();
               allTransactions.push({
@@ -458,11 +581,10 @@
                 filterType: data.type,
                 amount: data.amount,
                 timestamp: data.timestamp?.toDate() || new Date(),
-                details: `Distributed to ${data.memberCount} members, Total Shares: ${data.totalShares}`,
+                details: `Distributed to ${data.eligibleMemberCount} of ${data.totalMemberCount} members, Total Shares: ${data.totalShares}`,
               });
             });
 
-            // Process deposit/cash out transactions
             transactionSnapshot.docs.forEach((doc) => {
               const data = doc.data();
               allTransactions.push({
@@ -492,13 +614,13 @@
       function displayTransactionHistory() {
         const filter = elements.historyFilter.value;
         const sort = elements.historySort.value;
-        
+
         let filteredTransactions = allTransactions;
         if (filter !== "all") {
           filteredTransactions = allTransactions.filter((txn) => txn.filterType === filter);
         }
 
-        filteredTransactions.sort((a, b) => 
+        filteredTransactions.sort((a, b) =>
           sort === "desc" ? b.timestamp - a.timestamp : a.timestamp - b.timestamp
         );
 
@@ -537,13 +659,23 @@
         }
       });
 
+      // Check Server Time
+      elements.serverTimeBtn.addEventListener("click", async () => {
+        try {
+          const serverTime = await getServerTimeAsDate();
+          alert(`Server Time: ${serverTime.toLocaleString()} (Local), ${serverTime.toISOString()} (UTC)`);
+        } catch (error) {
+          showError(elements.profitError, `Failed to retrieve server time: ${error.message}`);
+        }
+      });
+
       // Distribute Profit/Loss Functionality
       elements.profitForm.addEventListener("submit", async (e) => {
         e.preventDefault();
 
         const currentTime = Date.now();
         if (currentTime - lastSubmissionTime < SUBMISSION_COOLDOWN) {
-          showError(elements.profitError, `Maghintay ng ${Math.ceil((SUBMISSION_COOLDOWN - (Date.now() - lastSubmissionTime)) / 1000)} segundo bago muling mag-submit.`);
+          showError(elements.profitError, `Maghintay ng ${Math.ceil((SUBMISSION_COOLDOWN - (currentTime - lastSubmissionTime)) / 1000)} segundo bago muling mag-submit.`);
           return;
         }
         lastSubmissionTime = currentTime;
@@ -567,56 +699,81 @@
           const fundDoc = fundSnapshot.docs[0];
           const fundBalance = fundDoc.data().balance || 0;
 
-          if (transactionType === "loss" && amount > fundBalance) {
-            showError(elements.profitError, "Kulang ang fund balance para sa pagkatalo.");
-            return;
-          }
-
-          const eligibleMembers = allMembers.filter((m) => 
-            m.status === "approved" && isMemberEligible(m)
-          );
-          const totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+          // Calculate total shares from all members with positive shares
+          const membersWithShares = allMembers.filter((m) => (m.shares || 0) > 0);
+          const totalShares = membersWithShares.reduce((sum, m) => sum + (m.shares || 0), 0);
           if (totalShares === 0) {
-            showError(elements.profitError, "Walang eligible na miyembro na may shares.");
+            showError(elements.profitError, "Walang miyembro na may shares.");
             return;
           }
 
           const amountPerShare = amount / totalShares;
           const batch = writeBatch(db);
+          let totalFundChange = 0;
+          let eligibleMemberCount = 0;
 
-          eligibleMembers.forEach((member) => {
-            const currentBalance = member.balance || 0;
-            let newBalance;
-            if (transactionType === "profit") {
-              newBalance = currentBalance + (member.shares || 0) * amountPerShare;
-            } else {
-              newBalance = currentBalance - (member.shares || 0) * amountPerShare;
-              if (newBalance < 0) newBalance = 0;
+          // Create a profit_distributions document first to get its ID
+          const distributionRef = doc(collection(db, "profit_distributions"));
+          const distributionId = distributionRef.id;
+
+          // Process eligible members
+          for (const member of membersWithShares) {
+            const eligibility = await isMemberEligible(member);
+            if (eligibility.eligible) {
+              const currentBalance = member.balance || 0;
+              let newBalance;
+              const memberDistributionAmount = (member.shares || 0) * amountPerShare;
+              if (transactionType === "profit") {
+                newBalance = currentBalance + memberDistributionAmount;
+                totalFundChange += memberDistributionAmount;
+              } else {
+                newBalance = currentBalance - memberDistributionAmount;
+                if (newBalance < 0) newBalance = 0;
+                totalFundChange -= memberDistributionAmount;
+              }
+              const userRef = doc(db, "users", member.id);
+              batch.update(userRef, {
+                balance: newBalance,
+                lastDistribution: serverTimestamp(),
+              });
+
+              // Log individual member distribution
+              const memberDistRef = doc(collection(db, "member_distributions"));
+              batch.set(memberDistRef, {
+                memberId: member.id,
+                memberName: member.name || "N/A",
+                type: transactionType,
+                amount: memberDistributionAmount,
+                timestamp: serverTimestamp(),
+                distributionId: distributionId,
+              });
+
+              console.log(
+                `${transactionType === "profit" ? "Idinagdag" : "Ibinawas"} ₱${formatCurrency(
+                  memberDistributionAmount
+                )} sa ${member.name || "N/A"} (Bagong balance: ₱${formatCurrency(newBalance)})`
+              );
+              eligibleMemberCount++;
             }
-            const userRef = doc(db, "users", member.id);
-            batch.update(userRef, { balance: newBalance });
-            console.log(
-              `${transactionType === "profit" ? "Idinagdag" : "Ibinawas"} ₱${formatCurrency(
-                (member.shares || 0) * amountPerShare
-              )} sa ${member.name || "N/A"} (Bagong balance: ₱${formatCurrency(newBalance)})`
-            );
-          });
+          }
 
+          // Update fund balance
           const fundRef = doc(db, "fund", fundDoc.id);
-          const newFundBalance = transactionType === "profit" ? fundBalance + amount : fundBalance - amount;
+          const newFundBalance = fundBalance + (transactionType === "profit" ? totalFundChange : -totalFundChange);
           if (newFundBalance < 0) {
             showError(elements.profitError, "Ang transaksyon ay magreresulta sa negatibong fund balance.");
             return;
           }
           batch.update(fundRef, { balance: newFundBalance });
 
-          const auditRef = collection(db, "profit_distributions");
-          batch.set(doc(auditRef), {
+          // Log distribution
+          batch.set(distributionRef, {
             type: transactionType,
             amount: amount,
             timestamp: serverTimestamp(),
             adminId: auth.currentUser?.uid || "unknown",
-            memberCount: eligibleMembers.length,
+            eligibleMemberCount,
+            totalMemberCount: membersWithShares.length,
             totalShares,
           });
 
@@ -625,14 +782,15 @@
           elements.profitForm.reset();
           await loadMembers();
           await loadFundBalance();
+          await loadDailyReport();
           alert(
             `Matagumpay na ${transactionType === "profit" ? "ipinadistribute" : "ibinawas"} ang ₱${formatCurrency(
               amount
-            )} sa ${eligibleMembers.length} miyembro!`
+            )} sa ${eligibleMemberCount} ng ${membersWithShares.length} miyembro!`
           );
         } catch (error) {
-          console.error(`Error ${transactionType === "profit" ? "distributing profit" : "deducting loss"}:`, error.code, error.message);
-          showError(elements.profitError, `Nabigo ang ${transactionType === "profit" ? "pamimigay ng profit" : "pagbabawas ng loss"}: ${error.code} - ${error.message}`);
+          console.error(`Error ${transactionType === "profit" ? "distributing profit" : "deducting loss"}:`, error);
+          showError(elements.profitError, `Nabigo ang ${transactionType === "profit" ? "pamimigay ng profit" : "pagbabawas ng loss"}: ${error.message}`);
         } finally {
           elements.distributeBtn.disabled = false;
           elements.distributeBtn.textContent = "Distribute";
@@ -655,6 +813,9 @@
         elements.editApprovalDate.value = member.approvalDate 
           ? new Date(member.approvalDate).toISOString().slice(0, 16)
           : new Date().toISOString().slice(0, 16);
+        elements.editLastDistribution.value = member.lastDistribution
+          ? new Date(member.lastDistribution).toISOString().slice(0, 16)
+          : "";
         elements.editModal.classList.remove("hidden");
       }
 
@@ -663,23 +824,40 @@
         const id = elements.editMemberId.value;
         const shares = parseInt(elements.editShares.value);
         const balance = parseFloat(elements.editBalance.value);
-        const approvalDate = new Date(elements.editApprovalDate.value).toISOString();
+        const status = elements.editStatus.value;
+        const approvalDate = elements.editApprovalDate.value
+          ? new Date(elements.editApprovalDate.value).toISOString()
+          : new Date().toISOString();
+
         if (isNaN(shares) || shares < 0 || isNaN(balance) || balance < 0) {
           showError(elements.profitError, "Ang shares at balance ay dapat na hindi negatibo.");
           return;
         }
+
+        const memberRef = doc(db, "users", id);
+        const memberSnap = await getDoc(memberRef);
+        const currentMemberData = memberSnap.exists() ? memberSnap.data() : {};
+
+        let updatedApprovalDate = currentMemberData.approvalDate || approvalDate;
+        if (status === "approved" && !currentMemberData.approvalDate) {
+          updatedApprovalDate = new Date().toISOString();
+        }
+
         const updatedData = {
           name: elements.editName.value,
           email: elements.editEmail.value,
-          status: elements.editStatus.value,
+          status: status,
           shares,
           balance,
-          approvalDate, // Store the approval date
+          approvalDate: updatedApprovalDate,
+          lastDistribution: currentMemberData.lastDistribution || null,
         };
+
         try {
-          await updateDoc(doc(db, "users", id), updatedData);
+          await updateDoc(memberRef, updatedData);
           elements.editModal.classList.add("hidden");
           await loadMembers();
+          await loadDailyReport();
           alert("Matagumpay na na-update ang miyembro!");
         } catch (error) {
           console.error("Error sa pag-update ng miyembro sa users collection:", error);
@@ -697,6 +875,7 @@
           try {
             await deleteDoc(doc(db, "users", id));
             await loadMembers();
+            await loadDailyReport();
             alert("Matagumpay na na-delete ang miyembro!");
           } catch (error) {
             console.error("Error sa pag-delete ng miyembro mula sa users collection:", error);
@@ -732,7 +911,7 @@
         }
       });
 
-      // Function to update transaction status
+      // Update Transaction Status
       async function updateTransactionStatus(transactionId, status) {
         try {
           const transactionRef = doc(db, "transactions", transactionId);
