@@ -36,6 +36,7 @@
     </style>
   </head>
   <body class="text-white min-h-screen p-4 sm:p-6">
+    <div id="authError" class="text-red-500 text-center mb-4 hidden"></div>
     <div class="max-w-7xl mx-auto">
       <!-- Header -->
       <header class="flex flex-col sm:flex-row justify-between items-center mb-8">
@@ -132,9 +133,8 @@
       </div>
 
       <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { auth, db } from "./firebase-config.js";
         import {
-          getFirestore,
           collection,
           getDocs,
           getDoc,
@@ -145,27 +145,13 @@
           orderBy,
           where,
           onSnapshot,
+          deleteDoc,
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-        import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
-        // Firebase Configuration
-        const firebaseConfig = {
-          apiKey: "YOUR_API_KEY",
-          authDomain: "YOUR_AUTH_DOMAIN",
-          projectId: "YOUR_PROJECT_ID",
-          storageBucket: "YOUR_STORAGE_BUCKET",
-          messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-          appId: "YOUR_APP_ID",
-          measurementId: "YOUR_MEASUREMENT_ID",
-        };
-
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
+        import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
         // DOM Elements
         const elements = {
+          authError: document.getElementById("authError"),
           memberShares: document.getElementById("memberShares"),
           memberBalance: document.getElementById("memberBalance"),
           profileLastDistribution: document.getElementById("profileLastDistribution"),
@@ -175,7 +161,7 @@
           dailyReportList: document.getElementById("dailyReportList"),
           transactionForm: document.getElementById("transactionForm"),
           transactionAmount: document.getElementById("transactionAmount"),
-          submitTransactionBtn: document.getElementById("submitTransactionBtn"),
+nun   submitTransactionBtn: document.getElementById("submitTransactionBtn"),
           transactionError: document.getElementById("transactionError"),
           transactionType: document.getElementById("transactionType"),
           logoutBtn: document.getElementById("logoutBtn"),
@@ -198,10 +184,10 @@
         const formatDate = (date) =>
           date && !isNaN(new Date(date).getTime()) ? new Date(date).toLocaleString("en-PH") : "None";
 
-        const showError = (message) => {
-          elements.transactionError.textContent = message;
-          elements.transactionError.classList.remove("hidden");
-          setTimeout(() => elements.transactionError.classList.add("hidden"), 5000);
+        const showError = (element, message) => {
+          element.textContent = message;
+          element.classList.remove("hidden");
+          setTimeout(() => element.classList.add("hidden"), 5000);
         };
 
         const showLoading = (element, message = "Loading...") => {
@@ -268,9 +254,7 @@
             elements.profileEmail.textContent = currentMember.email || "N/A";
             elements.profileStatus.textContent = currentMember.status || "Pending";
             elements.profileStatus.className = `px-2 py-1 rounded ${
-              currentMember.status === "approved" ? "bg-green-600" : currentMember.status === "pending" ? "bg-yellow-600"
-
- : "bg-red-600"
+              currentMember.status === "approved" ? "bg-green-600" : currentMember.status === "pending" ? "bg-yellow-600" : "bg-red-600"
             }`;
             elements.profileApprovalDate.textContent = formatDate(currentMember.approvalDate);
 
@@ -278,7 +262,7 @@
             await loadTransactionHistory(userId);
             await initializeChart(userId);
           } catch (error) {
-            showError(`Failed to load member data: ${error.message}`);
+            showError(elements.authError, `Failed to load member data: ${error.message}`);
             Object.values(elements).forEach((el) => {
               if (["memberShares", "memberBalance"].includes(el.id)) el.textContent = "0";
               if (["profileLastDistribution", "profileName", "profileEmail", "profileStatus", "profileApprovalDate"].includes(el.id)) el.textContent = "N/A";
@@ -321,7 +305,7 @@
               elements.dailyReportList.appendChild(div);
             });
           } catch (error) {
-            showError(`Failed to load daily report: ${error.message}`);
+            showError(elements.transactionError, `Failed to load daily report: ${error.message}`);
             elements.dailyReportList.innerHTML = '<p class="text-red-500">Failed to load daily report.</p>';
           }
         }
@@ -370,11 +354,11 @@
 
               displayTransactionHistory();
             }, (error) => {
-              showError(`Failed to load transaction history: ${error.message}`);
+              showError(elements.transactionError, `Failed to load transaction history: ${error.message}`);
               elements.historyList.innerHTML = '<p class="text-red-500">Failed to load transaction history.</p>';
             });
           }, (error) => {
-            showError(`Failed to load transaction history: ${error.message}`);
+            showError(elements.transactionError, `Failed to load transaction history: ${error.message}`);
             elements.historyList.innerHTML = '<p class="text-red-500">Failed to load transaction history.</p>';
           });
         }
@@ -418,163 +402,4 @@
             const ctx = document.getElementById("balanceChart").getContext("2d");
             const profitQuery = query(
               collection(db, "member_distributions"),
-              where("memberId", "==", userId),
-              orderBy("timestamp", "asc")
-            );
-            const transactionQuery = query(
-              collection(db, "transactions"),
-              where("memberId", "==", userId),
-              where("status", "==", "approved"),
-              orderBy("timestamp", "asc")
-            );
-
-            const profitSnapshot = await getDocs(profitQuery);
-            const transactionSnapshot = await getDocs(transactionQuery);
-            const transactions = [];
-
-            profitSnapshot.docs.forEach((doc) => {
-              const data = doc.data();
-              transactions.push({
-                timestamp: data.timestamp?.toDate() || new Date(),
-                amount: data.type === "profit" ? data.amount : -data.amount,
-              });
-            });
-
-            transactionSnapshot.docs.forEach((doc) => {
-              const data = doc.data();
-              transactions.push({
-                timestamp: data.timestamp?.toDate() || new Date(),
-                amount: data.type === "deposit" ? data.amount : -data.amount,
-              });
-            });
-
-            transactions.sort((a, b) => a.timestamp - b.timestamp);
-
-            let runningBalance = 0;
-            const labels = [];
-            const data = [];
-            transactions.forEach((txn) => {
-              runningBalance += txn.amount;
-              labels.push(txn.timestamp.toLocaleDateString("en-PH"));
-              data.push(runningBalance);
-            });
-
-            new Chart(ctx, {
-              type: "line",
-              data: {
-                labels: labels.length > 0 ? labels : ["No Data"],
-                datasets: [{
-                  label: "Balance History",
-                  data: data.length > 0 ? data : [0],
-                  backgroundColor: "rgba(59, 130, 246, 0.2)",
-                  borderColor: "rgba(59, 130, 246, 1)",
-                  borderWidth: 2,
-                  fill: true,
-                  tension: 0.3,
-                }],
-              },
-              options: {
-                responsive: true,
-                plugins: { legend: { labels: { color: "white" } } },
-                scales: {
-                  x: { ticks: { color: "white" } },
-                  y: { ticks: { color: "white" }, beginAtZero: true },
-                },
-              },
-            });
-          } catch (error) {
-            showError(`Failed to load chart: ${error.message}`);
-            document.getElementById("balanceChart").parentElement.innerHTML = '<p class="text-red-500">Failed to load chart.</p>';
-          }
-        }
-
-        // Authentication Check
-        onAuthStateChanged(auth, (user) => {
-          if (!user) {
-            showError("Not authenticated. Redirecting to login...");
-            setTimeout(() => (window.location.href = "/login.html"), 2000);
-          } else {
-            loadMemberData(user.uid);
-          }
-        }, (error) => {
-          showError("Authentication error, retrying...");
-          setTimeout(() => location.reload(), 2000);
-        });
-
-        // Submit Transaction Request
-        elements.transactionForm.addEventListener("submit", async (e) => {
-          e.preventDefault();
-
-          const currentTime = Date.now();
-          if (currentTime - lastSubmissionTime < SUBMISSION_COOLDOWN) {
-            showError(`Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (currentTime - lastSubmissionTime)) / 1000)} seconds before submitting again.`);
-            return;
-          }
-          lastSubmissionTime = currentTime;
-
-          elements.submitTransactionBtn.disabled = true;
-          elements.submitTransactionBtn.textContent = "Processing...";
-
-          try {
-            if (!currentMember) {
-              showError("Member data not loaded. Please wait.");
-              return;
-            }
-            const transactionType = elements.transactionType.value;
-            const amount = parseFloat(elements.transactionAmount.value);
-            if (isNaN(amount) || amount <= 0) {
-              showError("Please enter a valid amount greater than 0.");
-              return;
-            }
-
-            if (transactionType === "cashout" && (currentMember.balance || 0) < amount) {
-              showError("Insufficient balance for cash out.");
-              return;
-            }
-
-            const transactionRef = doc(collection(db, "transactions"));
-            await setDoc(transactionRef, {
-              memberId: currentMember.id,
-              memberName: currentMember.name || "N/A",
-              type: transactionType,
-              amount: amount,
-              status: "pending",
-              timestamp: serverTimestamp(),
-            });
-
-            elements.transactionForm.reset();
-            alert(`Successfully submitted ${transactionType} request of ₱${formatCurrency(amount)}!`);
-          } catch (error) {
-            showError(`Failed to submit request: ${error.message}`);
-          } finally {
-            elements.submitTransactionBtn.disabled = false;
-            elements.submitTransactionBtn.textContent = "Submit";
-          }
-        });
-
-        // Transaction History Filter and Sort
-        elements.historyFilter.addEventListener("change", displayTransactionHistory);
-        elements.historySort.addEventListener("change", displayTransactionHistory);
-
-        // Logout Functionality
-        elements.logoutBtn.addEventListener("click", async () => {
-          try {
-            await signOut(auth);
-            window.location.href = "/login.html";
-          } catch (error) {
-            showError(`Failed to logout: ${error.message}`);
-          }
-        });
-
-        // Check Server Time
-        elements.serverTimeBtn.addEventListener("click", async () => {
-          try {
-            const serverTime = await getServerTimeAsDate();
-            alert(`Server Time: ${serverTime.toLocaleString()} (Local), ${serverTime.toISOString()} (UTC)`);
-          } catch (error) {
-            showError(`Failed to retrieve server time: ${error.message}`);
-          }
-        });
-      </script>
-    </body>
-</html>
+              where(" Lannisterization堕ados en el mensaje siguiente
