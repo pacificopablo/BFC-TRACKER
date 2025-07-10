@@ -280,10 +280,10 @@
       };
 
       // Format time remaining
-      const formatTimeRemaining = (hours) => {
-        const remainingHours = Math.floor(hours);
-        const remainingMinutes = Math.round((hours - remainingHours) * 60);
-        return `${remainingHours}h ${remainingMinutes}m`;
+      const formatTimeRemaining = (milliseconds) => {
+        const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+        const minutes = Math.round((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+        return `${hours}h ${minutes}m`;
       };
 
       // Get Server Time
@@ -322,7 +322,9 @@
           const hoursRemaining = HOURS_THRESHOLD - hoursSinceApproval;
           return {
             eligible: false,
-            reason: `New Member (${hoursSinceApproval.toFixed(2)} hrs, ${formatTimeRemaining(hoursRemaining)} remaining)`,
+            reason: `New Member (${hoursSinceApproval.toFixed(2)} hrs, ${formatTimeRemaining(
+              hoursRemaining * 60 * 60 * 1000
+            )} remaining)`,
           };
         }
 
@@ -332,7 +334,12 @@
             ? new Date(member.lastDistribution)
             : null;
         if (lastDistribution && lastDistribution >= getPHTDayRange(serverTime).start) {
-          return { eligible: false, reason: "Already Received Today" };
+          const nextDayStart = new Date(getPHTDayRange(serverTime).end.getTime() + 1);
+          const timeRemaining = nextDayStart - serverTime;
+          return {
+            eligible: false,
+            reason: `Already Received Today (${formatTimeRemaining(timeRemaining)} until next eligibility)`,
+          };
         }
 
         return { eligible: true, reason: "Eligible" };
