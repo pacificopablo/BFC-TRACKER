@@ -294,11 +294,11 @@
         fundChartInstance = new Chart(ctx, {
           type: "line",
           data: {
-            labels: ["Jul 9", "Jul 10"], // Default labels for current date range
+            labels: ["Jul 9", "Jul 10"],
             datasets: [
               {
                 label: "Fund Balance",
-                data: [0, 0], // Default data, will be updated
+                data: [0, 0],
                 backgroundColor: "rgba(59, 130, 246, 0.2)",
                 borderColor: "rgba(59, 130, 246, 1)",
                 borderWidth: 2,
@@ -354,14 +354,21 @@
           showError("Failed to load fund chart data. Displaying static data.");
           const now = await getServerTime();
           fundChartInstance.data.labels = [now.toLocaleDateString("en-PH", { month: "short", day: "numeric" })];
-          fundChartInstance.data.datasets[0].data = [0]; // Static fallback
+          fundChartInstance.data.datasets[0].data = [0];
           fundChartInstance.update();
         }
       }
 
       // Load Transaction History
-      function loadTransactionHistory(userId) {
+      async function loadTransactionHistory(userId) {
         showLoading(elements.historyList);
+        const userDoc = await getDoc(doc(db, "users", userId));
+        if (!userDoc.exists()) {
+          elements.historyList.innerHTML = '<p class="text-red-500">Member data not found.</p>';
+          return;
+        }
+        const memberData = userDoc.data();
+
         const q = query(
           collection(db, "transactions"),
           where("memberId", "==", userId),
@@ -369,16 +376,24 @@
         );
         onSnapshot(
           q,
-          (snapshot) => {
+          async (snapshot) => {
             console.log("Transaction snapshot received:", snapshot.docs.length, "documents");
-            allTransactions = snapshot.docs.map((doc) => ({
-              id: doc.id,
-              type: doc.data().type === "deposit" ? "Deposit" : "Cash Out",
-              filterType: doc.data().type,
-              amount: doc.data().amount,
-              timestamp: doc.data().timestamp?.toDate() || new Date(),
-              status: doc.data().status,
-            }));
+            allTransactions = await Promise.all(
+              snapshot.docs.map(async (doc) => {
+                const data = doc.data();
+                const transactionTime = data.timestamp?.toDate() || new Date();
+                const eligibility = await isMemberEligible(memberData, transactionTime);
+                return {
+                  id: doc.id,
+                  type: data.type === "deposit" ? "Deposit" : "Cash Out",
+                  filterType: data.type,
+                  amount: data.amount,
+                  timestamp: transactionTime,
+                  status: data.status,
+                  eligibility: eligibility.eligible ? "Yes" : `No (${eligibility.reason})`,
+                };
+              })
+            );
             displayTransactionHistory();
           },
           (error) => {
@@ -410,6 +425,7 @@
                     ? "bg-yellow-600"
                     : "bg-red-600"
               }">${t.status || "N/A"}</span></p>
+              <p><strong>Eligible at Time:</strong> ${t.eligibility}</p>
             </div>
           `
               )
@@ -418,8 +434,15 @@
       }
 
       // Load Distribution History
-      function loadDistributionHistory(userId) {
+      async function loadDistributionHistory(userId) {
         showLoading(elements.distributionList);
+        const userDoc = await getDoc(doc(db, "users", userId));
+        if (!userDoc.exists()) {
+          elements.distributionList.innerHTML = '<p class="text-red-500">Member data not found.</p>';
+          return;
+        }
+        const memberData = userDoc.data();
+
         const q = query(
           collection(db, "member_distributions"),
           where("memberId", "==", userId),
@@ -427,16 +450,36 @@
         );
         onSnapshot(
           q,
-          (snapshot) => {
+          async (snapshot) => {
             console.log("Distribution snapshot received:", snapshot.docs.length, "documents");
-            elements.distributionList.innerHTML = snapshot.docs.length
-              ? snapshot.docs
+            const distributions = await Promise.all(
+              snapshot.docs.map(async (doc) => {
+                const data = doc.data();
+                const distributionTime = data.timestamp?.toDate() || new Date();
+                // For distributions, assume eligibility for profits (since they received it)
+                // For losses, check eligibility at the time (losses don't use same rules)
+                const eligibility =
+                  data.type === "profit"
+                    ? { eligible: true, reason: "Eligible (Received Profit)" }
+                    : await isMemberEligible(memberData, distributionTime);
+                return {
+                  id: doc.id,
+                  type: data.type === "profit" ? "Profit" : "Loss",
+                  amount: data.amount,
+                  timestamp: distributionTime,
+                  eligibility: eligibility.eligible ? "Yes" : `No (${eligibility.reason})`,
+                };
+              })
+            );
+            elements.distributionList.innerHTML = distributions.length
+              ? distributions
                   .map(
-                    (doc) => `
+                    (d) => `
             <div class="bg-gray-700 p-4 rounded-lg">
-              <p><strong>Type:</strong> ${doc.data().type === "profit" ? "Profit" : "Loss"}</p>
-              <p><strong>Amount:</strong> ${doc.data().type === "profit" ? "+" : "-"}₱${formatCurrency(doc.data().amount)}</p>
-              <p><strong>Date:</strong> ${doc.data().timestamp?.toDate().toLocaleString("en-PH") || "N/A"}</p>
+              <p><strong>Type:</strong> ${d.type}</p>
+              <p><strong>Amount:</strong> ${d.type === "Profit" ? "+" : "-"}₱${formatCurrency(d.amount)}</p>
+              <p><strong>Date:</strong> ${d.timestamp.toLocaleString("en-PH")}</p>
+              <p><strong>Eligible at Time:</strong> ${d.eligibility}</p>
             </div>
           `
                   )
