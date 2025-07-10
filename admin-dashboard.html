@@ -102,7 +102,7 @@
         <input
           type="text"
           id="searchInput"
-          class="D search members..."
+          placeholder="Search members..."
           class="p-2 bg-gray-700 rounded text-white w-64"
         />
       </div>
@@ -835,7 +835,8 @@
             newMainBalance = mainBalance + (type === "profit" ? -totalDistributed : totalDistributed);
             newExceedBalance = exceedBalance + (type === "profit" ? excessAmount : -excessAmount);
           } else {
-            newExceedBalance = exceedBalance + (type === "profit" ? -(totalDistributed + excessAmount) : totalDistributed);
+            // When using exceed fund, only update exceedBalance
+            newExceedBalance = exceedBalance - (type === "profit" ? totalDistributed + excessAmount : -totalDistributed);
           }
 
           if (newMainBalance < 0) throw new Error("Insufficient main fund balance.");
@@ -861,7 +862,7 @@
           await loadFundBalance();
           await loadDailyReport();
           await updateChart();
-          alert(`Successfully ${type === "profit" ? "distributed profit" : "deducted loss"} of ₱${formatCurrency(totalDistributed)} from ${source} fund! ${excessAmount > 0 ? `Excess ₱${formatCurrency(excessAmount)} added to exceed fund.` : ""}`);
+          alert(`Successfully ${type === "profit" ? "distributed profit" : "deducted loss"} of ₱${formatCurrency(totalDistributed)} from ${source} fund! ${excessAmount > 0 ? `Excess ₱${formatCurrency(excessAmount)} ${source === "main" ? "added to exceed fund" : "remains in exceed fund"}.` : ""}`);
         } catch (error) {
           showError(error.message);
         } finally {
