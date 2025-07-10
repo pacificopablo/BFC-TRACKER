@@ -279,6 +279,13 @@
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
+      // Format time remaining
+      const formatTimeRemaining = (hours) => {
+        const remainingHours = Math.floor(hours);
+        const remainingMinutes = Math.round((hours - remainingHours) * 60);
+        return `${remainingHours}h ${remainingMinutes}m`;
+      };
+
       // Get Server Time
       async function getServerTime() {
         const tempRef = doc(collection(db, "temp"));
@@ -296,7 +303,7 @@
         const endOfDay = new Date(phtTime).setHours(23, 59, 59, 999);
         return {
           start: new Date(startOfDay - 8 * 60 * 60 * 1000),
-          end: new Date(endOfDay - 8 * 60 * 1000),
+          end: new Date(endOfDay - 8 * 60 * 60 * 1000),
         };
       }
 
@@ -312,7 +319,11 @@
 
         const hoursSinceApproval = (serverTime - approvalDate) / (1000 * 60 * 60);
         if (hoursSinceApproval < HOURS_THRESHOLD) {
-          return { eligible: false, reason: `New Member (${hoursSinceApproval.toFixed(2)} hrs)` };
+          const hoursRemaining = HOURS_THRESHOLD - hoursSinceApproval;
+          return {
+            eligible: false,
+            reason: `New Member (${hoursSinceApproval.toFixed(2)} hrs, ${formatTimeRemaining(hoursRemaining)} remaining)`,
+          };
         }
 
         const lastDistribution = member.lastDistribution?.toDate
@@ -491,8 +502,15 @@
 
       // Update Top Shareholders
       async function updateTopShareholders(serverTime) {
-        const top = allMembers
-          .filter(async (m) => m.status === "approved" && (await isMemberEligible(m, serverTime)).eligible)
+        const top = (
+          await Promise.all(
+            allMembers.map(async (m) => {
+              const eligibility = await isMemberEligible(m, serverTime);
+              return eligibility.eligible && m.status === "approved" ? m : null;
+            })
+          )
+        )
+          .filter((m) => m)
           .sort((a, b) => (b.shares || 0) - (a.shares || 0))
           .slice(0, 5);
 
