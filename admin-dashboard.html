@@ -27,7 +27,7 @@
     </header>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
       <div class="bg-gray-800 p-4 rounded-lg shadow">
         <p class="text-sm text-gray-400">Total Members</p>
         <p class="text-2xl font-bold" id="totalMembers">0</p>
@@ -40,6 +40,10 @@
         <p class="text-sm text-gray-400">Total Balance</p>
         <p class="text-2xl font-bold">₱<span id="totalBalance">0.00</span></p>
       </div>
+      <div class="bg-gray-800 p-4 rounded-lg shadow">
+        <p class="text-sm text-gray-400">Exceed Fund</p>
+        <p class="text-2xl font-bold">₱<span id="exceedFund">0.00</span></p>
+      </div>
     </div>
 
     <!-- Fund Growth Chart -->
@@ -51,13 +55,21 @@
     <!-- Distribute Profit/Loss -->
     <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
       <h2 class="text-lg font-bold mb-4">💸 Distribute Profit/Loss</h2>
-      <p class="text-sm mb-4">Fund Balance: ₱<span id="fundBalance">0.00</span></p>
+      <p class="text-sm mb-2">Fund Balance: ₱<span id="fundBalance">0.00</span></p>
+      <p class="text-sm mb-4">Exceed Fund: ₱<span id="exceedFundDisplay">0.00</span></p>
       <form id="profitForm" class="space-y-4">
         <div>
           <label class="block text-sm mb-1">Transaction Type</label>
           <select id="transactionType" class="w-full p-2 bg-gray-700 rounded text-white">
             <option value="profit">Profit</option>
             <option value="loss">Loss</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Source</label>
+          <select id="fundSource" class="w-full p-2 bg-gray-700 rounded text-white">
+            <option value="main">Main Fund</option>
+            <option value="exceed">Exceed Fund</option>
           </select>
         </div>
         <div>
@@ -230,6 +242,8 @@
         totalShares: document.getElementById("totalShares"),
         totalBalance: document.getElementById("totalBalance"),
         fundBalance: document.getElementById("fundBalance"),
+        exceedFund: document.getElementById("exceedFund"),
+        exceedFundDisplay: document.getElementById("exceedFundDisplay"),
         membersList: document.getElementById("membersList"),
         topShareholders: document.getElementById("topShareholders"),
         requestsList: document.getElementById("requestsList"),
@@ -243,6 +257,7 @@
         distributeBtn: document.getElementById("distributeBtn"),
         profitError: document.getElementById("profitError"),
         transactionType: document.getElementById("transactionType"),
+        fundSource: document.getElementById("fundSource"),
         editModal: document.getElementById("editModal"),
         editForm: document.getElementById("editForm"),
         editMemberId: document.getElementById("editMemberId"),
@@ -366,33 +381,36 @@
         }
       }
 
-      // Load Fund Balance
+      // Load Fund and Exceed Fund Balances
       async function loadFundBalance() {
         const fundSnapshot = await getDocs(collection(db, "fund"));
-        let balance = 0;
+        let mainBalance = 0;
+        let exceedBalance = 0;
 
         // Calculate total balance from members
         const snapshot = await getDocs(collection(db, "users"));
         allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        balance = allMembers.reduce((sum, m) => sum + (m.balance || 0), 0);
+        mainBalance = allMembers.reduce((sum, m) => sum + (m.balance || 0), 0);
 
-        // Include any undistributed profit/loss from profit_distributions
+        // Calculate exceed fund from profit_distributions
         const profitSnapshot = await getDocs(collection(db, "profit_distributions"));
         profitSnapshot.docs.forEach((doc) => {
           const data = doc.data();
           if (data.excessAmount) {
-            balance += data.type === "profit" ? data.excessAmount : -data.excessAmount;
+            exceedBalance += data.type === "profit" ? data.excessAmount : -data.excessAmount;
           }
         });
 
         if (fundSnapshot.empty) {
-          await setDoc(doc(db, "fund", "main"), { balance });
+          await setDoc(doc(db, "fund", "main"), { mainBalance, exceedBalance });
         } else {
-          await updateDoc(doc(db, "fund", fundSnapshot.docs[0].id), { balance });
+          await updateDoc(doc(db, "fund", fundSnapshot.docs[0].id), { mainBalance, exceedBalance });
         }
 
-        elements.fundBalance.textContent = formatCurrency(balance);
-        return balance;
+        elements.fundBalance.textContent = formatCurrency(mainBalance);
+        elements.exceedFund.textContent = formatCurrency(exceedBalance);
+        elements.exceedFundDisplay.textContent = formatCurrency(exceedBalance);
+        return { mainBalance, exceedBalance };
       }
 
       // Initialize Chart
@@ -431,22 +449,21 @@
         const snapshot = await getDocs(q);
         const labels = [];
         const data = [];
-        let balance = (await loadFundBalance()) || 0;
+        const { mainBalance } = await loadFundBalance();
 
         snapshot.docs.forEach((doc) => {
           const d = doc.data();
           const date = d.timestamp.toDate().toLocaleDateString("en-PH", { month: "short", day: "numeric" });
           if (!labels.includes(date)) {
             labels.push(date);
-            balance += d.type === "profit" ? (d.amount + (d.excessAmount || 0)) : -(d.amount + (d.excessAmount || 0));
-            data.push(balance);
+            data.push(mainBalance); // Chart only main balance
           }
         });
 
         if (labels.length === 0) {
           const now = new Date();
           labels.push(now.toLocaleDateString("en-PH", { month: "short", day: "numeric" }));
-          data.push(balance);
+          data.push(mainBalance);
         }
 
         fundChartInstance.data.labels = labels;
@@ -608,8 +625,9 @@
                 filterType: doc.data().type,
                 amount: doc.data().amount,
                 excessAmount: doc.data().excessAmount || 0,
+                source: doc.data().source || "main",
                 timestamp: doc.data().timestamp?.toDate() || new Date(),
-                details: `To ${doc.data().eligibleMemberCount} of ${doc.data().totalMemberCount} members`,
+                details: `To ${doc.data().eligibleMemberCount} of ${doc.data().totalMemberCount} members (Source: ${doc.data().source})`,
               })),
               ...txnSnap.docs.map((doc) => ({
                 id: doc.id,
@@ -691,12 +709,15 @@
 
         try {
           const type = elements.transactionType.value;
+          const source = elements.fundSource.value;
           const totalAmount = parseFloat(elements.profitAmount.value);
           if (totalAmount <= 0) throw new Error("Amount must be greater than 0.");
 
           const fundSnap = await getDocs(collection(db, "fund"));
           const fundDoc = fundSnap.docs[0];
-          const fundBalance = fundDoc.data().balance || 0;
+          const fundData = fundDoc.data();
+          const mainBalance = fundData.mainBalance || 0;
+          const exceedBalance = fundData.exceedBalance || 0;
           const serverTime = await getServerTime();
           const batch = writeBatch(db);
 
@@ -708,6 +729,13 @@
           let eligibleMembers = [];
           let totalShares = 0;
 
+          if (source === "exceed" && exceedBalance < totalAmount) {
+            throw new Error("Insufficient exceed fund balance.");
+          }
+          if (source === "main" && mainBalance < totalAmount) {
+            throw new Error("Insufficient main fund balance.");
+          }
+
           if (type === "profit") {
             // Profit: Use isMemberEligible and 10% balance cap
             eligibleMembers = (
@@ -717,7 +745,29 @@
             ).filter((m) => m && m.shares > 0);
             totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
 
-            if (!eligibleMembers.length) throw new Error("No eligible members with shares.");
+            if (!eligibleMembers.length) {
+              // No eligible members, add entire amount to exceed fund
+              const newExceedBalance = exceedBalance + totalAmount;
+              batch.update(doc(db, "fund", fundDoc.id), { mainBalance, exceedBalance: newExceedBalance });
+              batch.set(distRef, {
+                type,
+                source,
+                amount: 0,
+                excessAmount: totalAmount,
+                timestamp: serverTimestamp(),
+                adminId: auth.currentUser.uid,
+                eligibleMemberCount: 0,
+                totalMemberCount: allMembers.length,
+                totalShares: 0,
+              });
+
+              await batch.commit();
+              elements.profitForm.reset();
+              await loadFundBalance();
+              await updateChart();
+              alert(`No eligible members for profit distribution. ₱${formatCurrency(totalAmount)} added to exceed fund.`);
+              return;
+            }
 
             eligibleMembers.forEach((m) => {
               const memberBalance = (m.shares || 0) * 10; // 1 share = ₱10
@@ -775,13 +825,24 @@
 
           if (totalDistributed > totalAmount) throw new Error("Insufficient amount to distribute.");
           const excessAmount = totalAmount - totalDistributed;
-          const newFundBalance = fundBalance + (type === "profit" ? totalDistributed + excessAmount : -(totalDistributed + excessAmount));
-          if (newFundBalance < 0) throw new Error("Insufficient fund balance.");
+          let newMainBalance = mainBalance;
+          let newExceedBalance = exceedBalance;
 
-          batch.update(doc(db, "fund", fundDoc.id), { balance: newFundBalance });
+          if (source === "main") {
+            newMainBalance = mainBalance + (type === "profit" ? -totalDistributed : totalDistributed);
+            newExceedBalance = exceedBalance + (type === "profit" ? excessAmount : -excessAmount);
+          } else {
+            newExceedBalance = exceedBalance + (type === "profit" ? -(totalDistributed + excessAmount) : totalDistributed);
+          }
+
+          if (newMainBalance < 0) throw new Error("Insufficient main fund balance.");
+          if (newExceedBalance < 0) throw new Error("Insufficient exceed fund balance.");
+
+          batch.update(doc(db, "fund", fundDoc.id), { mainBalance: newMainBalance, exceedBalance: newExceedBalance });
 
           batch.set(distRef, {
             type,
+            source,
             amount: totalDistributed,
             excessAmount: excessAmount > 0 ? excessAmount : 0,
             timestamp: serverTimestamp(),
@@ -793,13 +854,11 @@
 
           await batch.commit();
           elements.profitForm.reset();
-          // Note: adjustBalances may reset balances to shares * 10, undoing distributions unless shares are updated
-          // await adjustBalances(); // Uncomment if you want to reset balances
           await loadMembers();
           await loadFundBalance();
           await loadDailyReport();
           await updateChart();
-          alert(`Successfully ${type === "profit" ? "distributed profit" : "deducted loss"} of ₱${formatCurrency(totalDistributed)}! ${excessAmount > 0 ? `Excess ₱${formatCurrency(excessAmount)} added to fund balance.` : ""}`);
+          alert(`Successfully ${type === "profit" ? "distributed profit" : "deducted loss"} of ₱${formatCurrency(totalDistributed)} from ${source} fund! ${excessAmount > 0 ? `Excess ₱${formatCurrency(excessAmount)} added to exceed fund.` : ""}`);
         } catch (error) {
           showError(error.message);
         } finally {
