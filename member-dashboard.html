@@ -34,6 +34,7 @@
         <p><strong>Balance:</strong> ₱<span id="memberBalance">Loading...</span></p>
         <p><strong>Approval Date:</strong> <span id="memberApprovalDate">Loading...</span></p>
         <p><strong>Last Distribution:</strong> <span id="memberLastDistribution">Loading...</span></p>
+        <p><strong>Eligible for Distribution:</strong> <span id="memberEligibility">Loading...</span></p>
       </div>
     </div>
 
@@ -77,7 +78,7 @@
       <p id="transactionError" class="text-red-500 text-sm mt-2 hidden"></p>
     </div>
 
-    <!-- Transaction HISTORY -->
+    <!-- Transaction History -->
     <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
       <h2 class="text-lg font-bold mb-4">📜 Transaction History</h2>
       <div class="flex flex-col sm:flex-row justify-between mb-4 space-y-2 sm:space-y-0 sm:space-x-2">
@@ -115,6 +116,7 @@
         orderBy,
         onSnapshot,
         serverTimestamp,
+        deleteDoc,
       } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
       import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -143,6 +145,8 @@
         memberBalance: document.getElementById("memberBalance"),
         memberApprovalDate: document.getElementById("memberApprovalDate"),
         memberLastDistribution: document.getElementById("memberLastDistribution"),
+        memberEligibility: document.getElementById("memberEligibility"),
+        memberDetails: document.getElementById("memberDetails"),
         transactionForm: document.getElementById("transactionForm"),
         transactionType: document.getElementById("transactionType"),
         transactionAmount: document.getElementById("transactionAmount"),
@@ -159,6 +163,7 @@
       let allTransactions = [];
       let fundChartInstance = null;
       const SUBMISSION_COOLDOWN = 5000;
+      const HOURS_THRESHOLD = 24;
       let lastSubmissionTime = 0;
 
       // Utility Functions
@@ -176,10 +181,70 @@
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
-      // Get Local Time (Fallback since members can't write to temp)
-      function getLocalTime() {
-        const now = new Date();
-        return new Date(now.getTime() + 8 * 60 * 60 * 1000); // Adjust to PHT (UTC+8)
+      // Format time remaining
+      const formatTimeRemaining = (milliseconds) => {
+        const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+        const minutes = Math.round((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+        return `${hours}h ${minutes}m`;
+      };
+
+      // Get Server Time
+      async function getServerTime() {
+        const tempRef = doc(collection(db, "temp"));
+        await setDoc(tempRef, { timestamp: serverTimestamp() });
+        const docSnap = await getDoc(tempRef);
+        const serverTime = docSnap.exists() ? docSnap.data().timestamp.toDate() : new Date();
+        await deleteDoc(tempRef);
+        return serverTime;
+      }
+
+      // Get PHT Day Range
+      function getPHTDayRange(serverTime) {
+        const phtTime = new Date(serverTime.getTime() + 8 * 60 * 60 * 1000);
+        const startOfDay = new Date(phtTime).setHours(0, 0, 0, 0);
+        const endOfDay = new Date(phtTime).setHours(23, 59, 59, 999);
+        return {
+          start: new Date(startOfDay - 8 * 60 * 60 * 1000),
+          end: new Date(endOfDay - 8 * 60 * 60 * 1000),
+        };
+      }
+
+      // Check Member Eligibility
+      async function isMemberEligible(member, serverTime) {
+        if (member.status !== "approved") return { eligible: false, reason: "Not Approved" };
+        if (member.balance <= 0) return { eligible: false, reason: "Zero/Negative Balance" };
+
+        const approvalDate = member.approvalDate?.toDate
+          ? member.approvalDate.toDate()
+          : new Date(member.approvalDate);
+        if (!approvalDate || isNaN(approvalDate)) return { eligible: false, reason: "No Approval Date" };
+
+        const hoursSinceApproval = (serverTime - approvalDate) / (1000 * 60 * 60);
+        if (hoursSinceApproval < HOURS_THRESHOLD) {
+          const hoursRemaining = HOURS_THRESHOLD - hoursSinceApproval;
+          return {
+            eligible: false,
+            reason: `New Member (${hoursSinceApproval.toFixed(2)} hrs, ${formatTimeRemaining(
+              hoursRemaining * 60 * 60 * 1000
+            )} remaining)`,
+          };
+        }
+
+        const lastDistribution = member.lastDistribution?.toDate
+          ? member.lastDistribution.toDate()
+          : member.lastDistribution
+            ? new Date(member.lastDistribution)
+            : null;
+        if (lastDistribution && lastDistribution >= getPHTDayRange(serverTime).start) {
+          const nextDayStart = new Date(getPHTDayRange(serverTime).end.getTime() + 1);
+          const timeRemaining = nextDayStart - serverTime;
+          return {
+            eligible: false,
+            reason: `Already Received Today (${formatTimeRemaining(timeRemaining)} until next eligibility)`,
+          };
+        }
+
+        return { eligible: true, reason: "Eligible" };
       }
 
       // Load Member Details
@@ -192,8 +257,11 @@
             elements.memberDetails.innerHTML = '<p class="text-red-500">No member data available.</p>';
             return;
           }
-          const data = userDoc.data();
+          const data = { id: userDoc.id, ...userDoc.data() };
           console.log("Member data loaded:", data);
+          const serverTime = await getServerTime();
+          const eligibility = await isMemberEligible(data, serverTime);
+
           elements.memberName.textContent = data.name || "N/A";
           elements.memberEmail.textContent = data.email || "N/A";
           elements.memberStatus.textContent = data.status || "N/A";
@@ -212,6 +280,7 @@
           elements.memberLastDistribution.textContent = data.lastDistribution
             ? new Date(data.lastDistribution.toDate ? data.lastDistribution.toDate() : data.lastDistribution).toLocaleString("en-PH")
             : "None";
+          elements.memberEligibility.textContent = eligibility.eligible ? "Yes" : `No (${eligibility.reason})`;
         } catch (error) {
           showError("Failed to load member details: " + error.message);
           elements.memberDetails.innerHTML = '<p class="text-red-500">Error loading member data.</p>';
@@ -248,7 +317,7 @@
         });
       }
 
-      // Update Chart (Fallback to static data if access denied)
+      // Update Chart
       async function updateChart() {
         try {
           console.log("Updating chart...");
@@ -271,7 +340,7 @@
           });
 
           if (labels.length === 0) {
-            const now = getLocalTime();
+            const now = await getServerTime();
             labels.push(now.toLocaleDateString("en-PH", { month: "short", day: "numeric" }));
             data.push(initialBalance);
           }
@@ -283,7 +352,7 @@
         } catch (error) {
           console.error("Chart update failed:", error);
           showError("Failed to load fund chart data. Displaying static data.");
-          const now = getLocalTime();
+          const now = await getServerTime();
           fundChartInstance.data.labels = [now.toLocaleDateString("en-PH", { month: "short", day: "numeric" })];
           fundChartInstance.data.datasets[0].data = [0]; // Static fallback
           fundChartInstance.update();
@@ -438,10 +507,14 @@
         }
       });
 
-      // Server Time (Fallback to local time adjusted to PHT)
-      elements.serverTimeBtn.addEventListener("click", () => {
-        const time = getLocalTime();
-        alert(`Server Time: ${time.toLocaleString("en-PH")} (PHT) - Note: Local fallback`);
+      // Server Time
+      elements.serverTimeBtn.addEventListener("click", async () => {
+        try {
+          const time = await getServerTime();
+          alert(`Server Time: ${time.toLocaleString("en-PH")} (PHT)`);
+        } catch (error) {
+          showError("Failed to fetch server time: " + error.message);
+        }
       });
 
       // Auth Check
