@@ -102,7 +102,7 @@
         <input
           type="text"
           id="searchInput"
-          placeholder="Search members..."
+          class="D search members..."
           class="p-2 bg-gray-700 rounded text-white w-64"
         />
       </div>
@@ -746,7 +746,10 @@
             totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
 
             if (!eligibleMembers.length) {
-              // No eligible members, add entire amount to exceed fund
+              if (source === "exceed") {
+                throw new Error("No eligible members for profit distribution from exceed fund. Distribution rejected.");
+              }
+              // For main fund, add entire amount to exceed fund
               const newExceedBalance = exceedBalance + totalAmount;
               batch.update(doc(db, "fund", fundDoc.id), { mainBalance, exceedBalance: newExceedBalance });
               batch.set(distRef, {
