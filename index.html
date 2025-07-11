@@ -3,62 +3,127 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Baccarat Fund Signup</title>
+    <title>Baccarat Fund Authentication</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   </head>
   <body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
     <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md">
       <!-- Header -->
       <h1 class="text-2xl font-bold mb-6 flex items-center justify-center">
-        <span class="mr-2">💸</span> Baccarat Fund Signup
+        <span class="mr-2">👑</span> Baccarat Fund
       </h1>
 
+      <!-- Tabs for Login/Signup -->
+      <div class="flex justify-center mb-6">
+        <button id="loginTab" class="px-4 py-2 bg-blue-600 rounded-l-lg text-white font-semibold">Login</button>
+        <button id="signupTab" class="px-4 py-2 bg-gray-700 rounded-r-lg text-white font-semibold">Sign Up</button>
+      </div>
+
+      <!-- Login Form -->
+      <div id="loginSection" class="space-y-4">
+        <form id="loginForm" class="space-y-4">
+          <div>
+            <label class="block text-sm mb-1" for="loginEmail">Email</label>
+            <input
+              type="email"
+              id="loginEmail"
+              class="w-full p-2 bg-gray-700 rounded text-white"
+              placeholder="Enter your email"
+              required
+            />
+          </div>
+          <div>
+            <label class="block text-sm mb-1" for="loginPassword">Password</label>
+            <input
+              type="password"
+              id="loginPassword"
+              class="w-full p-2 bg-gray-700 rounded text-white"
+              placeholder="Enter your password"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            id="loginBtn"
+            class="w-full bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-600"
+          >
+            Login
+          </button>
+          <p id="loginError" class="text-red-500 text-sm mt-2 hidden"></p>
+        </form>
+        <p class="text-sm text-gray-400 text-center">
+          <button id="showForgotPassword" class="text-blue-400 hover:underline">Forgot Password?</button>
+        </p>
+      </div>
+
       <!-- Signup Form -->
-      <form id="signupForm" class="space-y-4">
+      <div id="signupSection" class="space-y-4 hidden">
+        <form id="signupForm" class="space-y-4">
+          <div>
+            <label class="block text-sm mb-1" for="signupName">Name</label>
+            <input
+              type="text"
+              id="signupName"
+              class="w-full p-2 bg-gray-700 rounded text-white"
+              placeholder="Enter your name"
+              required
+            />
+          </div>
+          <div>
+            <label class="block text-sm mb-1" for="signupEmail">Email</label>
+            <input
+              type="email"
+              id="signupEmail"
+              class="w-full p-2 bg-gray-700 rounded text-white"
+              placeholder="Enter your email"
+              required
+            />
+          </div>
+          <div>
+            <label class="block text-sm mb-1" for="signupPassword">Password</label>
+            <input
+              type="password"
+              id="signupPassword"
+              class="w-full p-2 bg-gray-700 rounded text-white"
+              placeholder="Enter your password"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            id="signupBtn"
+            class="w-full bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-600"
+          >
+            Sign Up
+          </button>
+          <p id="signupError" class="text-red-500 text-sm mt-2 hidden"></p>
+        </form>
+        <p class="text-sm text-gray-400 text-center">
+          Already have an account? <button id="showLogin" class="text-blue-400 hover:underline">Login</button>
+        </p>
+      </div>
+
+      <!-- Forgot Password Section -->
+      <div id="forgotPasswordSection" class="space-y-4 hidden">
+        <h2 class="text-lg font-bold mb-4 text-center">Forgot Password</h2>
         <div>
-          <label class="block text-sm mb-1" for="name">Name</label>
-          <input
-            type="text"
-            id="name"
-            class="w-full p-2 bg-gray-700 rounded text-white"
-            placeholder="Enter your name"
-            required
-          />
-        </div>
-        <div>
-          <label class="block text-sm mb-1" for="email">Email</label>
+          <label class="block text-sm mb-1" for="resetEmail">Email</label>
           <input
             type="email"
-            id="email"
+            id="resetEmail"
             class="w-full p-2 bg-gray-700 rounded text-white"
             placeholder="Enter your email"
-            required
-          />
-        </div>
-        <div>
-          <label class="block text-sm mb-1" for="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            class="w-full p-2 bg-gray-700 rounded text-white"
-            placeholder="Enter your password"
-            required
           />
         </div>
         <button
-          type="submit"
-          id="signupBtn"
-          class="w-full bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-600"
+          id="resetPasswordBtn"
+          class="w-full bg-yellow-600 px-4 py-2 rounded hover:bg-yellow-700 disabled:bg-gray-600"
         >
-          Sign Up
+          Send Reset Link
         </button>
-        <p id="signupError" class="text-red-500 text-sm mt-2 hidden"></p>
-      </form>
-
-      <!-- Login Link -->
-      <div class="mt-4 text-center">
-        <p class="text-sm text-gray-400">
-          Already have an account? <a href="login.html" class="text-blue-400 hover:underline">Login</a>
+        <p id="resetMessage" class="text-sm mt-2 hidden"></p>
+        <p class="text-sm text-gray-400 text-center">
+          Back to <button id="showLoginFromForgot" class="text-blue-400 hover:underline">Login</button>
         </p>
       </div>
     </div>
@@ -66,8 +131,13 @@
     <script type="module">
       // Firebase Imports
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-      import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-      import { getFirestore, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+      import {
+        getAuth,
+        signInWithEmailAndPassword,
+        createUserWithEmailAndPassword,
+        sendPasswordResetEmail,
+      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+      import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
       // Firebase Config
       const firebaseConfig = {
@@ -87,12 +157,28 @@
 
       // DOM Elements
       const elements = {
+        loginTab: document.getElementById("loginTab"),
+        signupTab: document.getElementById("signupTab"),
+        loginSection: document.getElementById("loginSection"),
+        signupSection: document.getElementById("signupSection"),
+        forgotPasswordSection: document.getElementById("forgotPasswordSection"),
+        loginForm: document.getElementById("loginForm"),
+        loginEmail: document.getElementById("loginEmail"),
+        loginPassword: document.getElementById("loginPassword"),
+        loginBtn: document.getElementById("loginBtn"),
+        loginError: document.getElementById("loginError"),
         signupForm: document.getElementById("signupForm"),
-        name: document.getElementById("name"),
-        email: document.getElementById("email"),
-        password: document.getElementById("password"),
+        signupName: document.getElementById("signupName"),
+        signupEmail: document.getElementById("signupEmail"),
+        signupPassword: document.getElementById("signupPassword"),
         signupBtn: document.getElementById("signupBtn"),
         signupError: document.getElementById("signupError"),
+        resetEmail: document.getElementById("resetEmail"),
+        resetPasswordBtn: document.getElementById("resetPasswordBtn"),
+        resetMessage: document.getElementById("resetMessage"),
+        showForgotPassword: document.getElementById("showForgotPassword"),
+        showLogin: document.getElementById("showLogin"),
+        showLoginFromForgot: document.getElementById("showLoginFromForgot"),
       };
 
       // Utility Function to Show Messages
@@ -103,6 +189,83 @@
         setTimeout(() => element.classList.add("hidden"), 5000);
       };
 
+      // Toggle Sections
+      const showLogin = () => {
+        elements.loginSection.classList.remove("hidden");
+        elements.signupSection.classList.add("hidden");
+        elements.forgotPasswordSection.classList.add("hidden");
+        elements.loginTab.classList.add("bg-blue-600");
+        elements.signupTab.classList.remove("bg-blue-600");
+        elements.signupTab.classList.add("bg-gray-700");
+      };
+
+      const showSignup = () => {
+        elements.loginSection.classList.add("hidden");
+        elements.signupSection.classList.remove("hidden");
+        elements.forgotPasswordSection.classList.add("hidden");
+        elements.signupTab.classList.add("bg-blue-600");
+        elements.loginTab.classList.remove("bg-blue-600");
+        elements.loginTab.classList.add("bg-gray-700");
+      };
+
+      const showForgotPassword = () => {
+        elements.loginSection.classList.add("hidden");
+        elements.signupSection.classList.add("hidden");
+        elements.forgotPasswordSection.classList.remove("hidden");
+        elements.loginTab.classList.add("bg-blue-600");
+        elements.signupTab.classList.remove("bg-blue-600");
+        elements.signupTab.classList.add("bg-gray-700");
+      };
+
+      // Tab and Link Event Listeners
+      elements.loginTab.addEventListener("click", showLogin);
+      elements.signupTab.addEventListener("click", showSignup);
+      elements.showForgotPassword.addEventListener("click", showForgotPassword);
+      elements.showLogin.addEventListener("click", showLogin);
+      elements.showLoginFromForgot.addEventListener("click", showLogin);
+
+      // Login Form Submission
+      elements.loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        elements.loginBtn.disabled = true;
+
+        try {
+          const userCredential = await signInWithEmailAndPassword(
+            auth,
+            elements.loginEmail.value,
+            elements.loginPassword.value
+          );
+          const user = userCredential.user;
+
+          // Check user role in Firestore
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData.role === "admin") {
+              window.location.href = "admin-dashboard.html";
+            } else {
+              window.location.href = "member-dashboard.html";
+            }
+          } else {
+            // Create default member document if none exists
+            await setDoc(doc(db, "users", user.uid), {
+              role: "member",
+              email: elements.loginEmail.value,
+              name: "",
+              status: "pending",
+              shares: 0,
+              balance: 0,
+              approvalDate: null,
+            });
+            window.location.href = "member-dashboard.html";
+          }
+        } catch (error) {
+          showMessage(elements.loginError, `Error: ${error.message}`);
+        } finally {
+          elements.loginBtn.disabled = false;
+        }
+      });
+
       // Signup Form Submission
       elements.signupForm.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -111,28 +274,48 @@
         try {
           const userCredential = await createUserWithEmailAndPassword(
             auth,
-            elements.email.value,
-            elements.password.value
+            elements.signupEmail.value,
+            elements.signupPassword.value
           );
           const user = userCredential.user;
 
           // Create user document in Firestore
           await setDoc(doc(db, "users", user.uid), {
-            role: "member", // Default to member; admins should be set manually or via admin panel
-            email: elements.email.value,
-            name: elements.name.value,
-            status: "pending", // Matches your dashboard logic
+            role: "member", // Default to member; admins set manually
+            email: elements.signupEmail.value,
+            name: elements.signupName.value,
+            status: "pending",
             shares: 0,
             balance: 0,
             approvalDate: null,
           });
 
           showMessage(elements.signupError, "Account created successfully! Redirecting to login...", false);
-          setTimeout(() => (window.location.href = "login.html"), 2000);
+          setTimeout(() => showLogin(), 2000);
         } catch (error) {
           showMessage(elements.signupError, `Error: ${error.message}`);
         } finally {
           elements.signupBtn.disabled = false;
+        }
+      });
+
+      // Forgot Password
+      elements.resetPasswordBtn.addEventListener("click", async () => {
+        const email = elements.resetEmail.value;
+        if (!email) {
+          showMessage(elements.resetMessage, "Please enter your email address.");
+          return;
+        }
+
+        elements.resetPasswordBtn.disabled = true;
+        try {
+          await sendPasswordResetEmail(auth, email);
+          showMessage(elements.resetMessage, "Password reset email sent! Check your inbox.", false);
+          elements.resetEmail.value = "";
+        } catch (error) {
+          showMessage(elements.resetMessage, `Error: ${error.message}`);
+        } finally {
+          elements.resetPasswordBtn.disabled = false;
         }
       });
     </script>
