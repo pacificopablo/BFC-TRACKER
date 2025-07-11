@@ -120,9 +120,9 @@
           if (userDoc.exists()) {
             const userData = userDoc.data();
             if (userData.role === "admin") {
-              window.location.href = "/"; // Redirect to admin dashboard
+              window.location.href = "admin-dashboard.html"; // Redirect to admin dashboard
             } else {
-              window.location.href = "/member-dashboard"; // Redirect to member dashboard
+              window.location.href = "member-dashboard.html"; // Redirect to member dashboard
             }
           } else {
             throw new Error("User profile not found. Please contact support.");
