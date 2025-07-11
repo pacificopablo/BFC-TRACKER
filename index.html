@@ -3,18 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Baccarat Fund Login</title>
+    <title>Baccarat Fund Signup</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   </head>
   <body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
     <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md">
       <!-- Header -->
       <h1 class="text-2xl font-bold mb-6 flex items-center justify-center">
-        <span class="mr-2">👑</span> Baccarat Fund Login
+        <span class="mr-2">💸</span> Baccarat Fund Signup
       </h1>
 
-      <!-- Login Form -->
-      <form id="loginForm" class="space-y-4">
+      <!-- Signup Form -->
+      <form id="signupForm" class="space-y-4">
+        <div>
+          <label class="block text-sm mb-1" for="name">Name</label>
+          <input
+            type="text"
+            id="name"
+            class="w-full p-2 bg-gray-700 rounded text-white"
+            placeholder="Enter your name"
+            required
+          />
+        </div>
         <div>
           <label class="block text-sm mb-1" for="email">Email</label>
           <input
@@ -37,38 +47,27 @@
         </div>
         <button
           type="submit"
-          id="loginBtn"
+          id="signupBtn"
           class="w-full bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-600"
         >
-          Login
+          Sign Up
         </button>
-        <p id="loginError" class="text-red-500 text-sm mt-2 hidden"></p>
+        <p id="signupError" class="text-red-500 text-sm mt-2 hidden"></p>
       </form>
 
-      <!-- Forgot Password Section -->
-      <div id="forgotPasswordSection" class="mt-4">
-        <p class="text-sm text-gray-400 mb-2">Forgot your password?</p>
-        <input
-          type="email"
-          id="resetEmail"
-          placeholder="Enter your email"
-          class="w-full p-2 bg-gray-700 rounded text-white mb-2"
-        />
-        <button
-          id="resetPasswordBtn"
-          class="w-full bg-yellow-600 px-4 py-2 rounded hover:bg-yellow-700 disabled:bg-gray-600"
-        >
-          Send Reset Link
-        </button>
-        <p id="resetMessage" class="text-sm mt-2 hidden"></p>
+      <!-- Login Link -->
+      <div class="mt-4 text-center">
+        <p class="text-sm text-gray-400">
+          Already have an account? <a href="login.html" class="text-blue-400 hover:underline">Login</a>
+        </p>
       </div>
     </div>
 
     <script type="module">
       // Firebase Imports
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-      import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-      import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+      import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+      import { getFirestore, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
       // Firebase Config
       const firebaseConfig = {
@@ -88,14 +87,12 @@
 
       // DOM Elements
       const elements = {
-        loginForm: document.getElementById("loginForm"),
+        signupForm: document.getElementById("signupForm"),
+        name: document.getElementById("name"),
         email: document.getElementById("email"),
         password: document.getElementById("password"),
-        loginBtn: document.getElementById("loginBtn"),
-        loginError: document.getElementById("loginError"),
-        resetEmail: document.getElementById("resetEmail"),
-        resetPasswordBtn: document.getElementById("resetPasswordBtn"),
-        resetMessage: document.getElementById("resetMessage"),
+        signupBtn: document.getElementById("signupBtn"),
+        signupError: document.getElementById("signupError"),
       };
 
       // Utility Function to Show Messages
@@ -106,51 +103,36 @@
         setTimeout(() => element.classList.add("hidden"), 5000);
       };
 
-      // Login Form Submission
-      elements.loginForm.addEventListener("submit", async (e) => {
+      // Signup Form Submission
+      elements.signupForm.addEventListener("submit", async (e) => {
         e.preventDefault();
-        elements.loginBtn.disabled = true;
+        elements.signupBtn.disabled = true;
 
         try {
-          const userCredential = await signInWithEmailAndPassword(auth, elements.email.value, elements.password.value);
+          const userCredential = await createUserWithEmailAndPassword(
+            auth,
+            elements.email.value,
+            elements.password.value
+          );
           const user = userCredential.user;
 
-          // Check user role in Firestore
-          const userDoc = await getDoc(doc(db, "users", user.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            if (userData.role === "admin") {
-              window.location.href = "admin-dashboard.html"; // Redirect to admin dashboard
-            } else {
-              window.location.href = "member-dashboard.html"; // Redirect to member dashboard
-            }
-          } else {
-            throw new Error("User profile not found. Please contact support.");
-          }
-        } catch (error) {
-          showMessage(elements.loginError, `Error: ${error.message}`);
-        } finally {
-          elements.loginBtn.disabled = false;
-        }
-      });
+          // Create user document in Firestore
+          await setDoc(doc(db, "users", user.uid), {
+            role: "member", // Default to member; admins should be set manually or via admin panel
+            email: elements.email.value,
+            name: elements.name.value,
+            status: "pending", // Matches your dashboard logic
+            shares: 0,
+            balance: 0,
+            approvalDate: null,
+          });
 
-      // Forgot Password
-      elements.resetPasswordBtn.addEventListener("click", async () => {
-        const email = elements.resetEmail.value;
-        if (!email) {
-          showMessage(elements.resetMessage, "Please enter your email address.");
-          return;
-        }
-
-        elements.resetPasswordBtn.disabled = true;
-        try {
-          await sendPasswordResetEmail(auth, email);
-          showMessage(elements.resetMessage, "Password reset email sent! Check your inbox.", false);
-          elements.resetEmail.value = "";
+          showMessage(elements.signupError, "Account created successfully! Redirecting to login...", false);
+          setTimeout(() => (window.location.href = "login.html"), 2000);
         } catch (error) {
-          showMessage(elements.resetMessage, `Error: ${error.message}`);
+          showMessage(elements.signupError, `Error: ${error.message}`);
         } finally {
-          elements.resetPasswordBtn.disabled = false;
+          elements.signupBtn.disabled = false;
         }
       });
     </script>
