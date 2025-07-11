@@ -17,6 +17,9 @@
         <button id="serverTimeBtn" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 text-sm">
           Server Time
         </button>
+        <button id="preDistReportBtn" class="bg-yellow-600 px-4 py-2 rounded hover:bg-yellow-700 text-sm">
+          Pre-Distribution Report
+        </button>
         <button id="adjustBalanceBtn" class="bg-purple-600 px-4 py-2 rounded hover:bg-purple-700 text-sm">
           Adjust Balances
         </button>
@@ -50,6 +53,33 @@
     <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
       <h2 class="text-lg font-bold mb-4">📊 Fund Growth</h2>
       <canvas id="fundChart" height="100"></canvas>
+    </div>
+
+    <!-- Add to Exceed Fund -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">💰 Add to Exceed Fund</h2>
+      <form id="addExceedForm" class="space-y-4">
+        <div>
+          <label class="block text-sm mb-1">Amount (₱)</label>
+          <input
+            type="number"
+            id="exceedAmount"
+            class="w-full p-2 bg-gray-700 rounded text-white"
+            placeholder="Enter amount"
+            min="0"
+            step="0.01"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          id="addExceedBtn"
+          class="w-full bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-600"
+        >
+          Add to Exceed Fund
+        </button>
+      </form>
+      <p id="exceedError" class="text-red-500 text-sm mt-2 hidden"></p>
     </div>
 
     <!-- Distribute Profit/Loss -->
@@ -258,6 +288,10 @@
         profitError: document.getElementById("profitError"),
         transactionType: document.getElementById("transactionType"),
         fundSource: document.getElementById("fundSource"),
+        addExceedForm: document.getElementById("addExceedForm"),
+        addExceedBtn: document.getElementById("addExceedBtn"),
+        exceedAmount: document.getElementById("exceedAmount"),
+        exceedError: document.getElementById("exceedError"),
         editModal: document.getElementById("editModal"),
         editForm: document.getElementById("editForm"),
         editMemberId: document.getElementById("editMemberId"),
@@ -271,6 +305,7 @@
         logoutBtn: document.getElementById("logoutBtn"),
         serverTimeBtn: document.getElementById("serverTimeBtn"),
         adjustBalanceBtn: document.getElementById("adjustBalanceBtn"),
+        preDistReportBtn: document.getElementById("preDistReportBtn"),
       };
 
       let allMembers = [];
@@ -284,17 +319,16 @@
       const formatCurrency = (value) =>
         parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
 
-      const showError = (message) => {
-        elements.profitError.textContent = message;
-        elements.profitError.classList.remove("hidden");
-        setTimeout(() => elements.profitError.classList.add("hidden"), 5000);
+      const showError = (element, message) => {
+        element.textContent = message;
+        element.classList.remove("hidden");
+        setTimeout(() => element.classList.add("hidden"), 5000);
       };
 
       const showLoading = (element, message = "Loading...") => {
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
-      // Format time remaining
       const formatTimeRemaining = (milliseconds) => {
         const hours = Math.floor(milliseconds / (1000 * 60 * 60));
         const minutes = Math.round((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
@@ -368,16 +402,16 @@
 
           for (const member of allMembers) {
             const eligibility = await isMemberEligible(member, serverTime);
-            if (!eligibility.eligible) continue; // Skip ineligible members
+            if (!eligibility.eligible) continue;
 
-            const newBalance = (member.shares || 0) * 10; // 1 share = ₱10
+            const newBalance = (member.shares || 0) * 10;
             batch.update(doc(db, "users", member.id), { balance: newBalance });
           }
 
           await batch.commit();
           console.log("Balances adjusted successfully: 1 share = ₱10");
         } catch (error) {
-          showError("Failed to adjust balances: " + error.message);
+          showError(elements.profitError, "Failed to adjust balances: " + error.message);
         }
       }
 
@@ -387,12 +421,10 @@
         let mainBalance = 0;
         let exceedBalance = 0;
 
-        // Calculate total balance from members
         const snapshot = await getDocs(collection(db, "users"));
         allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
         mainBalance = allMembers.reduce((sum, m) => sum + (m.balance || 0), 0);
 
-        // Calculate exceed fund from profit_distributions
         const profitSnapshot = await getDocs(collection(db, "profit_distributions"));
         profitSnapshot.docs.forEach((doc) => {
           const data = doc.data();
@@ -456,7 +488,7 @@
           const date = d.timestamp.toDate().toLocaleDateString("en-PH", { month: "short", day: "numeric" });
           if (!labels.includes(date)) {
             labels.push(date);
-            data.push(mainBalance); // Chart only main balance
+            data.push(mainBalance);
           }
         });
 
@@ -478,7 +510,6 @@
         const snapshot = await getDocs(collection(db, "users"));
         allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
-        // Adjust balances before rendering
         await adjustBalances();
 
         let memberCount = 0,
@@ -696,12 +727,54 @@
           : '<p class="text-gray-400">No distributions today.</p>';
       }
 
+      // Add to Exceed Fund
+      elements.addExceedForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const now = Date.now();
+        if (now - lastSubmissionTime < SUBMISSION_COOLDOWN) {
+          showError(elements.exceedError, `Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (now - lastSubmissionTime)) / 1000)} seconds.`);
+          return;
+        }
+        lastSubmissionTime = now;
+        elements.addExceedBtn.disabled = true;
+
+        try {
+          const amount = parseFloat(elements.exceedAmount.value);
+          if (amount <= 0) throw new Error("Amount must be greater than 0.");
+          const fundSnap = await getDocs(collection(db, "fund"));
+          const fundDoc = fundSnap.docs[0];
+          const fundData = fundDoc.data();
+          const newExceedBalance = (fundData.exceedBalance || 0) + amount;
+
+          await updateDoc(doc(db, "fund", fundDoc.id), { exceedBalance: newExceedBalance });
+          await setDoc(doc(collection(db, "profit_distributions")), {
+            type: "profit",
+            source: "external",
+            amount: 0,
+            excessAmount: amount,
+            timestamp: serverTimestamp(),
+            adminId: auth.currentUser.uid,
+            eligibleMemberCount: 0,
+            totalMemberCount: allMembers.length,
+            totalShares: 0,
+          });
+
+          elements.addExceedForm.reset();
+          await loadFundBalance();
+          alert(`Successfully added ₱${formatCurrency(amount)} to exceed fund. New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
+        } catch (error) {
+          showError(elements.exceedError, "Failed to add to exceed fund: " + error.message);
+        } finally {
+          elements.addExceedBtn.disabled = false;
+        }
+      });
+
       // Distribute Profit/Loss
       elements.profitForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const now = Date.now();
         if (now - lastSubmissionTime < SUBMISSION_COOLDOWN) {
-          showError(`Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (now - lastSubmissionTime)) / 1000)} seconds.`);
+          showError(elements.profitError, `Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (now - lastSubmissionTime)) / 1000)} seconds.`);
           return;
         }
         lastSubmissionTime = now;
@@ -721,9 +794,8 @@
           const serverTime = await getServerTime();
           const batch = writeBatch(db);
 
-          // Create distRef immediately after batch
           const distRef = doc(collection(db, "profit_distributions"));
-          console.log("distRef created with ID:", distRef.id); // Debug log
+          console.log("distRef created with ID:", distRef.id);
 
           let totalDistributed = 0;
           let eligibleMembers = [];
@@ -737,7 +809,6 @@
           }
 
           if (type === "profit") {
-            // Profit: Use isMemberEligible and 10% balance cap
             eligibleMembers = (
               await Promise.all(
                 allMembers.map(async (m) => ((await isMemberEligible(m, serverTime)).eligible ? m : null))
@@ -745,11 +816,9 @@
             ).filter((m) => m && m.shares > 0);
             totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
 
-            if (!eligibleMembers.length) {
-              if (source === "exceed") {
-                throw new Error("No eligible members for profit distribution from exceed fund. Distribution rejected.");
-              }
-              // For main fund, add entire amount to exceed fund
+            if (!eligibleMembers.length && source === "exceed") {
+              throw new Error("No eligible members for profit distribution from exceed fund. Distribution rejected.");
+            } else if (!eligibleMembers.length) {
               const newExceedBalance = exceedBalance + totalAmount;
               batch.update(doc(db, "fund", fundDoc.id), { mainBalance, exceedBalance: newExceedBalance });
               batch.set(distRef, {
@@ -768,13 +837,13 @@
               elements.profitForm.reset();
               await loadFundBalance();
               await updateChart();
-              alert(`No eligible members for profit distribution. ₱${formatCurrency(totalAmount)} added to exceed fund.`);
+              alert(`No eligible members for profit distribution. ₱${formatCurrency(totalAmount)} added to exceed fund. New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
               return;
             }
 
             eligibleMembers.forEach((m) => {
-              const memberBalance = (m.shares || 0) * 10; // 1 share = ₱10
-              const memberDist = Math.min(memberBalance * 0.1, totalAmount - totalDistributed); // Cap at 10% of balance
+              const memberBalance = (m.shares || 0) * 10;
+              const memberDist = Math.min(memberBalance * 0.1, totalAmount - totalDistributed);
               if (memberDist <= 0) return;
 
               const newBalance = m.balance + memberDist;
@@ -795,16 +864,15 @@
               });
             });
           } else {
-            // Loss: Divide equally among members with status !== "pending" and shares > 0, no 10% cap
             eligibleMembers = allMembers.filter((m) => m.status !== "pending" && m.shares > 0);
             totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
 
             if (!eligibleMembers.length) throw new Error("No members with non-pending status and positive shares.");
 
-            const lossPerMember = totalAmount / eligibleMembers.length; // Equal division
+            const lossPerMember = totalAmount / eligibleMembers.length;
 
             eligibleMembers.forEach((m) => {
-              const memberDist = Math.min(lossPerMember, m.balance); // Cap at balance to prevent negative
+              const memberDist = Math.min(lossPerMember, m.balance);
               if (memberDist <= 0) return;
 
               const newBalance = Math.max(0, m.balance - memberDist);
@@ -835,8 +903,7 @@
             newMainBalance = mainBalance + (type === "profit" ? -totalDistributed : totalDistributed);
             newExceedBalance = exceedBalance + (type === "profit" ? excessAmount : -excessAmount);
           } else {
-            // When using exceed fund, only update exceedBalance
-            newExceedBalance = exceedBalance - (type === "profit" ? totalDistributed + excessAmount : -totalDistributed);
+            newExceedBalance = exceedBalance - totalDistributed; // Deduct for both profit and loss
           }
 
           if (newMainBalance < 0) throw new Error("Insufficient main fund balance.");
@@ -862,12 +929,39 @@
           await loadFundBalance();
           await loadDailyReport();
           await updateChart();
-          alert(`Successfully ${type === "profit" ? "distributed profit" : "deducted loss"} of ₱${formatCurrency(totalDistributed)} from ${source} fund! ${excessAmount > 0 ? `Excess ₱${formatCurrency(excessAmount)} ${source === "main" ? "added to exceed fund" : "remains in exceed fund"}.` : ""}`);
+          alert(`Successfully ${type === "profit" ? "distributed profit" : "deducted loss"} of ₱${formatCurrency(totalDistributed)} from ${source} fund! ${excessAmount > 0 ? `Excess ₱${formatCurrency(excessAmount)} ${source === "main" ? "added to exceed fund" : "remains in exceed fund"}. ` : ""}New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
         } catch (error) {
-          showError(error.message);
+          showError(elements.profitError, error.message);
         } finally {
           elements.distributeBtn.disabled = false;
         }
+      });
+
+      // Pre-Distribution Report
+      elements.preDistReportBtn.addEventListener("click", async () => {
+        const serverTime = await getServerTime();
+        const { mainBalance, exceedBalance } = await loadFundBalance();
+        const memberRows = await Promise.all(
+          allMembers.map(async (m) => {
+            const eligibility = await isMemberEligible(m, serverTime);
+            return `| ${m.name || "N/A"} | ${m.email || "N/A"} | ${m.status || "N/A"} | ${m.shares || 0} | ${formatCurrency(m.balance)} | ${eligibility.eligible ? "Yes" : "No"} | ${eligibility.eligible ? "" : eligibility.reason} |`;
+          })
+        );
+        const pendingSnapshot = await getDocs(query(collection(db, "transactions"), orderBy("timestamp", "desc")));
+        const pendingRequests = pendingSnapshot.docs
+          .filter((doc) => doc.data().status === "pending")
+          .map(
+            (doc) => `- ${doc.data().memberName || "N/A"}: ${doc.data().type} ₱${formatCurrency(doc.data().amount)} (${doc.data().timestamp?.toDate().toLocaleString("en-PH") || "N/A"})`
+          )
+          .join("\n") || "No pending requests.";
+
+        const report = `# Pre-Distribution Report\n*Generated on ${serverTime.toLocaleString("en-PH")}*\n\n` +
+          `## Fund Balances\n- **Main Fund Balance**: ₱${formatCurrency(mainBalance)}\n- **Exceed Fund Balance**: ₱${formatCurrency(exceedBalance)}\n\n` +
+          `## Member Summary\n- **Total Members**: ${allMembers.length}\n- **Total Shares**: ${allMembers.reduce((sum, m) => sum + (m.shares || 0), 0)}\n- **Total Member Balance**: ₱${formatCurrency(allMembers.reduce((sum, m) => sum + (m.balance || 0), 0))}\n\n` +
+          `### Member Details\n| Member Name | Email | Status | Shares | Balance (₱) | Eligible for Profit | Reason for Ineligibility |\n|-------------|-------|--------|--------|-------------|---------------------|-------------------------|\n${memberRows.join("\n")}\n\n` +
+          `## Pending Transaction Requests\n${pendingRequests}\n\n` +
+          `## Notes\n- **Eligibility Criteria**: Approved status, positive balance, approved ≥24 hours, no distribution today.\n- **Exceed Fund**: Available for distribution if sufficient balance exists.`;
+        alert(report); // Replace with a modal or downloadable file in production
       });
 
       // Edit Member
@@ -916,7 +1010,7 @@
           await loadMembers();
           await loadFundBalance();
         } catch (error) {
-          showError("Failed to update member: " + error.message);
+          showError(elements.profitError, "Failed to update member: " + error.message);
         }
       });
 
@@ -936,7 +1030,7 @@
             if (data.type === "deposit") {
               batch.update(doc(db, "users", data.memberId), {
                 balance: (user.balance || 0) + data.amount,
-                shares: (user.shares || 0) + data.amount / 10, // 1 share = ₱10
+                shares: (user.shares || 0) + data.amount / 10,
               });
             } else if (data.type === "cashout" && (user.balance || 0) >= data.amount) {
               batch.update(doc(db, "users", data.memberId), {
@@ -955,7 +1049,7 @@
           await loadMembers();
           await loadFundBalance();
         } catch (error) {
-          showError("Failed to process transaction: " + error.message);
+          showError(elements.profitError, "Failed to process transaction: " + error.message);
         }
       });
 
