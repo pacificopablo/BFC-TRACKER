@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Baccarat Fund Admin Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   </head>
   <body class="bg-gray-900 text-white min-h-screen p-4">
@@ -22,6 +23,12 @@
         </button>
         <button id="adjustBalanceBtn" class="bg-purple-600 px-4 py-2 rounded hover:bg-purple-700 text-sm">
           Adjust Balances
+        </button>
+        <button id="exportExcelBtn" class="bg-green-600 px-4 py-2 rounded hover:bg-green-700 text-sm">
+          Export Report to Excel
+        </button>
+        <button id="exportDbBtn" class="bg-teal-600 px-4 py-2 rounded hover:bg-teal-700 text-sm">
+          Export Database to Excel
         </button>
         <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700 text-sm">
           Logout
@@ -306,6 +313,8 @@
         serverTimeBtn: document.getElementById("serverTimeBtn"),
         adjustBalanceBtn: document.getElementById("adjustBalanceBtn"),
         preDistReportBtn: document.getElementById("preDistReportBtn"),
+        exportExcelBtn: document.getElementById("exportExcelBtn"),
+        exportDbBtn: document.getElementById("exportDbBtn"),
       };
 
       let allMembers = [];
@@ -404,7 +413,7 @@
             const eligibility = await isMemberEligible(member, serverTime);
             if (!eligibility.eligible) continue;
 
-            // Use the member's latest balance instead of recalculating from shares
+            // Use the member's latest balance to calculate shares
             const newShares = Math.floor((member.balance || 0) / 10);
             batch.update(doc(db, "users", member.id), { shares: newShares });
           }
@@ -727,6 +736,171 @@
           : '<p class="text-gray-400">No distributions today.</p>';
       }
 
+      // Export Pre-Distribution Report to Excel
+      async function exportReportToExcel() {
+        try {
+          const serverTime = await getServerTime();
+          const { mainBalance, exceedBalance } = await loadFundBalance();
+
+          // Member Details
+          const memberData = await Promise.all(
+            allMembers.map(async (m) => {
+              const eligibility = await isMemberEligible(m, serverTime);
+              return {
+                "Member Name": m.name || "N/A",
+                Email: m.email || "N/A",
+                Status: m.status || "N/A",
+                Shares: m.shares || 0,
+                "Balance (₱)": formatCurrency(m.balance),
+                "Eligible for Profit": eligibility.eligible ? "Yes" : "No",
+                "Reason for Ineligibility": eligibility.eligible ? "" : eligibility.reason,
+              };
+            })
+          );
+
+          // Pending Transactions
+          const pendingSnapshot = await getDocs(query(collection(db, "transactions"), orderBy("timestamp", "desc")));
+          const pendingRequests = pendingSnapshot.docs
+            .filter((doc) => doc.data().status === "pending")
+            .map((doc) => ({
+              Member: doc.data().memberName || "N/A",
+              Type: doc.data().type || "N/A",
+              "Amount (₱)": formatCurrency(doc.data().amount),
+              Date: doc.data().timestamp?.toDate().toLocaleString("en-PH") || "N/A",
+            }));
+
+          // Fund Summary
+          const fundSummary = [
+            {
+              "Main Fund Balance (₱)": formatCurrency(mainBalance),
+              "Exceed Fund Balance (₱)": formatCurrency(exceedBalance),
+              "Total Members": allMembers.length,
+              "Total Shares": allMembers.reduce((sum, m) => sum + (m.shares || 0), 0),
+              "Total Member Balance (₱)": formatCurrency(allMembers.reduce((sum, m) => sum + (m.balance || 0), 0)),
+            },
+          ];
+
+          // Create Workbook
+          const wb = XLSX.utils.book_new();
+          
+          // Fund Summary Sheet
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fundSummary), "Fund Summary");
+          
+          // Member Details Sheet
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(memberData), "Members");
+          
+          // Pending Transactions Sheet
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(pendingRequests), "Pending Transactions");
+
+          // Notes Sheet
+          const notes = [
+            { Note: "Generated on: " + serverTime.toLocaleString("en-PH") },
+            { Note: "Eligibility Criteria: Approved status, positive balance, approved ≥24 hours, no distribution today." },
+            { Note: "Exceed Fund: Available for distribution if sufficient balance exists." },
+          ];
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(notes), "Notes");
+
+          // Download Excel File
+          XLSX.writeFile(wb, `Pre_Distribution_Report_${serverTime.toISOString().slice(0, 10)}.xlsx`);
+        } catch (error) {
+          showError(elements.profitError, "Failed to export report to Excel: " + error.message);
+        }
+      }
+
+      // Export Entire Database to Excel
+      async function exportDatabaseToExcel() {
+        try {
+          const serverTime = await getServerTime();
+
+          // Users Collection
+          const usersSnapshot = await getDocs(collection(db, "users"));
+          const usersData = usersSnapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              ID: doc.id,
+              Name: data.name || "N/A",
+              Email: data.email || "N/A",
+              Status: data.status || "N/A",
+              Shares: data.shares || 0,
+              "Balance (₱)": formatCurrency(data.balance),
+              "Approval Date": data.approvalDate?.toDate().toLocaleString("en-PH") || "N/A",
+              "Last Distribution": data.lastDistribution?.toDate().toLocaleString("en-PH") || "N/A",
+            };
+          });
+
+          // Fund Collection
+          const fundSnapshot = await getDocs(collection(db, "fund"));
+          const fundData = fundSnapshot.docs.map((doc) => ({
+            ID: doc.id,
+            "Main Balance (₱)": formatCurrency(doc.data().mainBalance || 0),
+            "Exceed Balance (₱)": formatCurrency(doc.data().exceedBalance || 0),
+          }));
+
+          // Transactions Collection
+          const transactionsSnapshot = await getDocs(query(collection(db, "transactions"), orderBy("timestamp", "desc")));
+          const transactionsData = transactionsSnapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              ID: doc.id,
+              "Member ID": data.memberId || "N/A",
+              "Member Name": data.memberName || "N/A",
+              Type: data.type || "N/A",
+              "Amount (₱)": formatCurrency(data.amount),
+              Status: data.status || "N/A",
+              Timestamp: data.timestamp?.toDate().toLocaleString("en-PH") || "N/A",
+            };
+          });
+
+          // Profit Distributions Collection
+          const profitDistSnapshot = await getDocs(query(collection(db, "profit_distributions"), orderBy("timestamp", "desc")));
+          const profitDistData = profitDistSnapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              ID: doc.id,
+              Type: data.type || "N/A",
+              Source: data.source || "N/A",
+              "Amount (₱)": formatCurrency(data.amount || 0),
+              "Excess Amount (₱)": formatCurrency(data.excessAmount || 0),
+              "Admin ID": data.adminId || "N/A",
+              "Eligible Member Count": data.eligibleMemberCount || 0,
+              "Total Member Count": data.totalMemberCount || 0,
+              "Total Shares": data.totalShares || 0,
+              Timestamp: data.timestamp?.toDate().toLocaleString("en-PH") || "N/A",
+            };
+          });
+
+          // Member Distributions Collection
+          const memberDistSnapshot = await getDocs(query(collection(db, "member_distributions"), orderBy("timestamp", "desc")));
+          const memberDistData = memberDistSnapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              ID: doc.id,
+              "Member ID": data.memberId || "N/A",
+              "Member Name": data.memberName || "N/A",
+              Type: data.type || "N/A",
+              "Amount (₱)": formatCurrency(data.amount || 0),
+              "Distribution ID": data.distributionId || "N/A",
+              Timestamp: data.timestamp?.toDate().toLocaleString("en-PH") || "N/A",
+            };
+          });
+
+          // Create Workbook
+          const wb = XLSX.utils.book_new();
+          
+          // Append Sheets
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(usersData), "Users");
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fundData), "Fund");
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(transactionsData), "Transactions");
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(profitDistData), "Profit Distributions");
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(memberDistData), "Member Distributions");
+
+          // Download Excel File
+          XLSX.writeFile(wb, `Database_Export_${serverTime.toISOString().slice(0, 10)}.xlsx`);
+        } catch (error) {
+          showError(elements.profitError, "Failed to export database to Excel: " + error.message);
+        }
+      }
+
       // Add to Exceed Fund
       elements.addExceedForm.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -903,7 +1077,7 @@
             newMainBalance = mainBalance + (type === "profit" ? -totalDistributed : totalDistributed);
             newExceedBalance = exceedBalance + (type === "profit" ? excessAmount : -excessAmount);
           } else {
-            newExceedBalance = exceedBalance - totalDistributed; // Deduct for both profit and loss
+            newExceedBalance = exceedBalance - totalDistributed;
           }
 
           if (newMainBalance < 0) throw new Error("Insufficient main fund balance.");
@@ -961,8 +1135,14 @@
           `### Member Details\n| Member Name | Email | Status | Shares | Balance (₱) | Eligible for Profit | Reason for Ineligibility |\n|-------------|-------|--------|--------|-------------|---------------------|-------------------------|\n${memberRows.join("\n")}\n\n` +
           `## Pending Transaction Requests\n${pendingRequests}\n\n` +
           `## Notes\n- **Eligibility Criteria**: Approved status, positive balance, approved ≥24 hours, no distribution today.\n- **Exceed Fund**: Available for distribution if sufficient balance exists.`;
-        alert(report); // Replace with a modal or downloadable file in production
+        alert(report);
       });
+
+      // Export Report to Excel Button
+      elements.exportExcelBtn.addEventListener("click", exportReportToExcel);
+
+      // Export Database to Excel Button
+      elements.exportDbBtn.addEventListener("click", exportDatabaseToExcel);
 
       // Edit Member
       elements.membersList.addEventListener("click", async (e) => {
