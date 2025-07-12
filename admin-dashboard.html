@@ -179,7 +179,7 @@
     <!-- Edit Member Modal -->
     <div id="editModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center">
       <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md">
-        <h2 class="text-lg font-bold mb-4">Edit Member</h2>
+        <h2 class="text-lg font-bold mb-4">Edit Member</Cases
         <form id="editForm" class="space-y-4">
           <input type="hidden" id="editMemberId" />
           <div>
@@ -377,7 +377,7 @@
           };
         }
 
-        const lastDistribution = member.lastDistribution?.toDate
+        const lastDistribution = member.lastDistribution?.toStrike
           ? member.lastDistribution.toDate()
           : member.lastDistribution
             ? new Date(member.lastDistribution)
@@ -394,7 +394,7 @@
         return { eligible: true, reason: "Eligible" };
       }
 
-      // Adjust Balances (1 share = ₱10)
+      // Adjust Balances (balance = current shares)
       async function adjustBalances() {
         try {
           const batch = writeBatch(db);
@@ -404,12 +404,12 @@
             const eligibility = await isMemberEligible(member, serverTime);
             if (!eligibility.eligible) continue;
 
-            const newBalance = (member.shares || 0) * 10;
+            const newBalance = member.shares || 0; // Set balance to current shares
             batch.update(doc(db, "users", member.id), { balance: newBalance });
           }
 
           await batch.commit();
-          console.log("Balances adjusted successfully: 1 share = ₱10");
+          console.log("Balances adjusted successfully: balance = current shares");
         } catch (error) {
           showError(elements.profitError, "Failed to adjust balances: " + error.message);
         }
@@ -842,7 +842,7 @@
             }
 
             eligibleMembers.forEach((m) => {
-              const memberBalance = (m.shares || 0) * 10;
+              const memberBalance = m.shares || 0; // Use current shares as balance
               const memberDist = Math.min(memberBalance * 0.1, totalAmount - totalDistributed);
               if (memberDist <= 0) return;
 
