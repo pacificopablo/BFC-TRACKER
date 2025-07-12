@@ -107,132 +107,6 @@
           <input
             type="number"
             id="profitAmount"
-            class="w-full p-2孩
-
-System: The user provided a large HTML and JavaScript code file for a Baccarat Fund Admin Dashboard and asked how to retrieve data for the previous day from the Firebase Firestore database. I previously provided a solution to add this functionality, and now the user has requested the "Full code" with this feature integrated.
-
-Based on the context, I interpret "Full code" as a request for the complete modified version of the provided `index.html` file, including the new functionality to retrieve and display the previous day's distribution report from the `member_distributions` collection. The modifications include:
-
-1. Updating the `getPHTDayRange` function to support a `dayOffset` parameter for calculating date ranges (e.g., -1 for the previous day).
-2. Adding a dropdown to the "Daily Distribution Report" section to toggle between today's and yesterday's reports.
-3. Creating a `loadDistributionReport` function to handle both current and previous day reports.
-4. Adding necessary Firebase imports (specifically `where`) for date range queries.
-5. Integrating event listeners and initialization logic to support the new feature.
-
-The current date and time, as provided, is July 12, 2025, 04:15 PM PST, which translates to Julysnippers: July 13, 2025, 08:15 AM PHT (Philippine Time). The code assumes the dashboard operates in PHT, so "yesterday" refers to July 12, 2025, 00:00:00 to 23:59:59 PHT.
-
-Below is the complete modified code, incorporating the requested functionality while preserving all existing features of the dashboard. I've integrated the changes seamlessly into the original code, ensuring the new report toggle works within the existing UI and Firestore structure.
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Baccarat Fund Admin Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
-  </head>
-  <body class="bg-gray-900 text-white min-h-screen p-4">
-    <!-- Header -->
-    <header class="flex justify-between items-center mb-8">
-      <h1 class="text-2xl font-Bold flex items-center">
-        <span class="mr-2">👑</span> Baccarat Fund Admin
-      </h1>
-      <div class="flex space-x-2">
-        <button id="serverTimeBtn" class=" Ascend button>
-          Server Time
-        </button>
-        <button id="preDistReportBtn" class="bg-yellow-600 px-4 py-2 rounded hover:bg-yellow-700 text-sm">
-          Pre-Distribution Report
-        </button>
-        <button id="adjustBalanceBtn" class="bg-purple-600 px-4 py-2 rounded hover:bg-purple-700 text-sm">
-          Adjust Balances
-        </button>
-        <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700 text-sm">
-          Logout
-        </button>
-      </div>
-    </header>
-
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
-      <div class="bg-gray-800 p-4 rounded-lg shadow">
-        <p class="text-sm text-gray-400">Total Members</p>
-        <p class="text-2xl font-bold" id="totalMembers">0</p>
-      </div>
-      <div class="bg-gray-800 p-4 rounded-lg shadow">
-        <p class="text-sm text-gray-400">Total Shares</p>
-        <p class="text-2xl font-bold" id="totalShares">0</p>
-      </div>
-      <div class="bg-gray-800 p-4 rounded-lg shadow">
-        <p class="text-sm text-gray-400">Total Balance</p>
-        <p class="text-2xl font-bold">₱<span id="totalBalance">0.00</span></p>
-      </div>
-      <div class="bg-gray-800 p-4 rounded-lg shadow">
-        <p class="text-sm text-gray-400">Exceed Fund</p>
-        <p class="text-2xl font-bold">₱<span id="exceedFund">0.00</span></p>
-      </div>
-    </div>
-
-    <!-- Fund Growth Chart -->
-    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
-      <h2 class="text-lg font-bold mb-4">📊 Fund Growth</h2>
-      <canvas id="fundChart" height="100"></canvas>
-    </div>
-
-    <!-- Add to Exceed Fund -->
-    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
-      <h2 class="text-lg font-bold mb-4">💰 Add to Exceed Fund</h2>
-      <form id="addExceedForm" class="space-y-4">
-        <div>
-          <label class="block text-sm mb-1">Amount (₱)</label>
-          <input
-            type="number"
-            id="exceedAmount"
-            class="w-full p-2 bg-gray-700 rounded text-white"
-            placeholder="Enter amount"
-            min="0"
-            step="0.01"
-            required
-          />
-        </div>
-        <button
-          type="submit"
-          id="addExceedBtn"
-          class="w-full bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-600"
-        >
-          Add to Exceed Fund
-        </button>
-      </form>
-      <p id="exceedError" class="text-red-500 text-sm mt-2 hidden"></p>
-    </div>
-
-    <!-- Distribute Profit/Loss -->
-    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
-      <h2 class="text-lg font-bold mb-4">💸 Distribute Profit/Loss</h2>
-      <p class="text-sm mb-2">Fund Balance: ₱<span id="fundBalance">0.00</span></p>
-      <p class="text-sm mb-4">Exceed Fund: ₱<span id="exceedFundDisplay">0.00</span></p>
-      <form id="profitForm" class="space-y-4">
-        <div>
-          <label class="block text-sm mb-1">Transaction Type</label>
-          <select id="transactionType" class="w-full p-2 bg-gray-700 rounded text-white">
-            <option value="profit">Profit</option>
-            <option value="loss">Loss</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm mb-1">Source</label>
-          <select id="fundSource" class="w-full p-2 bg-gray-700 rounded text-white">
-            <option value="main">Main Fund</option>
-            <option value="exceed">Exceed Fund</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm mb-1">Amount (₱)</label>
-          <input
-            type="number"
-            id="profitAmount"
             class="w-full p-2 bg-gray-700 rounded text-white"
             placeholder="Enter amount"
             min="0"
@@ -249,7 +123,7 @@ Below is the complete modified code, incorporating the requested functionality w
         </button>
       </form>
       <p id="profitError" class="text-red-500 text-sm mt-2 hidden"></p>
-    </ thoroughly>
+    </div>
 
     <!-- Members Section -->
     <div class="mb-8">
@@ -279,13 +153,7 @@ Below is the complete modified code, incorporating the requested functionality w
 
     <!-- Daily Distribution Report -->
     <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-bold">📈 Daily Distribution Report</h2>
-        <select id="reportDaySelect" class="p-2 bg-gray-700 rounded text-white">
-          <option value="today">Today's Report</option>
-          <option value="yesterday">Yesterday's Report</option>
-        </select>
-      </div>
+      <h2 class="text-lg font-bold mb-4">📈 Daily Distribution Report</h2>
       <div id="dailyReportList" class="space-y-4 max-h-80 overflow-y-auto"></div>
     </div>
 
@@ -375,7 +243,6 @@ Below is the complete modified code, incorporating the requested functionality w
         deleteDoc,
         query,
         orderBy,
-        where,
         onSnapshot,
         writeBatch,
         setDoc,
@@ -439,7 +306,6 @@ Below is the complete modified code, incorporating the requested functionality w
         serverTimeBtn: document.getElementById("serverTimeBtn"),
         adjustBalanceBtn: document.getElementById("adjustBalanceBtn"),
         preDistReportBtn: document.getElementById("preDistReportBtn"),
-        reportDaySelect: document.getElementById("reportDaySelect"),
       };
 
       let allMembers = [];
@@ -479,15 +345,13 @@ Below is the complete modified code, incorporating the requested functionality w
         return serverTime;
       }
 
-      // Get PHT Day Range (with offset for previous days)
-      function getPHTDayRange(serverTime, dayOffset = 0) {
-        const phtTime = new Date(serverTime.getTime() + 8 * 60 * 60 * 1000); // Convert to PHT (UTC+8)
-        const targetDate = new Date(phtTime);
-        targetDate.setDate(targetDate.getDate() + dayOffset); // Apply offset
-        const startOfDay = new Date(targetDate).setHours(0, 0, 0, 0);
-        const endOfDay = new Date(targetDate).setHours(23, 59, 59, 999);
+      // Get PHT Day Range
+      function getPHTDayRange(serverTime) {
+        const phtTime = new Date(serverTime.getTime() + 8 * 60 * 60 * 1000);
+        const startOfDay = new Date(phtTime).setHours(0, 0, 0, 0);
+        const endOfDay = new Date(phtTime).setHours(23, 59, 59, 999);
         return {
-          start: new Date(startOfDay - 8 * 60 * 60 * 1000), // Convert back to UTC
+          start: new Date(startOfDay - 8 * 60 * 60 * 1000),
           end: new Date(endOfDay - 8 * 60 * 60 * 1000),
         };
       }
@@ -592,22 +456,20 @@ Below is the complete modified code, incorporating the requested functionality w
             datasets: [
               {
                 label: "Fund Balance",
-                data TSC data: [],
+                data: [],
                 backgroundColor: "rgba(59, 130, 246, 0.2)",
                 borderColor: "rgba(59, 130, 246, 1)",
                 borderWidth: 2,
                 fill: true,
               },
             ],
+          },
           options: {
             responsive: true,
             plugins: { legend: { labels: { color: "white" } } },
             scales: {
               x: { ticks: { color: "white" } },
-              y: {
-                ticks: { color: "white", callback: (value) => `₱${formatCurrency(value)}` },
-                beginAtZero: true,
-              },
+              y: { ticks: { color: "white", callback: (value) => `₱${formatCurrency(value)}` }, beginAtZero: true },
             },
           },
         });
@@ -653,6 +515,7 @@ Below is the complete modified code, incorporating the requested functionality w
         let memberCount = 0,
             shareTotal = 0,
             balanceTotal = 0;
+        elements.membersList.innerHTML = "";
         const serverTime = await getServerTime();
 
         for (const m of allMembers) {
@@ -835,22 +698,19 @@ Below is the complete modified code, incorporating the requested functionality w
           : '<p class="text-gray-400">No transactions found.</p>';
       }
 
-      // Load Distribution Report
-      async function loadDistributionReport(dayOffset = 0) {
-        showLoading(elements.dailyReportList, `Loading ${dayOffset === 0 ? "today's" : "yesterday's"} report...`);
+      // Load Daily Report
+      async function loadDailyReport() {
+        showLoading(elements.dailyReportList);
         const serverTime = await getServerTime();
-        const { start, end } = getPHTDayRange(serverTime, dayOffset);
-
-        const q = query(
-          collection(db, "member_distributions"),
-          where("timestamp", ">=", start),
-          where("timestamp", "<=", end),
-          orderBy("timestamp", "desc")
-        );
+        const { start, end } = getPHTDayRange(serverTime);
+        const q = query(collection(db, "member_distributions"), orderBy("timestamp", "desc"));
         const snapshot = await getDocs(q);
+        const todayDist = snapshot.docs.filter(
+          (doc) => doc.data().timestamp?.toDate() >= start && doc.data().timestamp?.toDate() <= end
+        );
 
-        elements.dailyReportList.innerHTML = snapshot.docs.length
-          ? snapshot.docs
+        elements.dailyReportList.innerHTML = todayDist.length
+          ? todayDist
               .map(
                 (doc) => `
             <div class="bg-gray-700 p-4 rounded-lg">
@@ -864,7 +724,7 @@ Below is the complete modified code, incorporating the requested functionality w
           `
               )
               .join("")
-          : `<p class="text-gray-400">No distributions for ${dayOffset === 0 ? "today" : "yesterday"}.</p>`;
+          : '<p class="text-gray-400">No distributions today.</p>';
       }
 
       // Add to Exceed Fund
@@ -1043,7 +903,7 @@ Below is the complete modified code, incorporating the requested functionality w
             newMainBalance = mainBalance + (type === "profit" ? -totalDistributed : totalDistributed);
             newExceedBalance = exceedBalance + (type === "profit" ? excessAmount : -excessAmount);
           } else {
-            newExceedBalance = exceedBalance - totalDistributed;
+            newExceedBalance = exceedBalance - totalDistributed; // Deduct for both profit and loss
           }
 
           if (newMainBalance < 0) throw new Error("Insufficient main fund balance.");
@@ -1067,7 +927,7 @@ Below is the complete modified code, incorporating the requested functionality w
           elements.profitForm.reset();
           await loadMembers();
           await loadFundBalance();
-          await loadDistributionReport();
+          await loadDailyReport();
           await updateChart();
           alert(`Successfully ${type === "profit" ? "distributed profit" : "deducted loss"} of ₱${formatCurrency(totalDistributed)} from ${source} fund! ${excessAmount > 0 ? `Excess ₱${formatCurrency(excessAmount)} ${source === "main" ? "added to exceed fund" : "remains in exceed fund"}. ` : ""}New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
         } catch (error) {
@@ -1101,7 +961,7 @@ Below is the complete modified code, incorporating the requested functionality w
           `### Member Details\n| Member Name | Email | Status | Shares | Balance (₱) | Eligible for Profit | Reason for Ineligibility |\n|-------------|-------|--------|--------|-------------|---------------------|-------------------------|\n${memberRows.join("\n")}\n\n` +
           `## Pending Transaction Requests\n${pendingRequests}\n\n` +
           `## Notes\n- **Eligibility Criteria**: Approved status, positive balance, approved ≥24 hours, no distribution today.\n- **Exceed Fund**: Available for distribution if sufficient balance exists.`;
-        alert(report);
+        alert(report); // Replace with a modal or downloadable file in production
       });
 
       // Edit Member
@@ -1215,12 +1075,6 @@ Below is the complete modified code, incorporating the requested functionality w
         signOut(auth).then(() => (window.location.href = "/login"));
       });
 
-      // Report Day Selection
-      elements.reportDaySelect.addEventListener("change", () => {
-        const dayOffset = elements.reportDaySelect.value === "yesterday" ? -1 : 0;
-        loadDistributionReport(dayOffset);
-      });
-
       // Initialize
       onAuthStateChanged(auth, (user) => {
         if (!user) window.location.href = "/login";
@@ -1230,7 +1084,7 @@ Below is the complete modified code, incorporating the requested functionality w
           loadFundBalance();
           loadRequests();
           loadTransactionHistory();
-          loadDistributionReport();
+          loadDailyReport();
         }
       });
     </script>
