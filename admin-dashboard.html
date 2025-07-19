@@ -403,20 +403,16 @@
         return { eligible: true, reason: "Eligible" };
       }
 
-      // Adjust Balances (1 share = 10 pesos)
+      // Adjust Balances (1 share = 10 pesos, no eligibility check)
       async function adjustBalances() {
         if (!confirm("Are you sure you want to update all member shares? Each share will be calculated as ₱10 per share based on the latest balance.")) {
           return;
         }
         try {
           const batch = writeBatch(db);
-          const serverTime = await getServerTime();
 
           for (const member of allMembers) {
-            const eligibility = await isMemberEligible(member, serverTime);
-            if (!eligibility.eligible) continue;
-
-            // Calculate shares: 1 share = 10 pesos
+            // Calculate shares: 1 share = 10 pesos, no eligibility check
             const newShares = Math.floor((member.balance || 0) / 10);
             batch.update(doc(db, "users", member.id), { shares: newShares });
           }
