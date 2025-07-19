@@ -323,6 +323,7 @@
       const SUBMISSION_COOLDOWN = 5000;
       const HOURS_THRESHOLD = 24;
       let lastSubmissionTime = 0;
+      let lastAutoUpdateDate = null; // Track last auto-update date
 
       // Utility Functions
       const formatCurrency = (value) =>
@@ -357,6 +358,31 @@
           console.error("Error fetching server time:", error);
           throw error;
         }
+      }
+
+      // Get Current Time in PST (Asia/Manila)
+      function getPHTTime() {
+        const options = { timeZone: "Asia/Manila", hour12: false };
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat("en-US", {
+          ...options,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const parts = formatter.formatToParts(now);
+        const dateObj = {
+          year: parseInt(parts.find((p) => p.type === "year").value),
+          month: parseInt(parts.find((p) => p.type === "month").value) - 1,
+          day: parseInt(parts.find((p) => p.type === "day").value),
+          hour: parseInt(parts.find((p) => p.type === "hour").value),
+          minute: parseInt(parts.find((p) => p.type === "minute").value),
+          second: parseInt(parts.find((p) => p.type === "second").value),
+        };
+        return new Date(dateObj.year, dateObj.month, dateObj.day, dateObj.hour, dateObj.minute, dateObj.second);
       }
 
       // Check Member Eligibility (for profits only)
@@ -397,14 +423,18 @@
         return { eligible: true, reason: "Eligible" };
       }
 
+      // Get PH Day Range
+      function getPHTDayRange(date) {
+        const start = new Date(date);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(start);
+        end.setHours(23, 59, 59, 999);
+        return { start, end };
+      }
+
       // Adjust Balances (1 share = 10 pesos, no eligibility check)
       async function adjustBalances() {
         console.log("adjustBalances: Starting share update process");
-        if (!confirm("Are you sure you want to update all member shares? Each share will be calculated as ₱10 per share based on the latest balance.")) {
-          console.log("adjustBalances: Update cancelled by user");
-          return;
-        }
-
         try {
           console.log("adjustBalances: Fetching members");
           const snapshot = await getDocs(collection(db, "users"));
@@ -432,7 +462,6 @@
           await batch.commit();
           console.log("adjustBalances: Batch committed successfully");
 
-          alert("Shares updated successfully: 1 share = ₱10 based on latest balance.");
           await loadMembers();
           await loadFundBalance();
           console.log("adjustBalances: UI refreshed with updated members and fund balance");
@@ -440,6 +469,37 @@
           console.error("adjustBalances: Error updating shares:", error);
           showError(elements.profitError, "Failed to update shares: " + error.message);
         }
+      }
+
+      // Auto-Update Shares Every Sunday at 00:00 PST
+      function scheduleAutoUpdate() {
+        console.log("scheduleAutoUpdate: Initializing auto-update scheduler");
+        setInterval(async () => {
+          try {
+            const now = getPHTTime();
+            console.log("scheduleAutoUpdate: Checking time in PST:", now.toLocaleString("en-PH", { timeZone: "Asia/Manila" }));
+            const isSunday = now.getDay() === 0; // Sunday is 0
+            const isMidnight = now.getHours() === 0 && now.getMinutes() === 0;
+
+            // Format current date as YYYY-MM-DD for comparison
+            const currentDateStr = now.toISOString().slice(0, 10);
+
+            if (isSunday && isMidnight && lastAutoUpdateDate !== currentDateStr) {
+              console.log("scheduleAutoUpdate: Triggering auto-update for Sunday at 00:00 PST");
+              lastAutoUpdateDate = currentDateStr; // Update to prevent duplicate runs
+              await adjustBalances();
+              console.log("scheduleAutoUpdate: Auto-update completed");
+            } else {
+              console.log(
+                "scheduleAutoUpdate: Skipping update - Not Sunday at 00:00 PST or already updated today",
+                { isSunday, isMidnight, lastAutoUpdateDate }
+              );
+            }
+          } catch (error) {
+            console.error("scheduleAutoUpdate: Error in scheduler:", error);
+            showError(elements.profitError, "Auto-update failed: " + error.message);
+          }
+        }, 60000); // Check every minute
       }
 
       // Load Fund and Exceed Fund Balances
@@ -1307,7 +1367,7 @@
           const id = elements.editMemberId.value;
           await updateDoc(doc(db, "users", id), {
             name: elements.editName.value,
-            email: elements.editEmail.value,
+            email: members.editEmail.value,
             status: elements.editStatus.value,
             shares: parseInt(elements.editShares.value),
             balance: parseFloat(elements.editBalance.value),
@@ -1394,6 +1454,10 @@
       // Adjust Balance Button
       elements.adjustBalanceBtn.addEventListener("click", async () => {
         console.log("adjustBalanceBtn: Clicked");
+        if (!confirm("Are you sure you want to update all member shares? Each share will be calculated as ₱10 per share based on the latest balance.")) {
+          console.log("adjustBalanceBtn: Update cancelled by user");
+          return;
+        }
         await adjustBalances();
       });
 
@@ -1420,6 +1484,7 @@
           loadRequests();
           loadTransactionHistory();
           loadDailyReport();
+          scheduleAutoUpdate(); // Start the auto-update scheduler
         }
       });
     </script>
