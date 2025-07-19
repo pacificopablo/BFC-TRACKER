@@ -22,7 +22,7 @@
           Pre-Distribution Report
         </button>
         <button id="adjustBalanceBtn" class="bg-purple-600 px-4 py-2 rounded hover:bg-purple-700 text-sm">
-          Adjust Balances
+          Update Shares (₱10/Share)
         </button>
         <button id="exportExcelBtn" class="bg-green-600 px-4 py-2 rounded hover:bg-green-700 text-sm">
           Export Report to Excel
@@ -403,8 +403,11 @@
         return { eligible: true, reason: "Eligible" };
       }
 
-      // Adjust Balances (use latest balance)
+      // Adjust Balances (1 share = 10 pesos)
       async function adjustBalances() {
+        if (!confirm("Are you sure you want to update all member shares? Each share will be calculated as ₱10 per share based on the latest balance.")) {
+          return;
+        }
         try {
           const batch = writeBatch(db);
           const serverTime = await getServerTime();
@@ -413,16 +416,16 @@
             const eligibility = await isMemberEligible(member, serverTime);
             if (!eligibility.eligible) continue;
 
-            // Use the member's latest balance to calculate shares
+            // Calculate shares: 1 share = 10 pesos
             const newShares = Math.floor((member.balance || 0) / 10);
             batch.update(doc(db, "users", member.id), { shares: newShares });
           }
 
           await batch.commit();
-          console.log("Balances adjusted successfully: shares updated based on latest balance");
-          alert("Balances adjusted successfully: shares updated based on latest balance.");
+          console.log("Shares updated successfully: 1 share = ₱10 based on latest balance");
+          alert("Shares updated successfully: 1 share = ₱10 based on latest balance.");
         } catch (error) {
-          showError(elements.profitError, "Failed to adjust balances: " + error.message);
+          showError(elements.profitError, "Failed to update shares: " + error.message);
         }
       }
 
@@ -1132,7 +1135,7 @@
         const report = `# Pre-Distribution Report\n*Generated on ${serverTime.toLocaleString("en-PH")}*\n\n` +
           `## Fund Balances\n- **Main Fund Balance**: ₱${formatCurrency(mainBalance)}\n- **Exceed Fund Balance**: ₱${formatCurrency(exceedBalance)}\n\n` +
           `## Member Summary\n- **Total Members**: ${allMembers.length}\n- **Total Shares**: ${allMembers.reduce((sum, m) => sum + (m.shares || 0), 0)}\n- **Total Member Balance**: ₱${formatCurrency(allMembers.reduce((sum, m) => sum + (m.balance || 0), 0))}\n\n` +
-          `### Member Details\n| Member Name | Email | Status | Shares | Balance (₱) | Eligible for Profit | Reason for Ineligibility |\n|-------------|-------|--------|--------|-------------|---------------------|-------------------------|\n${memberRows.join("\n")}\n\n` +
+          `## Member Details\n| Member Name | Email | Status | Shares | Balance (₱) | Eligible for Profit | Reason for Ineligibility |\n|-------------|-------|--------|--------|-------------|---------------------|-------------------------|\n${memberRows.join("\n")}\n\n` +
           `## Pending Transaction Requests\n${pendingRequests}\n\n` +
           `## Notes\n- **Eligibility Criteria**: Approved status, positive balance, approved ≥24 hours, no distribution today.\n- **Exceed Fund**: Available for distribution if sufficient balance exists.`;
         alert(report);
@@ -1210,12 +1213,12 @@
             if (data.type === "deposit") {
               batch.update(doc(db, "users", data.memberId), {
                 balance: (user.balance || 0) + data.amount,
-                shares: (user.shares || 0) + data.amount / 10,
+                shares: Math.floor(((user.balance || 0) + data.amount) / 10),
               });
             } else if (data.type === "cashout" && (user.balance || 0) >= data.amount) {
               batch.update(doc(db, "users", data.memberId), {
                 balance: Math.max(0, (user.balance || 0) - data.amount),
-                shares: Math.max(0, (user.shares || 0) - data.amount / 10),
+                shares: Math.floor(Math.max(0, (user.balance || 0) - data.amount) / 10),
               });
             } else {
               throw new Error("Insufficient balance for cashout.");
