@@ -110,12 +110,12 @@
           </select>
         </div>
         <div>
-          <label class="block text-sm mb-1">Amount (₱)</label>
+          <label class="block text-sm mb-1">Amount (₱ for Profit, % for Loss)</label>
           <input
             type="number"
             id="profitAmount"
             class="w-full p-2 bg-gray-700 rounded text-white"
-            placeholder="Enter amount"
+            placeholder="Enter amount or percentage"
             min="0"
             step="0.01"
             required
@@ -1116,8 +1116,8 @@
         try {
           const type = elements.transactionType.value;
           const source = elements.fundSource.value;
-          const totalAmount = parseFloat(elements.profitAmount.value);
-          if (totalAmount <= 0) throw new Error("Amount must be greater than 0.");
+          const inputValue = parseFloat(elements.profitAmount.value);
+          if (inputValue <= 0) throw new Error("Amount or percentage must be greater than 0.");
 
           const fundSnap = await getDocs(collection(db, "fund"));
           const fundDoc = fundSnap.docs[0];
@@ -1134,14 +1134,16 @@
           let eligibleMembers = [];
           let totalShares = 0;
 
-          if (source === "exceed" && exceedBalance < totalAmount) {
-            throw new Error("Insufficient exceed fund balance.");
-          }
-          if (source === "main" && mainBalance < totalAmount) {
-            throw new Error("Insufficient main fund balance.");
-          }
-
           if (type === "profit") {
+            // Handle profit distribution
+            const totalAmount = inputValue;
+            if (source === "exceed" && exceedBalance < totalAmount) {
+              throw new Error("Insufficient exceed fund balance.");
+            }
+            if (source === "main" && mainBalance < totalAmount) {
+              throw new Error("Insufficient main fund balance.");
+            }
+
             eligibleMembers = (
               await Promise.all(
                 allMembers.map(async (m) => ((await isMemberEligible(m, serverTime)).eligible ? m : null))
@@ -1198,15 +1200,15 @@
               });
             });
           } else {
-            eligibleMembers = allMembers.filter((m) => m.status !== "pending" && m.shares > 0);
+            // Handle loss distribution (percentage-based)
+            const lossPercentage = inputValue / 100; // Convert percentage to decimal
+            eligibleMembers = allMembers.filter((m) => m.status !== "pending" && m.balance > 0);
             totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
 
-            if (!eligibleMembers.length) throw new Error("No members with non-pending status and positive shares.");
-
-            const lossPerMember = totalAmount / eligibleMembers.length;
+            if (!eligibleMembers.length) throw new Error("No members with non-pending status and positive balance.");
 
             eligibleMembers.forEach((m) => {
-              const memberDist = Math.min(lossPerMember, m.balance);
+              const memberDist = m.balance * lossPercentage; // Deduct percentage of member's balance
               if (memberDist <= 0) return;
 
               const newBalance = Math.max(0, m.balance - memberDist);
@@ -1215,6 +1217,7 @@
               batch.update(doc(db, "users", m.id), {
                 balance: newBalance,
                 lastDistribution: serverTimestamp(),
+                shares: Math.floor(newBalance / 10), // Update shares based on new balance
               });
 
               batch.set(doc(collection(db, "member_distributions")), {
@@ -1228,16 +1231,14 @@
             });
           }
 
-          if (totalDistributed > totalAmount) throw new Error("Insufficient amount to distribute.");
-          const excessAmount = totalAmount - totalDistributed;
           let newMainBalance = mainBalance;
           let newExceedBalance = exceedBalance;
 
           if (source === "main") {
             newMainBalance = mainBalance + (type === "profit" ? -totalDistributed : totalDistributed);
-            newExceedBalance = exceedBalance + (type === "profit" ? excessAmount : -excessAmount);
+            newExceedBalance = exceedBalance + (type === "profit" ? totalDistributed - inputValue : 0);
           } else {
-            newExceedBalance = exceedBalance - totalDistributed;
+            newExceedBalance = exceedBalance - (type === "profit" ? totalDistributed : totalDistributed);
           }
 
           if (newMainBalance < 0) throw new Error("Insufficient main fund balance.");
@@ -1249,7 +1250,7 @@
             type,
             source,
             amount: totalDistributed,
-            excessAmount: excessAmount > 0 ? excessAmount : 0,
+            excessAmount: type === "profit" ? Math.max(0, inputValue - totalDistributed) : 0,
             timestamp: serverTimestamp(),
             adminId: auth.currentUser.uid,
             eligibleMemberCount: eligibleMembers.length,
@@ -1263,7 +1264,7 @@
           await loadFundBalance();
           await loadDailyReport();
           await updateChart();
-          alert(`Successfully ${type === "profit" ? "distributed profit" : "deducted loss"} of ₱${formatCurrency(totalDistributed)} from ${source} fund! ${excessAmount > 0 ? `Excess ₱${formatCurrency(excessAmount)} ${source === "main" ? "added to exceed fund" : "remains in exceed fund"}. ` : ""}New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
+          alert(`Successfully ${type === "profit" ? "distributed profit" : "deducted loss"} of ₱${formatCurrency(totalDistributed)} from ${source} fund! ${type === "profit" && inputValue > totalDistributed ? `Excess ₱${formatCurrency(inputValue - totalDistributed)} ${source === "main" ? "added to exceed fund" : "remains in exceed fund"}. ` : ""}New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
           console.log("profitForm: Successfully processed", type, "of ₱", totalDistributed);
         } catch (error) {
           console.error("profitForm: Error:", error);
@@ -1365,22 +1366,53 @@
         e.preventDefault();
         try {
           const id = elements.editMemberId.value;
+          const name = elements.editName.value;
+          const email = elements.editEmail.value;
+          const status = elements.editStatus.value;
+          const shares = parseInt(elements.editShares.value);
+          const balance = parseFloat(elements.editBalance.value);
+          const approvalDate = elements.editApprovalDate.value;
+
+          // Input validation
+          if (!name || !email || !status) {
+            throw new Error("All fields are required.");
+          }
+          if (isNaN(shares) || shares < 0) {
+            throw new Error("Shares must be a non-negative number.");
+          }
+          if (isNaN(balance) || balance < 0) {
+            throw new Error("Balance must be a non-negative number.");
+          }
+          if (!approvalDate) {
+            throw new Error("Approval date is required.");
+          }
+
+          console.log("editForm: Submitting update for member ID:", id);
+          console.log("editForm: Form values:", { name, email, status, shares, balance, approvalDate });
+
           await updateDoc(doc(db, "users", id), {
-            name: elements.editName.value,
-            email: members.editEmail.value,
-            status: elements.editStatus.value,
-            shares: parseInt(elements.editShares.value),
-            balance: parseFloat(elements.editBalance.value),
-            approvalDate: new Date(elements.editApprovalDate.value),
+            name,
+            email,
+            status,
+            shares,
+            balance,
+            approvalDate: new Date(approvalDate),
           });
           elements.editModal.classList.add("hidden");
           elements.editForm.reset();
           await loadMembers();
           await loadFundBalance();
+          alert("Member updated successfully!");
           console.log("editForm: Member updated, UI refreshed");
         } catch (error) {
           console.error("editForm: Error:", error);
-          showError(elements.profitError, "Failed to update member: " + error.message);
+          let message = "Failed to update member: " + error.message;
+          if (error.code === "permission-denied") {
+            message = "You do not have permission to update this member.";
+          } else if (error.code === "not-found") {
+            message = "Member not found in the database.";
+          }
+          showError(elements.profitError, message);
         }
       });
 
