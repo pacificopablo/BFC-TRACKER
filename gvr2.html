@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Baccarat Fund Member Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  </head>
+  <body class="bg-gray-900 text-white min-h-screen p-4">
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-8">
+      <h1 class="text-2xl font-bold flex items-center">
+        <span class="mr-2">👑</span> Baccarat Fund Member Dashboard
+      </h1>
+      <div class="flex space-x-2">
+        <button id="serverTimeBtn" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 text-sm">
+          Server Time
+        </button>
+        <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700 text-sm">
+          Logout
+        </button>
+      </div>
+    </header>
+
+    <!-- Member Details -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">👤 Your Account</h2>
+      <div id="memberDetails" class="space-y-3 text-sm">
+        <div class="flex justify-between">
+          <span><strong>Name:</strong></span>
+          <span id="memberName" class="text-gray-300">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Email:</strong></span>
+          <span id="memberEmail" class="text-gray-300">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Status:</strong></span>
+          <span id="memberStatus" class="px-2 py-1 rounded">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Shares:</strong></span>
+          <span id="memberShares" class="text-gray-300">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Total Balance:</strong></span>
+          <span id="memberBalance" class="text-gray-300">₱Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Eligible Balance:</strong></span>
+          <span id="memberEligibleBalance" class="text-gray-300">₱Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Approval Date:</strong></span>
+          <span id="memberApprovalDate" class="text-gray-300">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Last Distribution:</strong></span>
+          <span id="memberLastDistribution" class="text-gray-300">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Eligible for Distribution:</strong></span>
+          <span id="memberEligibility" class="text-gray-300">Loading...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fund Growth Chart -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">📊 Fund Growth</h2>
+      <canvas id="fundChart" height="100"></canvas>
+    </div>
+
+    <!-- Submit Transaction Request -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">💸 Submit Transaction Request</h2>
+      <form id="transactionForm" class="space-y-4">
+        <div>
+          <label class="block text-sm mb-1">Transaction Type</label>
+          <select id="transactionType" class="w-full p-2 bg-gray-700 rounded text-white" required>
+            <option value="deposit">Deposit</option>
+            <option value="cashout">Cash Out</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Amount (₱)</label>
+          <input
+            type="number"
+            id="transactionAmount"
+            class="w-full p-2 bg-gray-700 rounded text-white"
+            placeholder="Enter amount"
+            min="0.01"
+            step="0.01"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          id="submitTransactionBtn"
+          class="w-full bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600"
+        >
+          Submit Request
+        </button>
+      </form>
+      <p id="transactionError" class="text-red-500 text-sm mt-2 hidden"></p>
+    </div>
+
+    <!-- Transaction History -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">📜 Transaction History</h2>
+      <div class="flex flex-col sm:flex-row justify-between mb-4 space-y-2 sm:space-y-0 sm:space-x-2">
+        <select id="historyFilter" class="p-2 bg-gray-700 rounded text-white">
+          <option value="all">All Transactions</option>
+          <option value="deposit">Deposits</option>
+          <option value="cashout">Cash Outs</option>
+        </select>
+        <select id="historySort" class="p-2 bg-gray-700 rounded text-white">
+          <option value="desc">Newest First</option>
+          <option value="asc">Oldest First</option>
+        </select>
+      </div>
+      <div id="historyList" class="space-y-4 max-h-80 overflow-y-auto"></div>
+    </div>
+
+    <!-- Distribution History -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow">
+      <h2 class="text-lg font-bold mb-4">📈 Distribution History</h2>
+      <div id="distributionList" class="space-y-4 max-h-80 overflow-y-auto"></div>
+    </div>
+
+    <script type="module">
+      // Firebase Imports
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+      import {
+        getFirestore,
+        collection,
+        getDocs,
+        getDoc,
+        doc,
+        setDoc,
+        query,
+        where,
+        orderBy,
+        onSnapshot,
+        serverTimestamp,
+        deleteDoc,
+      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+      import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+      // Firebase Config
+      const firebaseConfig = {
+        apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
+        authDomain: "bfc-tracker.firebaseapp.com",
+        projectId: "bfc-tracker",
+        storageBucket: "bfc-tracker.firebasestorage.app",
+        messagingSenderId: "127052459580",
+        appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
+        measurementId: "G-PNYRCFJHYM",
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      const auth = getAuth(app);
+
+      // DOM Elements
+      const elements = {
+        memberName: document.getElementById("memberName"),
+        memberEmail: document.getElementById("memberEmail"),
+        memberStatus: document.getElementById("memberStatus"),
+        memberShares: document.getElementById("memberShares"),
+        memberBalance: document.getElementById("memberBalance"),
+        memberEligibleBalance: document.getElementById("memberEligibleBalance"),
+        memberApprovalDate: document.getElementById("memberApprovalDate"),
+        memberLastDistribution: document.getElementById("memberLastDistribution"),
+        memberEligibility: document.getElementById("memberEligibility"),
+        memberDetails: document.getElementById("memberDetails"),
+        transactionForm: document.getElementById("transactionForm"),
+        transactionType: document.getElementById("transactionType"),
+        transactionAmount: document.getElementById("transactionAmount"),
+        submitTransactionBtn: document.getElementById("submitTransactionBtn"),
+        transactionError: document.getElementById("transactionError"),
+        historyList: document.getElementById("historyList"),
+        historyFilter: document.getElementById("historyFilter"),
+        historySort: document.getElementById("historySort"),
+        distributionList: document.getElementById("distributionList"),
+        logoutBtn: document.getElementById("logoutBtn"),
+        serverTimeBtn: document.getElementById("serverTimeBtn"),
+      };
+
+      let allTransactions = [];
+      let fundChartInstance = null;
+      const SUBMISSION_COOLDOWN = 5000;
+      const HOURS_THRESHOLD = 24;
+      let lastSubmissionTime = 0;
+
+      // Utility Functions
+      const formatCurrency = (value) =>
+        parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+
+      const showError = (message) => {
+        elements.transactionError.textContent = message;
+        elements.transactionError.classList.remove("hidden");
+        setTimeout(() => elements.transactionError.classList.add("hidden"), 5000);
+        console.error("Error:", message);
+      };
+
+      const showLoading = (element, message = "Loading...") => {
+        element.innerHTML = `<p class="text-gray-400">${message}</p>`;
+      };
+
+      const formatTimeRemaining = (milliseconds) => {
+        const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+        const minutes = Math.round((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+        return `${hours}h ${minutes}m`;
+      };
+
+      // Get Server Time
+      async function getServerTime() {
+        try {
+          const tempRef = doc(collection(db, "temp"));
+          await setDoc(tempRef, { timestamp: serverTimestamp() });
+          const docSnap = await getDoc(tempRef);
+          const serverTime = docSnap.exists() ? docSnap.data().timestamp.toDate() : new Date();
+          await deleteDoc(tempRef);
+          return serverTime;
+        } catch (error) {
+          console.error("Error fetching server time:", error);
+          throw error;
+        }
+      }
+
+      // Get PHT Day Range
+      function getPHTDayRange(serverTime) {
+        const phtTime = new Date(serverTime.getTime());
+        const startOfDay = new Date(phtTime).setHours(0, 0, 0, 0);
+        const endOfDay = new Date(phtTime).setHours(23, 59, 59, 999);
+        return {
+          start: new Date(startOfDay),
+          end: new Date(endOfDay),
+        };
+      }
+
+      // Check Member Eligibility
+      async function isMemberEligible(member, serverTime) {
+        if (member.status !== "approved") return { eligible: false, reason: "Not Approved" };
+
+        // Calculate eligible balance based on deposits older than 24 hours
+        const deposits = member.deposits || [];
+        const eligibleBalance = deposits.reduce((sum, deposit) => {
+          const depositDate = deposit.timestamp?.toDate ? deposit.timestamp.toDate() : new Date(deposit.timestamp);
+          const hoursSinceDeposit = (serverTime - depositDate) / (1000 * 60 * 60);
+          return hoursSinceDeposit >= HOURS_THRESHOLD ? sum + deposit.amount : sum;
+        }, 0);
+
+        if (eligibleBalance <= 0) return { eligible: false, reason: "No Eligible Balance" };
+
+        const approvalDate = member.approvalDate?.toDate
+          ? member.approvalDate.toDate()
+          : new Date(member.approvalDate);
+        if (!approvalDate || isNaN(approvalDate)) return { eligible: false, reason: "No Approval Date" };
+
+        const hoursSinceApproval = (serverTime - approvalDate) / (1000 * 60 * 60);
+        if (hoursSinceApproval < HOURS_THRESHOLD) {
+          const hoursRemaining = HOURS_THRESHOLD - hoursSinceApproval;
+          return {
+            eligible: false,
+            reason: `New Member (${hoursSinceApproval.toFixed(2)} hrs, ${formatTimeRemaining(
+              hoursRemaining * 60 * 60 * 1000
+            )} remaining)`,
+          };
+        }
+
+        const lastDistribution = member.lastDistribution?.toDate
+          ? member.lastDistribution.toDate()
+          : member.lastDistribution
+            ? new Date(member.lastDistribution)
+            : null;
+        if (lastDistribution && lastDistribution >= getPHTDayRange(serverTime).start) {
+          const nextDayStart = new Date(getPHTDayRange(serverTime).end.getTime() + 1);
+          const timeRemaining = nextDayStart - serverTime;
+          return {
+            eligible: false,
+            reason: `Already Received Today (${formatTimeRemaining(timeRemaining)} until next eligibility)`,
+          };
+        }
+
+        return { eligible: true, reason: "Eligible", eligibleBalance };
+      }
+
+      // Load Member Details
+      async function loadMemberDetails(userId) {
+        try {
+          console.log("Loading member details for userId:", userId);
+          const userDoc = await getDoc(doc(db, "users", userId));
+          if (!userDoc.exists()) {
+            showError("Member data not found.");
+            elements.memberDetails.innerHTML = '<p class="text-red-500">No member data available.</p>';
+            return;
+          }
+          const data = { id: userDoc.id, ...userDoc.data() };
+          console.log("Member data loaded:", data);
+          const serverTime = await getServerTime();
+          const eligibility = await isMemberEligible(data, serverTime);
+
+          elements.memberName.textContent = data.name || "N/A";
+          elements.memberEmail.textContent = data.email || "N/A";
+          elements.memberStatus.textContent = data.status || "N/A";
+          elements.memberStatus.className = `px-2 py-1 rounded text-sm ${
+            data.status === "approved"
+              ? "bg-green-600"
+              : data.status === "pending"
+                ? "bg-yellow-600"
+                : "bg-red-600"
+          }`;
+          elements.memberShares.textContent = data.shares || 0;
+          elements.memberBalance.textContent = formatCurrency(data.balance);
+          elements.memberEligibleBalance.textContent = formatCurrency(eligibility.eligibleBalance || 0);
+          elements.memberApprovalDate.textContent = data.approvalDate
+            ? new Date(data.approvalDate.toDate ? data.approvalDate.toDate() : data.approvalDate).toLocaleString("en-PH")
+            : "N/A";
+          elements.memberLastDistribution.textContent = data.lastDistribution
+            ? new Date(data.lastDistribution.toDate ? data.lastDistribution.toDate() : data.lastDistribution).toLocaleString("en-PH")
+            : "None";
+          elements.memberEligibility.textContent = eligibility.eligible ? "Yes" : `No (${eligibility.reason})`;
+          elements.memberEligibility.className = `text-sm ${
+            eligibility.eligible ? "text-green-400" : "text-red-400"
+          }`;
+        } catch (error) {
+          console.error("loadMemberDetails: Error:", error);
+          showError("Failed to load member details: " + error.message);
+          elements.memberDetails.innerHTML = '<p class="text-red-500">Error loading member data.</p>';
+        }
+      }
+
+      // Initialize Chart
+      function initializeChart() {
+        if (fundChartInstance) fundChartInstance.destroy();
+        const ctx = document.getElementById("fundChart").getContext("2d");
+        fundChartInstance = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "Fund Balance",
+                data: [],
+                backgroundColor: "rgba(59, 130, 246, 0.2)",
+                borderColor: "rgba(59, 130, 246, 1)",
+                borderWidth: 2,
+                fill: true,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { labels: { color: "white" } } },
+            scales: {
+              x: { ticks: { color: "white" } },
+              y: { ticks: { color: "white", callback: (value) => `₱${formatCurrency(value)}` }, beginAtZero: true },
+            },
+          },
+        });
+        console.log("initializeChart: Chart initialized");
+      }
+
+      // Update Chart
+      async function updateChart() {
+        try {
+          console.log("updateChart: Starting");
+          const fundSnap = await getDocs(collection(db, "fund"));
+          const initialBalance = fundSnap.empty ? 0 : fundSnap.docs[0].data().mainBalance || 0;
+          const q = query(collection(db, "profit_distributions"), orderBy("timestamp", "asc"));
+          const snapshot = await getDocs(q);
+          const labels = [];
+          const data = [];
+          let balance = initialBalance;
+
+          snapshot.docs.forEach((doc) => {
+            const d = doc.data();
+            const date = d.timestamp.toDate().toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+            if (!labels.includes(date)) {
+              labels.push(date);
+              balance += d.type === "profit" ? d.amount : -d.amount;
+              data.push(balance);
+            }
+          });
+
+          if (labels.length === 0) {
+            const now = await getServerTime();
+            labels.push(now.toLocaleDateString("en-PH", { month: "short", day: "numeric" }));
+            data.push(initialBalance);
+          }
+
+          fundChartInstance.data.labels = labels;
+          fundChartInstance.data.datasets[0].data = data;
+          fundChartInstance.update();
+          console.log("updateChart: Chart updated with labels:", labels, "data:", data);
+        } catch (error) {
+          console.error("updateChart: Error:", error);
+          showError("Failed to load fund chart data. Displaying static data.");
+          const now = await getServerTime();
+          fundChartInstance.data.labels = [now.toLocaleDateString("en-PH", { month: "short", day: "numeric" })];
+          fundChartInstance.data.datasets[0].data = [0];
+          fundChartInstance.update();
+        }
+      }
+
+      // Load Transaction History
+      function loadTransactionHistory(userId) {
+        showLoading(elements.historyList);
+        const q = query(
+          collection(db, "transactions"),
+          where("memberId", "==", userId),
+          orderBy("timestamp", "desc")
+        );
+        onSnapshot(
+          q,
+          (snapshot) => {
+            console.log("loadTransactionHistory: Snapshot received:", snapshot.docs.length, "documents");
+            allTransactions = snapshot.docs.map((doc) => ({
+              id: doc.id,
+              type: doc.data().type === "deposit" ? "Deposit" : "Cash Out",
+              filterType: doc.data().type,
+              amount: doc.data().amount,
+              timestamp: doc.data().timestamp?.toDate() || new Date(),
+              status: doc.data().status,
+            }));
+            displayTransactionHistory();
+          },
+          (error) => {
+            console.error("loadTransactionHistory: Error:", error);
+            showError("Failed to load transaction history: " + error.message);
+            elements.historyList.innerHTML = '<p class="text-red-500">Error loading transaction history.</p>';
+          }
+        );
+      }
+
+      // Display Transaction History
+      function displayTransactionHistory() {
+        console.log("displayTransactionHistory: Starting");
+        try {
+          const filter = elements.historyFilter.value;
+          const sort = elements.historySort.value;
+          let filtered = filter === "all" ? allTransactions : allTransactions.filter((t) => t.filterType === filter);
+          filtered.sort((a, b) => (sort === "desc" ? b.timestamp - a.timestamp : a.timestamp - b.timestamp));
+
+          elements.historyList.innerHTML = filtered.length
+            ? filtered
+                .map(
+                  (t) => `
+            <div class="bg-gray-700 p-4 rounded-lg">
+              <p><strong>Type:</strong> ${t.type}</p>
+              <p><strong>Amount:</strong> ₱${formatCurrency(t.amount)}</p>
+              <p><strong>Date:</strong> ${t.timestamp.toLocaleString("en-PH")}</p>
+              <p><strong>Status:</strong> <span class="px-2 py-1 rounded text-sm ${
+                t.status === "approved"
+                  ? "bg-green-600"
+                  : t.status === "pending"
+                    ? "bg-yellow-600"
+                    : "bg-red-600"
+              }">${t.status || "N/A"}</span></p>
+            </div>
+          `
+                )
+                .join("")
+            : '<p class="text-gray-400">No transactions found.</p>';
+          console.log("displayTransactionHistory: Displayed", filtered.length, "transactions");
+        } catch (error) {
+          console.error("displayTransactionHistory: Error:", error);
+          showError("Failed to display transaction history: " + error.message);
+        }
+      }
+
+      // Load Distribution History
+      function loadDistributionHistory(userId) {
+        showLoading(elements.distributionList);
+        const q = query(
+          collection(db, "member_distributions"),
+          where("memberId", "==", userId),
+          orderBy("timestamp", "desc")
+        );
+        onSnapshot(
+          q,
+          (snapshot) => {
+            console.log("loadDistributionHistory: Snapshot received:", snapshot.docs.length, "documents");
+            elements.distributionList.innerHTML = snapshot.docs.length
+              ? snapshot.docs
+                  .map(
+                    (doc) => `
+            <div class="bg-gray-700 p-4 rounded-lg">
+              <p><strong>Type:</strong> ${doc.data().type === "profit" ? "Profit" : "Loss"}</p>
+              <p><strong>Amount:</strong> ${doc.data().type === "profit" ? "+" : "-"}₱${formatCurrency(doc.data().amount)}</p>
+              <p><strong>Date:</strong> ${doc.data().timestamp?.toDate().toLocaleString("en-PH") || "N/A"}</p>
+            </div>
+          `
+                  )
+                  .join("")
+              : '<p class="text-gray-400">No distributions found.</p>';
+          },
+          (error) => {
+            console.error("loadDistributionHistory: Error:", error);
+            showError("Failed to load distribution history: " + error.message);
+            elements.distributionList.innerHTML = '<p class="text-red-500">Error loading distribution history.</p>';
+          }
+        );
+      }
+
+      // Submit Transaction Request
+      elements.transactionForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const now = Date.now();
+        if (now - lastSubmissionTime < SUBMISSION_COOLDOWN) {
+          showError(`Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (now - lastSubmissionTime)) / 1000)} seconds.`);
+          return;
+        }
+        lastSubmissionTime = now;
+        elements.submitTransactionBtn.disabled = true;
+
+        try {
+          const type = elements.transactionType.value;
+          const amount = parseFloat(elements.transactionAmount.value);
+          if (amount <= 0) throw new Error("Amount must be greater than 0.");
+
+          const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+          if (!userDoc.exists()) throw new Error("Member data not found.");
+
+          const userData = userDoc.data();
+          if (type === "cashout" && (userData.balance || 0) < amount) {
+            throw new Error("Insufficient balance for cash out.");
+          }
+
+          await setDoc(doc(collection(db, "transactions")), {
+            memberId: auth.currentUser.uid,
+            memberName: userData.name || "N/A",
+            type,
+            amount,
+            status: "pending",
+            timestamp: serverTimestamp(),
+          });
+
+          elements.transactionForm.reset();
+          alert(`Transaction request (${type}) of ₱${formatCurrency(amount)} submitted successfully!`);
+          console.log("Transaction request submitted:", { type, amount });
+        } catch (error) {
+          console.error("transactionForm: Error:", error);
+          showError(error.message);
+        } finally {
+          elements.submitTransactionBtn.disabled = false;
+        }
+      });
+
+      // History Filter/Sort
+      elements.historyFilter.addEventListener("change", () => {
+        console.log("historyFilter: Changed to", elements.historyFilter.value);
+        displayTransactionHistory();
+      });
+      elements.historySort.addEventListener("change", () => {
+        console.log("historySort: Changed to", elements.historySort.value);
+        displayTransactionHistory();
+      });
+
+      // Logout
+      elements.logoutBtn.addEventListener("click", async () => {
+        try {
+          await signOut(auth);
+          window.location.href = "/login.html";
+        } catch (error) {
+          console.error("logoutBtn: Error:", error);
+          showError("Failed to log out: " + error.message);
+        }
+      });
+
+      // Server Time
+      elements.serverTimeBtn.addEventListener("click", async () => {
+        try {
+          const time = await getServerTime();
+          alert(`Server Time: ${time.toLocaleString("en-PH")} (PHT)`);
+        } catch (error) {
+          console.error("serverTimeBtn: Error:", error);
+          showError("Failed to fetch server time: " + error.message);
+        }
+      });
+
+      // Auth Check
+      onAuthStateChanged(auth, (user) => {
+        if (!user) {
+          window.location.href = "/login.html";
+        } else {
+          console.log("User authenticated:", user.uid);
+          initializeChart();
+          loadMemberDetails(user.uid);
+          loadTransactionHistory(user.uid);
+          loadDistributionHistory(user.uid);
+          updateChart();
+        }
+      });
+    </script>
+  </body>
+</html>
