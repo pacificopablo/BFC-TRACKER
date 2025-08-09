@@ -24,17 +24,45 @@
     </header>
 
     <!-- Member Details -->
-    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+    <div class="bg-gray-800 p-6 rounded-lg shadow mb-8">
       <h2 class="text-lg font-bold mb-4">👤 Your Account</h2>
-      <div id="memberDetails" class="space-y-2">
-        <p><strong>Name:</strong> <span id="memberName">Loading...</span></p>
-        <p><strong>Email:</strong> <span id="memberEmail">Loading...</span></p>
-        <p><strong>Status:</strong> <span id="memberStatus" class="px-2 py-1 rounded">Loading...</span></p>
-        <p><strong>Shares:</strong> <span id="memberShares">Loading...</span></p>
-        <p><strong>Balance:</strong> ₱<span id="memberBalance">Loading...</span></p>
-        <p><strong>Approval Date:</strong> <span id="memberApprovalDate">Loading...</span></p>
-        <p><strong>Last Distribution:</strong> <span id="memberLastDistribution">Loading...</span></p>
-        <p><strong>Eligible for Distribution:</strong> <span id="memberEligibility">Loading...</span></p>
+      <div id="memberDetails" class="space-y-3 text-sm">
+        <div class="flex justify-between">
+          <span><strong>Name:</strong></span>
+          <span id="memberName" class="text-gray-300">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Email:</strong></span>
+          <span id="memberEmail" class="text-gray-300">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Status:</strong></span>
+          <span id="memberStatus" class="px-2 py-1 rounded">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Shares:</strong></span>
+          <span id="memberShares" class="text-gray-300">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Total Balance:</strong></span>
+          <span id="memberBalance" class="text-gray-300">₱Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Eligible Balance:</strong></span>
+          <span id="memberEligibleBalance" class="text-gray-300">₱Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Approval Date:</strong></span>
+          <span id="memberApprovalDate" class="text-gray-300">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Last Distribution:</strong></span>
+          <span id="memberLastDistribution" class="text-gray-300">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span><strong>Eligible for Distribution:</strong></span>
+          <span id="memberEligibility" class="text-gray-300">Loading...</span>
+        </div>
       </div>
     </div>
 
@@ -143,6 +171,7 @@
         memberStatus: document.getElementById("memberStatus"),
         memberShares: document.getElementById("memberShares"),
         memberBalance: document.getElementById("memberBalance"),
+        memberEligibleBalance: document.getElementById("memberEligibleBalance"),
         memberApprovalDate: document.getElementById("memberApprovalDate"),
         memberLastDistribution: document.getElementById("memberLastDistribution"),
         memberEligibility: document.getElementById("memberEligibility"),
@@ -181,7 +210,6 @@
         element.innerHTML = `<p class="text-gray-400">${message}</p>`;
       };
 
-      // Format time remaining
       const formatTimeRemaining = (milliseconds) => {
         const hours = Math.floor(milliseconds / (1000 * 60 * 60));
         const minutes = Math.round((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
@@ -190,29 +218,43 @@
 
       // Get Server Time
       async function getServerTime() {
-        const tempRef = doc(collection(db, "temp"));
-        await setDoc(tempRef, { timestamp: serverTimestamp() });
-        const docSnap = await getDoc(tempRef);
-        const serverTime = docSnap.exists() ? docSnap.data().timestamp.toDate() : new Date();
-        await deleteDoc(tempRef);
-        return serverTime;
+        try {
+          const tempRef = doc(collection(db, "temp"));
+          await setDoc(tempRef, { timestamp: serverTimestamp() });
+          const docSnap = await getDoc(tempRef);
+          const serverTime = docSnap.exists() ? docSnap.data().timestamp.toDate() : new Date();
+          await deleteDoc(tempRef);
+          return serverTime;
+        } catch (error) {
+          console.error("Error fetching server time:", error);
+          throw error;
+        }
       }
 
       // Get PHT Day Range
       function getPHTDayRange(serverTime) {
-        const phtTime = new Date(serverTime.getTime() + 8 * 60 * 60 * 1000);
+        const phtTime = new Date(serverTime.getTime());
         const startOfDay = new Date(phtTime).setHours(0, 0, 0, 0);
         const endOfDay = new Date(phtTime).setHours(23, 59, 59, 999);
         return {
-          start: new Date(startOfDay - 8 * 60 * 60 * 1000),
-          end: new Date(endOfDay - 8 * 60 * 60 * 1000),
+          start: new Date(startOfDay),
+          end: new Date(endOfDay),
         };
       }
 
       // Check Member Eligibility
       async function isMemberEligible(member, serverTime) {
         if (member.status !== "approved") return { eligible: false, reason: "Not Approved" };
-        if (member.balance <= 0) return { eligible: false, reason: "Zero/Negative Balance" };
+
+        // Calculate eligible balance based on deposits older than 24 hours
+        const deposits = member.deposits || [];
+        const eligibleBalance = deposits.reduce((sum, deposit) => {
+          const depositDate = deposit.timestamp?.toDate ? deposit.timestamp.toDate() : new Date(deposit.timestamp);
+          const hoursSinceDeposit = (serverTime - depositDate) / (1000 * 60 * 60);
+          return hoursSinceDeposit >= HOURS_THRESHOLD ? sum + deposit.amount : sum;
+        }, 0);
+
+        if (eligibleBalance <= 0) return { eligible: false, reason: "No Eligible Balance" };
 
         const approvalDate = member.approvalDate?.toDate
           ? member.approvalDate.toDate()
@@ -244,7 +286,7 @@
           };
         }
 
-        return { eligible: true, reason: "Eligible" };
+        return { eligible: true, reason: "Eligible", eligibleBalance };
       }
 
       // Load Member Details
@@ -265,7 +307,7 @@
           elements.memberName.textContent = data.name || "N/A";
           elements.memberEmail.textContent = data.email || "N/A";
           elements.memberStatus.textContent = data.status || "N/A";
-          elements.memberStatus.className = `px-2 py-1 rounded ${
+          elements.memberStatus.className = `px-2 py-1 rounded text-sm ${
             data.status === "approved"
               ? "bg-green-600"
               : data.status === "pending"
@@ -274,6 +316,7 @@
           }`;
           elements.memberShares.textContent = data.shares || 0;
           elements.memberBalance.textContent = formatCurrency(data.balance);
+          elements.memberEligibleBalance.textContent = formatCurrency(eligibility.eligibleBalance || 0);
           elements.memberApprovalDate.textContent = data.approvalDate
             ? new Date(data.approvalDate.toDate ? data.approvalDate.toDate() : data.approvalDate).toLocaleString("en-PH")
             : "N/A";
@@ -281,7 +324,11 @@
             ? new Date(data.lastDistribution.toDate ? data.lastDistribution.toDate() : data.lastDistribution).toLocaleString("en-PH")
             : "None";
           elements.memberEligibility.textContent = eligibility.eligible ? "Yes" : `No (${eligibility.reason})`;
+          elements.memberEligibility.className = `text-sm ${
+            eligibility.eligible ? "text-green-400" : "text-red-400"
+          }`;
         } catch (error) {
+          console.error("loadMemberDetails: Error:", error);
           showError("Failed to load member details: " + error.message);
           elements.memberDetails.innerHTML = '<p class="text-red-500">Error loading member data.</p>';
         }
@@ -294,11 +341,11 @@
         fundChartInstance = new Chart(ctx, {
           type: "line",
           data: {
-            labels: ["Jul 9", "Jul 10"], // Default labels for current date range
+            labels: [],
             datasets: [
               {
                 label: "Fund Balance",
-                data: [0, 0], // Default data, will be updated
+                data: [],
                 backgroundColor: "rgba(59, 130, 246, 0.2)",
                 borderColor: "rgba(59, 130, 246, 1)",
                 borderWidth: 2,
@@ -315,14 +362,15 @@
             },
           },
         });
+        console.log("initializeChart: Chart initialized");
       }
 
       // Update Chart
       async function updateChart() {
         try {
-          console.log("Updating chart...");
+          console.log("updateChart: Starting");
           const fundSnap = await getDocs(collection(db, "fund"));
-          const initialBalance = fundSnap.empty ? 0 : fundSnap.docs[0].data().balance || 0;
+          const initialBalance = fundSnap.empty ? 0 : fundSnap.docs[0].data().mainBalance || 0;
           const q = query(collection(db, "profit_distributions"), orderBy("timestamp", "asc"));
           const snapshot = await getDocs(q);
           const labels = [];
@@ -348,13 +396,13 @@
           fundChartInstance.data.labels = labels;
           fundChartInstance.data.datasets[0].data = data;
           fundChartInstance.update();
-          console.log("Chart updated with labels:", labels, "data:", data);
+          console.log("updateChart: Chart updated with labels:", labels, "data:", data);
         } catch (error) {
-          console.error("Chart update failed:", error);
+          console.error("updateChart: Error:", error);
           showError("Failed to load fund chart data. Displaying static data.");
           const now = await getServerTime();
           fundChartInstance.data.labels = [now.toLocaleDateString("en-PH", { month: "short", day: "numeric" })];
-          fundChartInstance.data.datasets[0].data = [0]; // Static fallback
+          fundChartInstance.data.datasets[0].data = [0];
           fundChartInstance.update();
         }
       }
@@ -370,7 +418,7 @@
         onSnapshot(
           q,
           (snapshot) => {
-            console.log("Transaction snapshot received:", snapshot.docs.length, "documents");
+            console.log("loadTransactionHistory: Snapshot received:", snapshot.docs.length, "documents");
             allTransactions = snapshot.docs.map((doc) => ({
               id: doc.id,
               type: doc.data().type === "deposit" ? "Deposit" : "Cash Out",
@@ -382,6 +430,7 @@
             displayTransactionHistory();
           },
           (error) => {
+            console.error("loadTransactionHistory: Error:", error);
             showError("Failed to load transaction history: " + error.message);
             elements.historyList.innerHTML = '<p class="text-red-500">Error loading transaction history.</p>';
           }
@@ -390,20 +439,22 @@
 
       // Display Transaction History
       function displayTransactionHistory() {
-        const filter = elements.historyFilter.value;
-        const sort = elements.historySort.value;
-        let filtered = filter === "all" ? allTransactions : allTransactions.filter((t) => t.filterType === filter);
-        filtered.sort((a, b) => (sort === "desc" ? b.timestamp - a.timestamp : a.timestamp - b.timestamp));
+        console.log("displayTransactionHistory: Starting");
+        try {
+          const filter = elements.historyFilter.value;
+          const sort = elements.historySort.value;
+          let filtered = filter === "all" ? allTransactions : allTransactions.filter((t) => t.filterType === filter);
+          filtered.sort((a, b) => (sort === "desc" ? b.timestamp - a.timestamp : a.timestamp - b.timestamp));
 
-        elements.historyList.innerHTML = filtered.length
-          ? filtered
-              .map(
-                (t) => `
+          elements.historyList.innerHTML = filtered.length
+            ? filtered
+                .map(
+                  (t) => `
             <div class="bg-gray-700 p-4 rounded-lg">
               <p><strong>Type:</strong> ${t.type}</p>
               <p><strong>Amount:</strong> ₱${formatCurrency(t.amount)}</p>
               <p><strong>Date:</strong> ${t.timestamp.toLocaleString("en-PH")}</p>
-              <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${
+              <p><strong>Status:</strong> <span class="px-2 py-1 rounded text-sm ${
                 t.status === "approved"
                   ? "bg-green-600"
                   : t.status === "pending"
@@ -412,9 +463,14 @@
               }">${t.status || "N/A"}</span></p>
             </div>
           `
-              )
-              .join("")
-          : '<p class="text-gray-400">No transactions found.</p>';
+                )
+                .join("")
+            : '<p class="text-gray-400">No transactions found.</p>';
+          console.log("displayTransactionHistory: Displayed", filtered.length, "transactions");
+        } catch (error) {
+          console.error("displayTransactionHistory: Error:", error);
+          showError("Failed to display transaction history: " + error.message);
+        }
       }
 
       // Load Distribution History
@@ -428,7 +484,7 @@
         onSnapshot(
           q,
           (snapshot) => {
-            console.log("Distribution snapshot received:", snapshot.docs.length, "documents");
+            console.log("loadDistributionHistory: Snapshot received:", snapshot.docs.length, "documents");
             elements.distributionList.innerHTML = snapshot.docs.length
               ? snapshot.docs
                   .map(
@@ -444,6 +500,7 @@
               : '<p class="text-gray-400">No distributions found.</p>';
           },
           (error) => {
+            console.error("loadDistributionHistory: Error:", error);
             showError("Failed to load distribution history: " + error.message);
             elements.distributionList.innerHTML = '<p class="text-red-500">Error loading distribution history.</p>';
           }
@@ -487,6 +544,7 @@
           alert(`Transaction request (${type}) of ₱${formatCurrency(amount)} submitted successfully!`);
           console.log("Transaction request submitted:", { type, amount });
         } catch (error) {
+          console.error("transactionForm: Error:", error);
           showError(error.message);
         } finally {
           elements.submitTransactionBtn.disabled = false;
@@ -494,8 +552,14 @@
       });
 
       // History Filter/Sort
-      elements.historyFilter.addEventListener("change", displayTransactionHistory);
-      elements.historySort.addEventListener("change", displayTransactionHistory);
+      elements.historyFilter.addEventListener("change", () => {
+        console.log("historyFilter: Changed to", elements.historyFilter.value);
+        displayTransactionHistory();
+      });
+      elements.historySort.addEventListener("change", () => {
+        console.log("historySort: Changed to", elements.historySort.value);
+        displayTransactionHistory();
+      });
 
       // Logout
       elements.logoutBtn.addEventListener("click", async () => {
@@ -503,6 +567,7 @@
           await signOut(auth);
           window.location.href = "/login.html";
         } catch (error) {
+          console.error("logoutBtn: Error:", error);
           showError("Failed to log out: " + error.message);
         }
       });
@@ -513,6 +578,7 @@
           const time = await getServerTime();
           alert(`Server Time: ${time.toLocaleString("en-PH")} (PHT)`);
         } catch (error) {
+          console.error("serverTimeBtn: Error:", error);
           showError("Failed to fetch server time: " + error.message);
         }
       });
