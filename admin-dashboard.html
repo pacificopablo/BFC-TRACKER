@@ -1259,12 +1259,11 @@
           let totalDistributed = 0;
           let eligibleMembers = [];
           let totalShares = 0;
+          let excessAmount = 0;
+          let newExceedBalance = exceedBalance;
 
           if (source === "exceed" && exceedBalance < totalAmount) {
             throw new Error("Insufficient exceed fund balance.");
-          }
-          if (source === "main" && mainBalance < totalAmount) {
-            throw new Error("Insufficient main fund balance.");
           }
 
           eligibleMembers = (
@@ -1274,111 +1273,134 @@
           ).filter((m) => m && m.shares > 0);
           totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
 
-          if (!eligibleMembers.length && source === "exceed" && type === "profit") {
-            throw new Error("No eligible members for profit distribution from exceed fund. Distribution rejected.");
-          } else if (!eligibleMembers.length && type === "profit") {
-            const newExceedBalance = exceedBalance + totalAmount;
-            batch.update(doc(db, "fund", fundDoc.id), { mainBalance, exceedBalance: newExceedBalance });
+          if (eligibleMembers.length === 0 || totalShares === 0) {
+            if (type === "profit") {
+              if (source === "exceed") {
+                throw new Error("No eligible members for profit distribution from exceed fund. Distribution rejected.");
+              } else {
+                // source main, add to exceed
+                newExceedBalance = exceedBalance + totalAmount;
+                batch.update(doc(db, "fund", fundDoc.id), { exceedBalance: newExceedBalance });
+                batch.set(distRef, {
+                  type,
+                  source,
+                  amount: 0,
+                  excessAmount: totalAmount,
+                  timestamp: serverTimestamp(),
+                  adminId: auth.currentUser.uid,
+                  eligibleMemberCount: 0,
+                  totalMemberCount: allMembers.length,
+                  totalShares: 0,
+                });
+                await batch.commit();
+                elements.profitForm.reset();
+                await loadFundBalance();
+                await updateChart();
+                alert(`No eligible members for profit distribution. ₱${formatCurrency(totalAmount)} added to exceed fund. New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
+                console.log("profitForm: No eligible members, added ₱", totalAmount, "to exceed fund");
+                return;
+              }
+            } else { // loss
+              if (source === "exceed") {
+                newExceedBalance = exceedBalance - totalAmount;
+                batch.update(doc(db, "fund", fundDoc.id), { exceedBalance: newExceedBalance });
+                batch.set(distRef, {
+                  type,
+                  source,
+                  amount: totalAmount,
+                  excessAmount: 0,
+                  timestamp: serverTimestamp(),
+                  adminId: auth.currentUser.uid,
+                  eligibleMemberCount: 0,
+                  totalMemberCount: allMembers.length,
+                  totalShares: 0,
+                });
+                await batch.commit();
+                elements.profitForm.reset();
+                await loadFundBalance();
+                await updateChart();
+                alert(`No eligible members for loss deduction. ₱${formatCurrency(totalAmount)} deducted from exceed fund. New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
+                console.log("profitForm: No eligible members, deducted ₱", totalAmount, "from exceed fund for loss");
+                return;
+              } else {
+                throw new Error("No eligible members for loss deduction.");
+              }
+            }
+          }
+
+          // Eligible members exist
+          if (type === "loss" && source === "exceed") {
+            // For loss from exceed with eligible members, deduct from exceed, no deduction from members
+            newExceedBalance = exceedBalance - totalAmount;
+            batch.update(doc(db, "fund", fundDoc.id), { exceedBalance: newExceedBalance });
             batch.set(distRef, {
               type,
               source,
-              amount: 0,
-              excessAmount: totalAmount,
+              amount: totalAmount,
+              excessAmount: 0,
               timestamp: serverTimestamp(),
               adminId: auth.currentUser.uid,
-              eligibleMemberCount: 0,
+              eligibleMemberCount: eligibleMembers.length,
               totalMemberCount: allMembers.length,
-              totalShares: 0,
+              totalShares,
             });
+          } else {
+            const perShare = totalAmount / totalShares;
+            totalDistributed = 0;
 
-            await batch.commit();
-            elements.profitForm.reset();
-            await loadFundBalance();
-            await updateChart();
-            alert(`No eligible members for profit distribution. ₱${formatCurrency(totalAmount)} added to exceed fund. New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
-            console.log("profitForm: No eligible members, added ₱", totalAmount, "to exceed fund");
-            return;
-          } else if (!eligibleMembers.length && type === "loss") {
-            throw new Error("No eligible members for loss deduction.");
-          }
-
-          if (type === "profit") {
             eligibleMembers.forEach((m) => {
-              const memberBalance = m.balance || 0; // Use only balance, not pendingDeposits
-              const memberDist = Math.min(memberBalance * 0.1, totalAmount - totalDistributed);
-              if (memberDist <= 0) return;
+              let memberDist = parseFloat((perShare * m.shares).toFixed(2));
 
-              const newBalance = m.balance + memberDist;
+              if (type === "loss") {
+                if (memberDist > m.balance) memberDist = m.balance;
+                const newBalance = m.balance - memberDist;
+                batch.update(doc(db, "users", m.id), {
+                  balance: newBalance,
+                  lastDistribution: serverTimestamp(),
+                });
+              } else {
+                const newBalance = m.balance + memberDist;
+                batch.update(doc(db, "users", m.id), {
+                  balance: newBalance,
+                  lastDistribution: serverTimestamp(),
+                });
+              }
+
               totalDistributed += memberDist;
-
-              batch.update(doc(db, "users", m.id), {
-                balance: newBalance,
-                lastDistribution: serverTimestamp(),
-              });
 
               batch.set(doc(collection(db, "member_distributions")), {
                 memberId: m.id,
                 memberName: m.name,
-                type: "profit",
+                type,
                 amount: memberDist,
                 timestamp: serverTimestamp(),
                 distributionId: distRef.id,
               });
             });
-          } else {
-            const lossPerMember = totalAmount / eligibleMembers.length;
 
-            eligibleMembers.forEach((m) => {
-              const memberDist = Math.min(lossPerMember, m.balance || 0); // Use only balance
-              if (memberDist <= 0) return;
+            excessAmount = totalAmount - totalDistributed;
 
-              const newBalance = Math.max(0, m.balance - memberDist);
-              totalDistributed += memberDist;
+            if (source === "main") {
+              newExceedBalance += (type === "profit" ? excessAmount : -excessAmount);
+            } else { // exceed
+              newExceedBalance -= totalDistributed;
+            }
 
-              batch.update(doc(db, "users", m.id), {
-                balance: newBalance,
-                lastDistribution: serverTimestamp(),
-              });
+            if (newExceedBalance < 0) throw new Error("Insufficient exceed fund balance.");
 
-              batch.set(doc(collection(db, "member_distributions")), {
-                memberId: m.id,
-                memberName: m.name,
-                type: "loss",
-                amount: memberDist,
-                timestamp: serverTimestamp(),
-                distributionId: distRef.id,
-              });
+            batch.update(doc(db, "fund", fundDoc.id), { exceedBalance: newExceedBalance });
+            batch.set(distRef, {
+              type,
+              source,
+              amount: totalDistributed,
+              excessAmount,
+              timestamp: serverTimestamp(),
+              adminId: auth.currentUser.uid,
+              eligibleMemberCount: eligibleMembers.length,
+              totalMemberCount: allMembers.length,
+              totalShares,
             });
           }
-
-          if (totalDistributed > totalAmount) throw new Error("Insufficient amount to distribute.");
-          const excessAmount = totalAmount - totalDistributed;
-          let newMainBalance = mainBalance;
-          let newExceedBalance = exceedBalance;
-
-          if (source === "main") {
-            newMainBalance = mainBalance + (type === "profit" ? -totalDistributed : totalDistributed);
-            newExceedBalance = exceedBalance + (type === "profit" ? excessAmount : -excessAmount);
-          } else {
-            newExceedBalance = exceedBalance - totalDistributed;
-          }
-
-          if (newMainBalance < 0) throw new Error("Insufficient main fund balance.");
-          if (newExceedBalance < 0) throw new Error("Insufficient exceed fund balance.");
-
-          batch.update(doc(db, "fund", fundDoc.id), { mainBalance: newMainBalance, exceedBalance: newExceedBalance });
-
-          batch.set(distRef, {
-            type,
-            source,
-            amount: totalDistributed,
-            excessAmount: excessAmount > 0 ? excessAmount : 0,
-            timestamp: serverTimestamp(),
-            adminId: auth.currentUser.uid,
-            eligibleMemberCount: eligibleMembers.length,
-            totalMemberCount: allMembers.length,
-            totalShares,
-          });
 
           await batch.commit();
           elements.profitForm.reset();
@@ -1386,7 +1408,7 @@
           await loadFundBalance();
           await loadDailyReport();
           await updateChart();
-          alert(`Successfully ${type === "profit" ? "distributed profit" : "deducted loss"} of ₱${formatCurrency(totalDistributed)} from ${source} fund! ${excessAmount > 0 ? `Excess ₱${formatCurrency(excessAmount)} ${source === "main" ? "added to exceed fund" : "remains in exceed fund"}. ` : ""}New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
+          alert(`Successfully ${type === "profit" ? "distributed profit" : "deducted loss"} of ₱${formatCurrency(totalDistributed)} from ${source} fund! ${excessAmount > 0 ? `Excess ₱${formatCurrency(excessAmount)} ${type === "profit" ? "added to" : "deducted from"} exceed fund. ` : ""}New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
           console.log("profitForm: Successfully processed", type, "of ₱", totalDistributed);
         } catch (error) {
           console.error("profitForm: Error:", error);
@@ -1566,13 +1588,14 @@
               batch.update(doc(db, "users", data.memberId), {
                 pendingDeposits,
               });
-            } else if (data.type === "cashout" && (user.balance || 0) >= data.amount) {
+            } else if (data.type === "cashout") {
+              if ((user.balance || 0) < data.amount) {
+                throw new Error("Insufficient balance for cashout.");
+              }
               batch.update(doc(db, "users", data.memberId), {
                 balance: Math.max(0, (user.balance || 0) - data.amount),
                 shares: Math.floor(Math.max(0, (user.balance || 0) - data.amount) / 10),
               });
-            } else {
-              throw new Error("Insufficient balance for cashout.");
             }
             batch.update(doc(db, "transactions", id), { status: "approved" });
           } else if (e.target.classList.contains("reject-btn")) {
