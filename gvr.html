@@ -1365,22 +1365,53 @@
         e.preventDefault();
         try {
           const id = elements.editMemberId.value;
+          const name = elements.editName.value;
+          const email = elements.editEmail.value;
+          const status = elements.editStatus.value;
+          const shares = parseInt(elements.editShares.value);
+          const balance = parseFloat(elements.editBalance.value);
+          const approvalDate = elements.editApprovalDate.value;
+
+          // Input validation
+          if (!name || !email || !status) {
+            throw new Error("All fields are required.");
+          }
+          if (isNaN(shares) || shares < 0) {
+            throw new Error("Shares must be a non-negative number.");
+          }
+          if (isNaN(balance) || balance < 0) {
+            throw new Error("Balance must be a non-negative number.");
+          }
+          if (!approvalDate) {
+            throw new Error("Approval date is required.");
+          }
+
+          console.log("editForm: Submitting update for member ID:", id);
+          console.log("editForm: Form values:", { name, email, status, shares, balance, approvalDate });
+
           await updateDoc(doc(db, "users", id), {
-            name: elements.editName.value,
-            email: members.editEmail.value,
-            status: elements.editStatus.value,
-            shares: parseInt(elements.editShares.value),
-            balance: parseFloat(elements.editBalance.value),
-            approvalDate: new Date(elements.editApprovalDate.value),
+            name,
+            email,
+            status,
+            shares,
+            balance,
+            approvalDate: new Date(approvalDate),
           });
           elements.editModal.classList.add("hidden");
           elements.editForm.reset();
           await loadMembers();
           await loadFundBalance();
+          alert("Member updated successfully!");
           console.log("editForm: Member updated, UI refreshed");
         } catch (error) {
           console.error("editForm: Error:", error);
-          showError(elements.profitError, "Failed to update member: " + error.message);
+          let message = "Failed to update member: " + error.message;
+          if (error.code === "permission-denied") {
+            message = "You do not have permission to update this member.";
+          } else if (error.code === "not-found") {
+            message = "Member not found in the database.";
+          }
+          showError(elements.profitError, message);
         }
       });
 
