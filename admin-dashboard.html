@@ -388,7 +388,7 @@
       // Check Member Eligibility (for profits and losses)
       async function isMemberEligible(member, serverTime) {
         if (member.status !== "approved") return { eligible: false, reason: "Not Approved" };
-        if (member.balance <= 0) return { eligible: false, reason: "Zero/Negative Balance" };
+        if ((member.balance || 0) <= 0) return { eligible: false, reason: "Zero/Negative Balance" };
 
         const approvalDate = member.approvalDate?.toDate
           ? member.approvalDate.toDate()
@@ -501,6 +501,70 @@
         }, 60000);
       }
 
+      // Process Pending Deposits (move matured deposits to balance)
+      async function processPendingDeposits() {
+        console.log("processPendingDeposits: Starting");
+        try {
+          const serverTime = await getServerTime();
+          const batch = writeBatch(db);
+          let updateCount = 0;
+
+          for (const member of allMembers) {
+            const pendingDeposits = member.pendingDeposits || [];
+            const maturedDeposits = [];
+            let totalMaturedAmount = 0;
+
+            // Filter matured deposits (older than 24 hours)
+            pendingDeposits.forEach((deposit) => {
+              const depositTime = deposit.depositTime?.toDate
+                ? deposit.depositTime.toDate()
+                : new Date(deposit.depositTime);
+              const hoursSinceDeposit = (serverTime - depositTime) / (1000 * 60 * 60);
+              if (hoursSinceDeposit >= HOURS_THRESHOLD) {
+                totalMaturedAmount += deposit.amount;
+              } else {
+                maturedDeposits.push(deposit);
+              }
+            });
+
+            if (totalMaturedAmount > 0) {
+              const newBalance = (member.balance || 0) + totalMaturedAmount;
+              const newShares = Math.floor(newBalance / 10);
+              batch.update(doc(db, "users", member.id), {
+                balance: newBalance,
+                shares: newShares,
+                pendingDeposits: maturedDeposits,
+              });
+              updateCount++;
+              console.log(
+                `processPendingDeposits: Processed ₱${totalMaturedAmount} for member ${member.id}, New Balance: ₱${newBalance}`
+              );
+            }
+          }
+
+          if (updateCount > 0) {
+            await batch.commit();
+            console.log("processPendingDeposits: Committed updates for", updateCount, "members");
+            await loadMembers();
+            await loadFundBalance();
+          } else {
+            console.log("processPendingDeposits: No matured deposits to process");
+          }
+        } catch (error) {
+          console.error("processPendingDeposits: Error:", error);
+          showError(elements.profitError, "Failed to process pending deposits: " + error.message);
+        }
+      }
+
+      // Schedule Periodic Check for Pending Deposits
+      function schedulePendingDepositsCheck() {
+        console.log("schedulePendingDepositsCheck: Initializing");
+        setInterval(async () => {
+          console.log("schedulePendingDepositsCheck: Checking for matured deposits");
+          await processPendingDeposits();
+        }, 60000); // Check every minute
+      }
+
       // Load Fund and Exceed Fund Balances
       async function loadFundBalance() {
         console.log("loadFundBalance: Starting");
@@ -511,8 +575,12 @@
 
           const snapshot = await getDocs(collection(db, "users"));
           allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          mainBalance = allMembers.reduce((sum, m) => sum + (m.balance || 0), 0);
-          console.log("loadFundBalance: Calculated mainBalance:", mainBalance);
+          mainBalance = allMembers.reduce((sum, m) => {
+            const pendingDeposits = m.pendingDeposits || [];
+            const pendingTotal = pendingDeposits.reduce((sum, d) => sum + (d.amount || 0), 0);
+            return sum + (m.balance || 0) + pendingTotal;
+          }, 0);
+          console.log("loadFundBalance: Calculated mainBalance including pending deposits:", mainBalance);
 
           const profitSnapshot = await getDocs(collection(db, "profit_distributions"));
           profitSnapshot.docs.forEach((doc) => {
@@ -640,6 +708,26 @@
               ? `Deposit Eligible in ${formatTimeRemaining((HOURS_THRESHOLD - hoursSinceApproval) * 60 * 60 * 1000)}`
               : "Deposit Eligible for Profit/Loss";
 
+            // Calculate pending deposits
+            const pendingDeposits = m.pendingDeposits || [];
+            const pendingDepositsText = pendingDeposits.length
+              ? pendingDeposits
+                  .map((d) => {
+                    const depositTime = d.depositTime?.toDate
+                      ? d.depositTime.toDate()
+                      : new Date(d.depositTime);
+                    const hoursSinceDeposit = (serverTime - depositTime) / (1000 * 60 * 60);
+                    const pendingText =
+                      hoursSinceDeposit < HOURS_THRESHOLD
+                        ? `₱${formatCurrency(d.amount)} (Eligible in ${formatTimeRemaining(
+                            (HOURS_THRESHOLD - hoursSinceDeposit) * 60 * 60 * 1000
+                          )})`
+                        : `₱${formatCurrency(d.amount)} (Matured)`;
+                    return pendingText;
+                  })
+                  .join(", ")
+              : "None";
+
             const div = document.createElement("div");
             div.className = "bg-gray-800 p-4 rounded-lg shadow";
             div.innerHTML = `
@@ -654,6 +742,7 @@
               }">${m.status || "N/A"}</span></p>
               <p><strong>Shares:</strong> ${m.shares || 0}</p>
               <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
+              <p><strong>Pending Deposits:</strong> ${pendingDepositsText}</p>
               <p><strong>Eligible for Distribution:</strong> ${eligibility.eligible ? "Yes" : `No (${eligibility.reason})`}</p>
               <p><strong>Deposit Status:</strong> ${depositEligibility}</p>
               <div class="flex space-x-2 mt-2">
@@ -727,6 +816,25 @@
               ? `Deposit Eligible in ${formatTimeRemaining((HOURS_THRESHOLD - hoursSinceApproval) * 60 * 60 * 1000)}`
               : "Deposit Eligible for Profit/Loss";
 
+            const pendingDeposits = m.pendingDeposits || [];
+            const pendingDepositsText = pendingDeposits.length
+              ? pendingDeposits
+                  .map((d) => {
+                    const depositTime = d.depositTime?.toDate
+                      ? d.depositTime.toDate()
+                      : new Date(d.depositTime);
+                    const hoursSinceDeposit = (serverTime - depositTime) / (1000 * 60 * 60);
+                    const pendingText =
+                      hoursSinceDeposit < HOURS_THRESHOLD
+                        ? `₱${formatCurrency(d.amount)} (Eligible in ${formatTimeRemaining(
+                            (HOURS_THRESHOLD - hoursSinceDeposit) * 60 * 60 * 1000
+                          )})`
+                        : `₱${formatCurrency(d.amount)} (Matured)`;
+                    return pendingText;
+                  })
+                  .join(", ")
+              : "None";
+
             const div = document.createElement("div");
             div.className = "bg-gray-800 p-4 rounded-lg shadow";
             div.innerHTML = `
@@ -741,6 +849,7 @@
               }">${m.status}</span></p>
               <p><strong>Shares:</strong> ${m.shares || 0}</p>
               <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
+              <p><strong>Pending Deposits:</strong> ${pendingDepositsText}</p>
               <p><strong>Eligible for Distribution:</strong> ${eligibility.eligible ? "Yes" : `No (${eligibility.reason})`}</p>
               <p><strong>Deposit Status:</strong> ${depositEligibility}</p>
               <div class="flex space-x-2 mt-2">
@@ -909,12 +1018,25 @@
           const memberData = await Promise.all(
             allMembers.map(async (m) => {
               const eligibility = await isMemberEligible(m, serverTime);
+              const pendingDeposits = m.pendingDeposits || [];
+              const pendingDepositsText = pendingDeposits.length
+                ? pendingDeposits
+                    .map((d) => {
+                      const depositTime = d.depositTime?.toDate
+                        ? d.depositTime.toDate()
+                        : new Date(d.depositTime);
+                      const hoursSinceDeposit = (serverTime - depositTime) / (1000 * 60 * 60);
+                      return `₱${formatCurrency(d.amount)} (${hoursSinceDeposit < HOURS_THRESHOLD ? `Pending ${formatTimeRemaining((HOURS_THRESHOLD - hoursSinceDeposit) * 60 * 60 * 1000)}` : "Matured"})`;
+                    })
+                    .join(", ")
+                : "None";
               return {
                 "Member Name": m.name || "N/A",
                 Email: m.email || "N/A",
                 Status: m.status || "N/A",
                 Shares: m.shares || 0,
                 "Balance (₱)": formatCurrency(m.balance),
+                "Pending Deposits": pendingDepositsText,
                 "Eligible for Profit": eligibility.eligible ? "Yes" : "No",
                 "Reason for Ineligibility": eligibility.eligible ? "" : eligibility.reason,
               };
@@ -971,6 +1093,12 @@
           const usersSnapshot = await getDocs(collection(db, "users"));
           const usersData = usersSnapshot.docs.map((doc) => {
             const data = doc.data();
+            const pendingDeposits = data.pendingDeposits || [];
+            const pendingDepositsText = pendingDeposits.length
+              ? pendingDeposits
+                  .map((d) => `₱${formatCurrency(d.amount)} at ${d.depositTime?.toDate().toLocaleString("en-PH") || "N/A"}`)
+                  .join(", ")
+              : "None";
             return {
               ID: doc.id,
               Name: data.name || "N/A",
@@ -978,6 +1106,7 @@
               Status: data.status || "N/A",
               Shares: data.shares || 0,
               "Balance (₱)": formatCurrency(data.balance),
+              "Pending Deposits": pendingDepositsText,
               "Approval Date": data.approvalDate?.toDate().toLocaleString("en-PH") || "N/A",
               "Last Distribution": data.lastDistribution?.toDate().toLocaleString("en-PH") || "N/A",
             };
@@ -1175,7 +1304,7 @@
 
           if (type === "profit") {
             eligibleMembers.forEach((m) => {
-              const memberBalance = (m.shares || 0) * 10;
+              const memberBalance = m.balance || 0; // Use only balance, not pendingDeposits
               const memberDist = Math.min(memberBalance * 0.1, totalAmount - totalDistributed);
               if (memberDist <= 0) return;
 
@@ -1200,7 +1329,7 @@
             const lossPerMember = totalAmount / eligibleMembers.length;
 
             eligibleMembers.forEach((m) => {
-              const memberDist = Math.min(lossPerMember, m.balance);
+              const memberDist = Math.min(lossPerMember, m.balance || 0); // Use only balance
               if (memberDist <= 0) return;
 
               const newBalance = Math.max(0, m.balance - memberDist);
@@ -1382,6 +1511,10 @@
           console.log("editForm: Submitting update for member ID:", id);
           console.log("editForm: Form values:", { name, email, status, shares, balance, approvalDate });
 
+          // Fetch current member to preserve pendingDeposits
+          const memberDoc = await getDoc(doc(db, "users", id));
+          const member = memberDoc.data();
+
           await updateDoc(doc(db, "users", id), {
             name,
             email,
@@ -1389,6 +1522,7 @@
             shares,
             balance,
             approvalDate: new Date(approvalDate),
+            pendingDeposits: member.pendingDeposits || [], // Preserve existing pending deposits
           });
           elements.editModal.classList.add("hidden");
           elements.editForm.reset();
@@ -1424,9 +1558,13 @@
           if (e.target.classList.contains("approve-btn")) {
             console.log("requestsList: Approve button clicked for transaction ID:", id);
             if (data.type === "deposit") {
+              const pendingDeposits = user.pendingDeposits || [];
+              pendingDeposits.push({
+                amount: data.amount,
+                depositTime: serverTimestamp(),
+              });
               batch.update(doc(db, "users", data.memberId), {
-                balance: (user.balance || 0) + data.amount,
-                shares: Math.floor(((user.balance || 0) + data.amount) / 10),
+                pendingDeposits,
               });
             } else if (data.type === "cashout" && (user.balance || 0) >= data.amount) {
               batch.update(doc(db, "users", data.memberId), {
@@ -1509,6 +1647,7 @@
           loadTransactionHistory();
           loadDailyReport();
           scheduleAutoUpdate();
+          schedulePendingDepositsCheck();
         }
       });
     </script>
