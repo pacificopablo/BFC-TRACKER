@@ -342,8 +342,10 @@
       let allTransactions = [];
       let fundChartInstance = null;
       const SUBMISSION_COOLDOWN = 5000;
+      const TRANSACTION_COOLDOWN = 2000; // Added for transaction buttons
       const HOURS_THRESHOLD = 24;
       let lastSubmissionTime = 0;
+      let lastTransactionTime = 0; // Added for transaction buttons
       let lastAutoUpdateDate = null;
       let cachedServerTime = null;
 
@@ -780,8 +782,8 @@
               <p><strong>Amount:</strong> ₱${formatCurrency(doc.data().amount)}</p>
               <p><strong>Date:</strong> ${doc.data().timestamp?.toDate().toLocaleString("en-PH") || "N/A"}</p>
               <div class="flex space-x-2 mt-2">
-                <button data-id="${doc.id}" class="approve-btn bg-green-600 px-3 py-1 rounded text-sm hover:bg-green-700">Approve</button>
-                <button data-id="${doc.id}" class="reject-btn bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">Reject</button>
+                <button data-id="${doc.id}" class="approve-btn bg-green-600 px-3 py-1 rounded text-sm hover:bg-green-700 disabled:bg-gray-600">Approve</button>
+                <button data-id="${doc.id}" class="reject-btn bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700 disabled:bg-gray-600">Reject</button>
               </div>
             </div>
           `
@@ -1431,19 +1433,46 @@
 
       // Approve/Reject Transactions
       elements.requestsList.addEventListener("click", async (e) => {
-        console.log("requestsList: Click event");
-        const id = e.target.dataset.id;
-        if (!id) return;
+        console.log("requestsList: Click event triggered");
+        const button = e.target;
+        const id = button.dataset.id;
+        if (!id || (!button.classList.contains("approve-btn") && !button.classList.contains("reject-btn"))) return;
+
+        const now = Date.now();
+        if (now - lastTransactionTime < TRANSACTION_COOLDOWN) {
+          showError(elements.profitError, `Please wait ${Math.ceil((TRANSACTION_COOLDOWN - (now - lastTransactionTime)) / 1000)} seconds.`);
+          return;
+        }
+        lastTransactionTime = now;
+
+        console.log(`requestsList: Processing transaction ID: ${id}, Action: ${button.classList.contains("approve-btn") ? "Approve" : "Reject"}`);
+
+        // Disable buttons to prevent multiple clicks
+        const card = button.closest(".bg-gray-700");
+        const approveBtn = button.classList.contains("approve-btn") ? button : card.querySelector(".approve-btn");
+        const rejectBtn = button.classList.contains("reject-btn") ? button : card.querySelector(".reject-btn");
+        approveBtn.disabled = true;
+        rejectBtn.disabled = true;
+        card.classList.add("opacity-50", "pointer-events-none");
 
         try {
           const transactionDoc = await getDoc(doc(db, "transactions", id));
+          if (!transactionDoc.exists()) {
+            throw new Error("Transaction not found.");
+          }
           const data = transactionDoc.data();
-          const userDoc = await getDoc(doc(db, "users", data.memberId));
-          const user = userDoc.data();
+          if (data.status !== "pending") {
+            throw new Error("Transaction already processed.");
+          }
           const batch = writeBatch(db);
 
-          if (e.target.classList.contains("approve-btn")) {
-            console.log("requestsList: Approve transaction ID:", id);
+          if (button.classList.contains("approve-btn")) {
+            const userDoc = await getDoc(doc(db, "users", data.memberId));
+            if (!userDoc.exists()) {
+              throw new Error("User not found.");
+            }
+            const user = userDoc.data();
+
             if (data.type === "deposit") {
               const depositTimestamp = serverTimestamp();
               const newBalance = (user.balance || 0) + data.amount;
@@ -1457,27 +1486,36 @@
                 shares: Math.floor(newBalance / 10),
                 deposits: arrayUnion(newDeposit),
               });
-            } else if (data.type === "cashout" && (user.balance || 0) >= data.amount) {
+              console.log(`requestsList: Approving deposit of ₱${data.amount} for user ${data.memberId}`);
+            } else if (data.type === "cashout") {
+              if ((user.balance || 0) < data.amount) {
+                throw new Error("Insufficient balance for cashout.");
+              }
               batch.update(doc(db, "users", data.memberId), {
                 balance: Math.max(0, (user.balance || 0) - data.amount),
                 shares: Math.floor(Math.max(0, (user.balance || 0) - data.amount) / 10),
               });
-            } else {
-              throw new Error("Insufficient balance for cashout.");
+              console.log(`requestsList: Approving cashout of ₱${data.amount} for user ${data.memberId}`);
             }
             batch.update(doc(db, "transactions", id), { status: "approved" });
-          } else if (e.target.classList.contains("reject-btn")) {
-            console.log("requestsList: Reject transaction ID:", id);
+          } else if (button.classList.contains("reject-btn")) {
             batch.update(doc(db, "transactions", id), { status: "rejected" });
+            console.log(`requestsList: Rejecting transaction ID: ${id}`);
           }
 
           await batch.commit();
+          console.log("requestsList: Transaction processed successfully");
           await loadMembers();
           await loadFundBalance();
-          console.log("requestsList: Transaction processed");
+          alert(`Transaction ${button.classList.contains("approve-btn") ? "approved" : "rejected"} successfully!`);
         } catch (error) {
-          console.error("requestsList: Error:", error);
-          showError(elements.profitError, "Failed to process transaction: " + error.message);
+          console.error("requestsList: Error processing transaction:", error);
+          showError(elements.profitError, `Failed to process transaction: ${error.message}`);
+        } finally {
+          // Re-enable buttons and restore card state
+          approveBtn.disabled = false;
+          rejectBtn.disabled = false;
+          card.classList.remove("opacity-50", "pointer-events-none");
         }
       });
 
