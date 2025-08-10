@@ -1,40 +1,939 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Baccarat Fund Admin Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
-  </head>
-  <body class="bg-gray-900 text-white min-h-screen p-4">
-    <!-- Header -->
-    <header class="flex justify-between items-center mb-8">
-      <h1 class="text-2xl font-bold flex items-center">
-        <span class="mr-2">👑</span> Baccarat Fund Admin
-      </h1>
-      <div class="flex space-x-2">
-        <button id="serverTimeBtn" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 text-sm">
-          Server Time
-        </button>
-        <button id="preDistReportBtn" class="bg-yellow-600 px-4 py-2 rounded hover:bg-yellow-700 text-sm">
-          Pre-Distribution Report
-        </button>
-        <button id="adjustBalanceBtn" class="bg-purple-600 px-4 py-2 rounded hover:bg-purple-700 text-sm">
-          Update Shares (₱10/Share)
-        </button>
-        <button id="exportExcelBtn" class="bg-green-600 px-4 py-2 rounded hover:bg-green-700 text-sm">
-          Export Report to Excel
-        </button>
-        <button id="exportDbBtn" class="bg-teal-600 px-4 py-2 rounded hover:bg-teal-700 text-sm">
-          Export Database to Excel
-        </button>
-        <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700 text-sm">
-          Logout
-        </button>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Baccarat Fund Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signOut,
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      getDocs,
+      doc,
+      updateDoc,
+      setDoc,
+      writeBatch,
+      serverTimestamp,
+      query,
+      where,
+      orderBy,
+      getDoc,
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import {
+      getStorage,
+      ref,
+      uploadBytes,
+      getDownloadURL,
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+    import { saveAs } from "https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js";
+    import * as XLSX from "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/xlsx.full.min.js";
+
+    const firebaseConfig = {
+      // Replace with your Firebase configuration
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    const SUBMISSION_COOLDOWN = 5000;
+    let lastSubmissionTime = 0;
+    let allMembers = [];
+    let chartInstance = null;
+
+    const elements = {
+      loading: document.getElementById("loading"),
+      dashboard: document.getElementById("dashboard"),
+      loginBtn: document.getElementById("loginBtn"),
+      logoutBtn: document.getElementById("logoutBtn"),
+      userEmail: document.getElementById("userEmail"),
+      membersList: document.getElementById("membersList"),
+      totalMembers: document.getElementById("totalMembers"),
+      totalShares: document.getElementById("totalShares"),
+      totalBalance: document.getElementById("totalBalance"),
+      exceedFund: document.getElementById("exceedFund"),
+      depositForm: document.getElementById("depositForm"),
+      depositError: document.getElementById("depositError"),
+      depositBtn: document.getElementById("depositBtn"),
+      withdrawForm: document.getElementById("withdrawForm"),
+      withdrawError: document.getElementById("withdrawError"),
+      withdrawBtn: document.getElementById("withdrawBtn"),
+      profitForm: document.getElementById("profitForm"),
+      profitError: document.getElementById("profitError"),
+      distributeBtn: document.getElementById("distributeBtn"),
+      fundBalance: document.getElementById("fundBalance"),
+      exceedFundDisplay: document.getElementById("exceedFundDisplay"),
+      updateSharesBtn: document.getElementById("updateSharesBtn"),
+      dailyReport: document.getElementById("dailyReport"),
+      reportBtn: document.getElementById("reportBtn"),
+      historyList: document.getElementById("historyList"),
+      fundChart: document.getElementById("fundChart"),
+      exportDbBtn: document.getElementById("exportDbBtn"),
+    };
+
+    const formatCurrency = (amount) =>
+      new Intl.NumberFormat("en-PH", {
+        style: "currency",
+        currency: "PHP",
+      }).format(amount);
+
+    const showError = (element, message) => {
+      element.textContent = message;
+      element.classList.remove("hidden");
+      setTimeout(() => element.classList.add("hidden"), 3000);
+    };
+
+    const getServerTime = async () => {
+      const serverTimeDoc = await getDoc(doc(db, "serverTime", "current"));
+      return serverTimeDoc.exists() ? serverTimeDoc.data().time.toDate() : new Date();
+    };
+
+    const isMemberEligible = async (member, serverTime) => {
+      if (member.status !== "approved") return { eligible: false, reason: "Not approved" };
+      if (member.balance <= 0) return { eligible: false, reason: "Zero balance" };
+      if (!member.approvalDate) return { eligible: false, reason: "No approval date" };
+
+      const approvalTime = member.approvalDate.toDate();
+      const hoursSinceApproval = (serverTime - approvalTime) / (1000 * 60 * 60);
+      if (hoursSinceApproval < 24) return { eligible: false, reason: "Approved less than 24 hours" };
+
+      if (member.lastDistribution) {
+        const lastDistTime = member.lastDistribution.toDate();
+        const isSameDay = serverTime.toDateString() === lastDistTime.toDateString();
+        if (isSameDay) return { eligible: false, reason: "Already received today" };
+      }
+
+      return { eligible: true };
+    };
+
+    const loadMembers = async () => {
+      console.log("loadMembers: Fetching members");
+      const membersSnap = await getDocs(collection(db, "users"));
+      allMembers = membersSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      let totalShares = 0;
+      let totalBalance = 0;
+
+      elements.membersList.innerHTML = "";
+      const serverTime = await getServerTime();
+
+      for (const member of allMembers) {
+        const { eligible, reason } = await isMemberEligible(member, serverTime);
+        totalShares += member.shares || 0;
+        totalBalance += member.balance || 0;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="border px-4 py-2">${member.name || "Unknown"}</td>
+          <td class="border px-4 py-2">${member.email}</td>
+          <td class="border px-4 py-2">${member.status}</td>
+          <td class="border px-4 py-2">${formatCurrency(member.balance || 0)}</td>
+          <td class="border px-4 py-2">${member.shares || 0}</td>
+          <td class="border px-4 py-2">${eligible ? "Yes" : `No (${reason})`}</td>
+          <td class="border px-4 py-2">
+            ${
+              member.status === "pending"
+                ? `
+                <button
+                  class="approveBtn bg-green-600 px-2 py-1 rounded hover:bg-green-700 text-white"
+                  data-id="${member.id}"
+                >
+                  Approve
+                </button>
+                <button
+                  class="rejectBtn bg-red-600 px-2 py-1 rounded hover:bg-red-700 text-white"
+                  data-id="${member.id}"
+                >
+                  Reject
+                </button>
+                `
+                : member.status
+            }
+          </td>
+        `;
+        elements.membersList.appendChild(tr);
+      }
+
+      elements.totalMembers.textContent = allMembers.length;
+      elements.totalShares.textContent = totalShares;
+      elements.totalBalance.textContent = formatCurrency(totalBalance);
+      elements.exceedFund.textContent = formatCurrency((await getDocs(collection(db, "fund"))).docs[0]?.data()?.exceedBalance || 0);
+
+      document.querySelectorAll(".approveBtn").forEach((btn) =>
+        btn.addEventListener("click", async () => {
+          console.log("approveBtn: Approving member", btn.dataset.id);
+          await updateDoc(doc(db, "users", btn.dataset.id), {
+            status: "approved",
+            approvalDate: serverTimestamp(),
+          });
+          alert("Member approved!");
+          await loadMembers();
+        })
+      );
+
+      document.querySelectorAll(".rejectBtn").forEach((btn) =>
+        btn.addEventListener("click", async () => {
+          console.log("rejectBtn: Rejecting member", btn.dataset.id);
+          await updateDoc(doc(db, "users", btn.dataset.id), { status: "rejected" });
+          alert("Member rejected!");
+          await loadMembers();
+        })
+      );
+      console.log("loadMembers: Members loaded, total:", allMembers.length);
+    };
+
+    const loadFundBalance = async () => {
+      console.log("loadFundBalance: Fetching fund balance");
+      const fundSnap = await getDocs(collection(db, "fund"));
+      const fundData = fundSnap.docs[0]?.data() || { mainBalance: 0, exceedBalance: 0 };
+      elements.fundBalance.textContent = formatCurrency(fundData.mainBalance);
+      elements.exceedFundDisplay.textContent = formatCurrency(fundData.exceedBalance);
+      console.log("loadFundBalance: Main:", fundData.mainBalance, "Exceed:", fundData.exceedBalance);
+    };
+
+    const updateChart = async () => {
+      console.log("updateChart: Updating fund chart");
+      const historySnap = await getDocs(
+        query(collection(db, "profit_distributions"), orderBy("timestamp", "asc"))
+      );
+      const dataPoints = [];
+      let runningBalance = 0;
+
+      historySnap.forEach((doc) => {
+        const data = doc.data();
+        runningBalance += data.type === "profit" ? -data.amount : data.amount;
+        dataPoints.push({
+          x: data.timestamp.toDate(),
+          y: runningBalance,
+        });
+      });
+
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(elements.fundChart, {
+        type: "line",
+        data: {
+          datasets: [
+            {
+              label: "Fund Balance",
+              data: dataPoints,
+              borderColor: "#34D399",
+              fill: false,
+            },
+          ],
+        },
+        options: {
+          scales: {
+            x: { type: "time", time: { unit: "day" } },
+            y: { beginAtZero: false },
+          },
+        },
+      });
+      console.log("updateChart: Chart updated with", dataPoints.length, "points");
+    };
+
+    const loadDailyReport = async () => {
+      console.log("loadDailyReport: Fetching daily report");
+      const serverTime = await getServerTime();
+      const startOfDay = new Date(serverTime);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(serverTime);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const reportSnap = await getDocs(
+        query(
+          collection(db, "member_distributions"),
+          where("timestamp", ">=", startOfDay),
+          where("timestamp", "<=", endOfDay)
+        )
+      );
+
+      elements.dailyReport.innerHTML = "";
+      reportSnap.forEach((doc) => {
+        const data = doc.data();
+        const li = document.createElement("li");
+        li.textContent = `Member: ${data.memberName}, Type: ${data.type.charAt(0).toUpperCase() + data.type.slice(1)}, Amount: ${data.type === "profit" ? "+" : "-"}${formatCurrency(data.amount)}`;
+        elements.dailyReport.appendChild(li);
+      });
+      console.log("loadDailyReport: Loaded", reportSnap.size, "entries");
+    };
+
+    const exportToExcel = async (preDistribution = false) => {
+      console.log("exportToExcel: Exporting report, preDistribution:", preDistribution);
+      const serverTime = await getServerTime();
+      const wb = XLSX.utils.book_new();
+      const fundSnap = await getDocs(collection(db, "fund"));
+      const fundData = fundSnap.docs[0]?.data() || { mainBalance: 0, exceedBalance: 0 };
+
+      const fundWs = XLSX.utils.json_to_sheet([
+        { MainFund: fundData.mainBalance, ExceedFund: fundData.exceedBalance },
+      ]);
+      XLSX.utils.book_append_sheet(wb, fundWs, "Fund Summary");
+
+      const membersWs = XLSX.utils.json_to_sheet(
+        await Promise.all(
+          allMembers.map(async (m) => ({
+            Name: m.name,
+            Email: m.email,
+            Status: m.status,
+            Balance: m.balance,
+            Shares: m.shares,
+            Eligible: (await isMemberEligible(m, serverTime)).eligible ? "Yes" : "No",
+          }))
+        )
+      );
+      XLSX.utils.book_append_sheet(wb, membersWs, "Members");
+
+      const notesWs = XLSX.utils.json_to_sheet([
+        { Notes: preDistribution ? "Pre-distribution report" : "Post-distribution report" },
+      ]);
+      XLSX.utils.book_append_sheet(wb, notesWs, "Notes");
+
+      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
+      saveAs(blob, `fund_report_${new Date().toISOString()}.xlsx`);
+      console.log("exportToExcel: Report exported");
+    };
+
+    onAuthStateChanged(auth, async (user) => {
+      console.log("onAuthStateChanged: User state changed", user ? user.email : "No user");
+      if (user) {
+        elements.loading.classList.add("hidden");
+        elements.dashboard.classList.remove("hidden");
+        elements.userEmail.textContent = user.email;
+        await loadMembers();
+        await loadFundBalance();
+        await loadDailyReport();
+        await updateChart();
+      } else {
+        elements.loading.classList.add("hidden");
+        elements.loginBtn.classList.remove("hidden");
+      }
+    });
+
+    elements.logoutBtn.addEventListener("click", async () => {
+      console.log("logoutBtn: Signing out");
+      await signOut(auth);
+      elements.dashboard.classList.add("hidden");
+      elements.loginBtn.classList.remove("hidden");
+    });
+
+    elements.depositForm.addEventListener("submit", async (e) => {
+      console.log("depositForm: Form submitted");
+      e.preventDefault();
+      const now = Date.now();
+      if (now - lastSubmissionTime < SUBMISSION_COOLDOWN) {
+        showError(elements.depositError, `Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (now - lastSubmissionTime)) / 1000)} seconds.`);
+        console.log("depositForm: Cooldown active, submission blocked");
+        return;
+      }
+      lastSubmissionTime = now;
+      elements.depositBtn.disabled = true;
+
+      try {
+        const memberEmail = document.getElementById("depositMember").value;
+        const amount = parseFloat(document.getElementById("depositAmount").value);
+        const receipt = document.getElementById("receipt").files[0];
+        if (!memberEmail || amount <= 0 || !receipt) throw new Error("All fields are required.");
+
+        const member = allMembers.find((m) => m.email === memberEmail);
+        if (!member) throw new Error("Member not found.");
+        if (member.status !== "approved") throw new Error("Member is not approved.");
+
+        const storageRef = ref(storage, `receipts/${member.id}/${receipt.name}`);
+        await uploadBytes(storageRef, receipt);
+        const receiptUrl = await getDownloadURL(storageRef);
+
+        const batch = writeBatch(db);
+        const newBalance = (member.balance || 0) + amount;
+        batch.update(doc(db, "users", member.id), {
+          balance: newBalance,
+          lastDeposit: serverTimestamp(),
+        });
+
+        const fundSnap = await getDocs(collection(db, "fund"));
+        const fundDoc = fundSnap.docs[0];
+        const newMainBalance = (fundDoc.data().mainBalance || 0) + amount;
+        batch.update(doc(db, "fund", fundDoc.id), { mainBalance: newMainBalance });
+
+        batch.set(doc(collection(db, "transactions")), {
+          memberId: member.id,
+          type: "deposit",
+          amount,
+          receiptUrl,
+          timestamp: serverTimestamp(),
+          adminId: auth.currentUser.uid,
+        });
+
+        await batch.commit();
+        elements.depositForm.reset();
+        await loadMembers();
+        await loadFundBalance();
+        await updateChart();
+        alert(`Successfully deposited ${formatCurrency(amount)} to ${member.name}!`);
+        console.log("depositForm: Deposited ₱", amount, "to", member.email);
+      } catch (error) {
+        console.error("depositForm: Error:", error);
+        showError(elements.depositError, error.message);
+      } finally {
+        elements.depositBtn.disabled = false;
+        console.log("depositForm: Button re-enabled");
+      }
+    });
+
+    elements.withdrawForm.addEventListener("submit", async (e) => {
+      console.log("withdrawForm: Form submitted");
+      e.preventDefault();
+      const now = Date.now();
+      if (now - lastSubmissionTime < SUBMISSION_COOLDOWN) {
+        showError(elements.withdrawError, `Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (now - lastSubmissionTime)) / 1000)} seconds.`);
+        console.log("withdrawForm: Cooldown active, submission blocked");
+        return;
+      }
+      lastSubmissionTime = now;
+      elements.withdrawBtn.disabled = true;
+
+      try {
+        const memberEmail = document.getElementById("withdrawMember").value;
+        const amount = parseFloat(document.getElementById("withdrawAmount").value);
+        if (!memberEmail || amount <= 0) throw new Error("All fields are required.");
+
+        const member = allMembers.find((m) => m.email === memberEmail);
+        if (!member) throw new Error("Member not found.");
+        if (member.status !== "approved") throw new Error("Member is not approved.");
+        if (member.balance < amount) throw new Error("Insufficient member balance.");
+
+        const batch = writeBatch(db);
+        const newBalance = member.balance - amount;
+        batch.update(doc(db, "users", member.id), {
+          balance: newBalance,
+          lastWithdrawal: serverTimestamp(),
+        });
+
+        const fundSnap = await getDocs(collection(db, "fund"));
+        const fundDoc = fundSnap.docs[0];
+        const newMainBalance = (fundDoc.data().mainBalance || 0) - amount;
+        if (newMainBalance < 0) throw new Error("Insufficient main fund balance.");
+        batch.update(doc(db, "fund", fundDoc.id), { mainBalance: newMainBalance });
+
+        batch.set(doc(collection(db, "transactions")), {
+          memberId: member.id,
+          type: "withdrawal",
+          amount,
+          timestamp: serverTimestamp(),
+          adminId: auth.currentUser.uid,
+        });
+
+        await batch.commit();
+        elements.withdrawForm.reset();
+        await loadMembers();
+        await loadFundBalance();
+        await updateChart();
+        alert(`Successfully withdrew ${formatCurrency(amount)} from ${member.name}!`);
+        console.log("withdrawForm: Withdrew ₱", amount, "from", member.email);
+      } catch (error) {
+        console.error("withdrawForm: Error:", error);
+        showError(elements.withdrawError, error.message);
+      } finally {
+        elements.withdrawBtn.disabled = false;
+        console.log("withdrawForm: Button re-enabled");
+      }
+    });
+
+    elements.profitForm.addEventListener("submit", async (e) => {
+      console.log("profitForm: Form submitted");
+      e.preventDefault();
+      const now = Date.now();
+      if (now - lastSubmissionTime < SUBMISSION_COOLDOWN) {
+        showError(elements.profitError, `Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (now - lastSubmissionTime)) / 1000)} seconds.`);
+        console.log("profitForm: Cooldown active, submission blocked");
+        return;
+      }
+      lastSubmissionTime = now;
+      elements.distributeBtn.disabled = true;
+
+      try {
+        const type = document.getElementById("transactionType").value;
+        const source = document.getElementById("fundSource").value;
+        const amount = parseFloat(document.getElementById("profitAmount").value);
+        if (amount <= 0) throw new Error("Amount must be greater than 0.");
+
+        const fundSnap = await getDocs(collection(db, "fund"));
+        const fundDoc = fundSnap.docs[0];
+        const fundData = fundDoc.data();
+        const mainBalance = fundData.mainBalance || 0;
+        const exceedBalance = fundData.exceedBalance || 0;
+        const serverTime = await getServerTime();
+        const batch = writeBatch(db);
+        const distRef = doc(collection(db, "profit_distributions"));
+        console.log("profitForm: Created distribution ref with ID:", distRef.id);
+
+        if (source === "exceed" && exceedBalance < amount) {
+          throw new Error("Insufficient exceed fund balance.");
+        }
+        if (source === "main" && mainBalance < amount && type === "profit") {
+          throw new Error("Insufficient main fund balance.");
+        }
+
+        let totalDistributed = 0;
+        let eligibleMembers = [];
+        let totalShares = 0;
+
+        if (type === "profit") {
+          eligibleMembers = (
+            await Promise.all(
+              allMembers.map(async (m) => ((await isMemberEligible(m, serverTime)).eligible ? m : null))
+            )
+          ).filter((m) => m && m.shares > 0);
+          totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+
+          if (!eligibleMembers.length && source === "exceed") {
+            throw new Error("No eligible members for profit distribution from exceed fund. Distribution rejected.");
+          } else if (!eligibleMembers.length) {
+            const newExceedBalance = exceedBalance + amount;
+            batch.update(doc(db, "fund", fundDoc.id), { mainBalance, exceedBalance: newExceedBalance });
+            batch.set(distRef, {
+              type,
+              source,
+              amount: 0,
+              excessAmount: amount,
+              timestamp: serverTimestamp(),
+              adminId: auth.currentUser.uid,
+              eligibleMemberCount: 0,
+              totalMemberCount: allMembers.length,
+              totalShares: 0,
+            });
+
+            await batch.commit();
+            elements.profitForm.reset();
+            await loadFundBalance();
+            await updateChart();
+            alert(`No eligible members for profit distribution. ${formatCurrency(amount)} added to exceed fund. New exceed fund balance: ${formatCurrency(newExceedBalance)}.`);
+            console.log("profitForm: No eligible members, added ₱", amount, "to exceed fund");
+            return;
+          }
+
+          eligibleMembers.forEach((m) => {
+            const memberBalance = (m.shares || 0) * 10;
+            const memberDist = Math.min(memberBalance * 0.1, amount - totalDistributed);
+            if (memberDist <= 0) return;
+
+            const newBalance = m.balance + memberDist;
+            totalDistributed += memberDist;
+
+            batch.update(doc(db, "users", m.id), {
+              balance: newBalance,
+              lastDistribution: serverTimestamp(),
+            });
+
+            batch.set(doc(collection(db, "member_distributions")), {
+              memberId: m.id,
+              memberName: m.name,
+              type: "profit",
+              amount: memberDist,
+              timestamp: serverTimestamp(),
+              distributionId: distRef.id,
+            });
+          });
+        } else {
+          eligibleMembers = allMembers.filter((m) => m.status !== "pending" && m.balance > 0);
+          totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+          const totalEligibleBalance = eligibleMembers.reduce((sum, m) => sum + (m.balance || 0), 0);
+
+          if (!eligibleMembers.length) throw new Error("No members with non-pending status and positive balance.");
+          if (totalEligibleBalance <= 0) throw new Error("No positive balance among eligible members.");
+
+          eligibleMembers.forEach((m) => {
+            const memberDist = (m.balance / totalEligibleBalance) * amount;
+            if (memberDist <= 0) return;
+
+            const newBalance = Math.max(0, m.balance - memberDist);
+            totalDistributed += memberDist;
+
+            batch.update(doc(db, "users", m.id), {
+              balance: newBalance,
+              lastDistribution: serverTimestamp(),
+            });
+
+            batch.set(doc(collection(db, "member_distributions")), {
+              memberId: m.id,
+              memberName: m.name,
+              type: "loss",
+              amount: memberDist,
+              timestamp: serverTimestamp(),
+              distributionId: distRef.id,
+            });
+          });
+        }
+
+        if (type === "profit" && totalDistributed > amount) throw new Error("Insufficient amount to distribute.");
+        const excessAmount = amount - totalDistributed;
+        let newMainBalance = mainBalance;
+        let newExceedBalance = exceedBalance;
+
+        if (source === "main") {
+          newMainBalance = mainBalance + (type === "profit" ? -totalDistributed : totalDistributed);
+          newExceedBalance = exceedBalance + (type === "profit" ? excessAmount : -excessAmount);
+        } else {
+          newExceedBalance = exceedBalance - totalDistributed;
+        }
+
+        if (newMainBalance < 0) throw new Error("Insufficient main fund balance.");
+        if (newExceedBalance < 0) throw new Error("Insufficient exceed fund balance.");
+
+        batch.update(doc(db, "fund", fundDoc.id), { mainBalance: newMainBalance, exceedBalance: newExceedBalance });
+
+        batch.set(distRef, {
+          type,
+          source,
+          amount: totalDistributed,
+          excessAmount: excessAmount > 0 ? excessAmount : 0,
+          timestamp: serverTimestamp(),
+          adminId: auth.currentUser.uid,
+          eligibleMemberCount: eligibleMembers.length,
+          totalMemberCount: allMembers.length,
+          totalShares,
+        });
+
+        await batch.commit();
+        elements.profitForm.reset();
+        await loadMembers();
+        await loadFundBalance();
+        await loadDailyReport();
+        await updateChart();
+        alert(
+          `Successfully ${type === "profit" ? "distributed profit" : "deducted loss"} of ${formatCurrency(
+            totalDistributed
+          )} from ${source} fund! ${
+            excessAmount > 0
+              ? `Excess ${formatCurrency(excessAmount)} ${
+                  source === "main" ? "added to exceed fund" : "remains in exceed fund"
+                }. `
+              : ""
+          }New exceed fund balance: ${formatCurrency(newExceedBalance)}.`
+        );
+        console.log("profitForm: Successfully processed", type, "of ₱", totalDistributed);
+      } catch (error) {
+        console.error("profitForm: Error:", error);
+        showError(elements.profitError, error.message);
+      } finally {
+        elements.distributeBtn.disabled = false;
+        console.log("profitForm: Button re-enabled");
+      }
+    });
+
+    elements.updateSharesBtn.addEventListener("click", async () => {
+      console.log("updateSharesBtn: Updating shares");
+      const batch = writeBatch(db);
+      allMembers.forEach((member) => {
+        const newShares = Math.floor((member.balance || 0) / 10);
+        batch.update(doc(db, "users", member.id), { shares: newShares });
+      });
+      await batch.commit();
+      await loadMembers();
+      alert("Shares updated successfully!");
+      console.log("updateSharesBtn: Shares updated for", allMembers.length, "members");
+    });
+
+    elements.reportBtn.addEventListener("click", () => {
+      console.log("reportBtn: Exporting pre-distribution report");
+      exportToExcel(true);
+    });
+
+    elements.exportDbBtn.addEventListener("click", async () => {
+      console.log("exportDbBtn: Exporting database");
+      const wb = XLSX.utils.book_new();
+
+      const usersWs = XLSX.utils.json_to_sheet(
+        allMembers.map((m) => ({
+          ID: m.id,
+          Name: m.name,
+          Email: m.email,
+          Status: m.status,
+          Balance: m.balance,
+          Shares: m.shares,
+          ApprovalDate: m.approvalDate?.toDate().toISOString(),
+          LastDistribution: m.lastDistribution?.toDate().toISOString(),
+        }))
+      );
+      XLSX.utils.book_append_sheet(wb, usersWs, "Users");
+
+      const fundSnap = await getDocs(collection(db, "fund"));
+      const fundWs = XLSX.utils.json_to_sheet(
+        fundSnap.docs.map((doc) => ({ ID: doc.id, ...doc.data() }))
+      );
+      XLSX.utils.book_append_sheet(wb, fundWs, "Fund");
+
+      const transactionsSnap = await getDocs(collection(db, "transactions"));
+      const transactionsWs = XLSX.utils.json_to_sheet(
+        transactionsSnap.docs.map((doc) => ({
+          ID: doc.id,
+          ...doc.data(),
+          Timestamp: doc.data().timestamp?.toDate().toISOString(),
+        }))
+      );
+      XLSX.utils.book_append_sheet(wb, transactionsWs, "Transactions");
+
+      const distributionsSnap = await getDocs(collection(db, "profit_distributions"));
+      const distributionsWs = XLSX.utils.json_to_sheet(
+        distributionsSnap.docs.map((doc) => ({
+          ID: doc.id,
+          ...doc.data(),
+          Timestamp: doc.data().timestamp?.toDate().toISOString(),
+        }))
+      );
+      XLSX.utils.book_append_sheet(wb, distributionsWs, "Profit Distributions");
+
+      const memberDistSnap = await getDocs(collection(db, "member_distributions"));
+      const memberDistWs = XLSX.utils.json_to_sheet(
+        memberDistSnap.docs.map((doc) => ({
+          ID: doc.id,
+          ...doc.data(),
+          Timestamp: doc.data().timestamp?.toDate().toISOString(),
+        }))
+      );
+      XLSX.utils.book_append_sheet(wb, memberDistWs, "Member Distributions");
+
+      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
+      saveAs(blob, `full_database_${new Date().toISOString()}.xlsx`);
+      console.log("exportDbBtn: Database exported");
+    });
+  </script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center">
+  <div id="loading" class="text-center">
+    <p>Loading...</p>
+  </div>
+  <div id="dashboard" class="hidden container mx-auto p-4">
+    <div class="flex justify-between items-center mb-8">
+      <h1 class="text-2xl font-bold">Baccarat Fund Admin Dashboard</h1>
+      <div>
+        <span id="userEmail" class="mr-4"></span>
+        <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
       </div>
-    </header>
+    </div>
+    <button id="loginBtn" class="hidden bg-blue-600 px-4 py-2 rounded hover:bg-blue-700">Login</button>
+
+    <!-- Members List -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">👥 Members</h2>
+      <table class="w-full border-collapse">
+        <thead>
+          <tr>
+            <th class="border px-4 py-2">Name</th>
+            <th class="border px-4 py-2">Email</th>
+            <th class="border px-4 py-2">Status</th>
+            <th class="border px-4 py-2">Balance</th>
+            <th class="border px-4 py-2">Shares</th>
+            <th class="border px-4 py-2">Eligible</th>
+            <th class="border px-4 py-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="membersList"></tbody>
+      </table>
+      <button
+        id="updateSharesBtn"
+        class="mt-4 bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
+      >
+        Update Shares (₱10/Share)
+      </button>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div class="bg-gray-800 p-4 rounded-lg shadow">
+        <h2 class="text-lg font-bold">Total Members</h2>
+        <p id="totalMembers" class="text-2xl">0</p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-lg shadow">
+        <h2 class="text-lg font-bold">Total Shares</h2>
+        <p id="totalShares" class="text-2xl">0</p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-lg shadow">
+        <h2 class="text-lg font-bold">Total Balance</h2>
+        <p id="totalBalance" class="text-2xl">₱0.00</p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-lg shadow">
+        <h2 class="text-lg font-bold">Exceed Fund</h2>
+        <p id="exceedFund" class="text-2xl">₱0.00</p>
+      </div>
+    </div>
+
+    <!-- Deposit Form -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">💰 Deposit</h2>
+      <form id="depositForm" class="space-y-4">
+        <div>
+          <label class="block text-sm mb-1">Member Email</label>
+          <input
+            type="email"
+            id="depositMember"
+            class="w-full p-2 bg-gray-700 rounded text-white"
+            required
+          />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Amount (₱)</label>
+          <input
+            type="number"
+            id="depositAmount"
+            class="w-full p-2 bg-gray-700 rounded text-white"
+            min="0"
+            step="0.01"
+            required
+          />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Receipt</label>
+          <input
+            type="file"
+            id="receipt"
+            class="w-full p-2 bg-gray-700 rounded text-white"
+            accept="image/*"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          id="depositBtn"
+          class="w-full bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600"
+        >
+          Deposit
+        </button>
+      </form>
+      <p id="depositError" class="text-red-500 text-sm mt-2 hidden"></p>
+    </div>
+
+    <!-- Withdraw Form -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">💸 Withdraw</h2>
+      <form id="withdrawForm" class="space-y-4">
+        <div>
+          <label class="block text-sm mb-1">Member Email</label>
+          <input
+            type="email"
+            id="withdrawMember"
+            class="w-full p-2 bg-gray-700 rounded text-white"
+            required
+          />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Amount (₱)</label>
+          <input
+            type="number"
+            id="withdrawAmount"
+            class="w-full p-2 bg-gray-700 rounded text-white"
+            min="0"
+            step="0.01"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          id="withdrawBtn"
+          class="w-full bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600"
+        >
+          Withdraw
+        </button>
+      </form>
+      <p id="withdrawError" class="text-red-500 text-sm mt-2 hidden"></p>
+    </div>
+
+    <!-- Distribute Profit/Loss -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">💸 Distribute Profit/Loss</h2>
+      <p class="text-sm mb-2">Fund Balance: ₱<span id="fundBalance">0.00</span></p>
+      <p class="text-sm mb-4">Exceed Fund: ₱<span id="exceedFundDisplay">0.00</span></p>
+      <form id="profitForm" class="space-y-4">
+        <div>
+          <label class="block text-sm mb-1">Transaction Type</label>
+          <select id="transactionType" class="w-full p-2 bg-gray-700 rounded text-white">
+            <option value="profit">Profit</option>
+            <option value="loss">Loss</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Source</label>
+          <select id="fundSource" class="w-full p-2 bg-gray-700 rounded text-white">
+            <option value="main">Main Fund</option>
+            <option value="exceed">Exceed Fund</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Amount (₱)</label>
+          <input
+            type="number"
+            id="profitAmount"
+            class="w-full p-2 bg-gray-700 rounded text-white"
+            placeholder="Enter amount"
+            min="0"
+            step="0.01"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          id="distributeBtn"
+          class="w-full bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600"
+        >
+          Distribute
+        </button>
+      </form>
+      <p id="profitError" class="text-red-500 text-sm mt-2 hidden"></p>
+    </div>
+
+    <!-- Daily Distribution Report -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">📊 Daily Distribution Report</h2>
+      <button
+        id="reportBtn"
+        class="mb-4 bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
+      >
+        Export Report to Excel
+      </button>
+      <ul id="dailyReport" class="list-disc pl-5"></ul>
+    </div>
+
+    <!-- Transaction History -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">📜 Transaction History</h2>
+      <ul id="historyList" class="list-disc pl-5"></ul>
+    </div>
+
+    <!-- Fund Growth Chart -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">📈 Fund Growth</h2>
+      <canvas id="fundChart"></canvas>
+    </div>
+
+    <!-- Export Database -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow">
+      <h2 class="text-lg font-bold mb-4">💾 Export Database</h2>
+      <button
+        id="exportDbBtn"
+        class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
+      >
+        Export Full Database to Excel
+      </button>
+    </div>
+  </div>
+</body>
+</html>    </header>
 
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
