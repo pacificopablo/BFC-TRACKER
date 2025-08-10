@@ -338,7 +338,7 @@
       const SUBMISSION_COOLDOWN = 5000;
       const HOURS_THRESHOLD = 24;
       let lastSubmissionTime = 0;
-      let lastAutoUpdateDate = null; // Track last auto-update date
+      let lastAutoUpdateDate = null;
 
       // Utility Functions
       const formatCurrency = (value) =>
@@ -400,7 +400,7 @@
         return new Date(dateObj.year, dateObj.month, dateObj.day, dateObj.hour, dateObj.minute, dateObj.second);
       }
 
-      // Check Member Eligibility (for profits only)
+      // Check Member Eligibility (for display only)
       async function isMemberEligible(member, serverTime) {
         if (member.status !== "approved") return { eligible: false, reason: "Not Approved" };
         if (member.balance <= 0) return { eligible: false, reason: "Zero/Negative Balance" };
@@ -447,7 +447,7 @@
         return { start, end };
       }
 
-      // Adjust Balances (1 share = 10 pesos, no eligibility check)
+      // Adjust Balances (1 share = 10 pesos)
       async function adjustBalances() {
         console.log("adjustBalances: Starting share update process");
         try {
@@ -493,15 +493,14 @@
           try {
             const now = getPHTTime();
             console.log("scheduleAutoUpdate: Checking time in PST:", now.toLocaleString("en-PH", { timeZone: "Asia/Manila" }));
-            const isSunday = now.getDay() === 0; // Sunday is 0
+            const isSunday = now.getDay() === 0;
             const isMidnight = now.getHours() === 0 && now.getMinutes() === 0;
 
-            // Format current date as YYYY-MM-DD for comparison
             const currentDateStr = now.toISOString().slice(0, 10);
 
             if (isSunday && isMidnight && lastAutoUpdateDate !== currentDateStr) {
               console.log("scheduleAutoUpdate: Triggering auto-update for Sunday at 00:00 PST");
-              lastAutoUpdateDate = currentDateStr; // Update to prevent duplicate runs
+              lastAutoUpdateDate = currentDateStr;
               await adjustBalances();
               console.log("scheduleAutoUpdate: Auto-update completed");
             } else {
@@ -514,7 +513,7 @@
             console.error("scheduleAutoUpdate: Error in scheduler:", error);
             showError(elements.profitError, "Auto-update failed: " + error.message);
           }
-        }, 60000); // Check every minute
+        }, 60000);
       }
 
       // Load Fund and Exceed Fund Balances
@@ -676,450 +675,198 @@
           elements.totalMembers.textContent = memberCount;
           elements.totalShares.textContent = shareTotal;
           elements.totalBalance.textContent = formatCurrency(balanceTotal);
-          console.log("loadMembers: Updated UI with", memberCount, "members, total shares:", shareTotal);
-          await updateTopShareholders(serverTime);
+          console.log("loadMembers: Updated totals - Members:", memberCount, "Shares:", shareTotal, "Balance:", balanceTotal);
+
+          const topMembers = [...allMembers]
+            .sort((a, b) => (b.shares || 0) - (a.shares || 0))
+            .slice(0, 5);
+          elements.topShareholders.innerHTML = topMembers
+            .map(
+              (m) =>
+                `<li>${m.name || "N/A"}: ${m.shares || 0} shares (₱${formatCurrency(m.balance || 0)})</li>`
+            )
+            .join("");
+          console.log("loadMembers: Updated top shareholders");
         } catch (error) {
           console.error("loadMembers: Error:", error);
           showError(elements.profitError, "Failed to load members: " + error.message);
         }
       }
 
-      // Update Top Shareholders
-      async function updateTopShareholders(serverTime) {
-        console.log("updateTopShareholders: Starting");
-        try {
-          const top = (
-            await Promise.all(
-              allMembers.map(async (m) => {
-                const eligibility = await isMemberEligible(m, serverTime);
-                return eligibility.eligible && m.status === "approved" ? m : null;
-              })
-            )
-          )
-            .filter((m) => m)
-            .sort((a, b) => (b.shares || 0) - (a.shares || 0))
-            .slice(0, 5);
-
-          elements.topShareholders.innerHTML = top.length
-            ? top.map((m) => `<li>${m.name || "N/A"} — ${m.shares || 0} shares</li>`).join("")
-            : '<p class="text-gray-400">No eligible shareholders.</p>';
-          console.log("updateTopShareholders: Updated with", top.length, "top shareholders");
-        } catch (error) {
-          console.error("updateTopShareholders: Error:", error);
-          showError(elements.profitError, "Failed to update top shareholders: " + error.message);
-        }
-      }
-
-      // Search Members
-      elements.searchInput.addEventListener("input", async () => {
-        console.log("searchInput: Search triggered with query:", elements.searchInput.value);
-        try {
-          const query = elements.searchInput.value.toLowerCase();
-          const filtered = allMembers.filter(
-            (m) =>
-              m.name?.toLowerCase().includes(query) ||
-              m.email?.toLowerCase().includes(query) ||
-              m.status?.toLowerCase().includes(query)
-          );
-          elements.membersList.innerHTML = "";
-          const serverTime = await getServerTime();
-
-          for (const m of filtered) {
-            const eligibility = await isMemberEligible(m, serverTime);
-            const div = document.createElement("div");
-            div.className = "bg-gray-800 p-4 rounded-lg shadow";
-            div.innerHTML = `
-              <p><strong>Name:</strong> ${m.name || "N/A"}</p>
-              <p><strong>Email:</strong> ${m.email || "N/A"}</p>
-              <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${
-                m.status === "approved"
-                  ? "bg-green-600"
-                  : m.status === "pending"
-                    ? "bg-yellow-600"
-                    : "bg-red-600"
-              }">${m.status}</span></p>
-              <p><strong>Shares:</strong> ${m.shares || 0}</p>
-              <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
-              <p><strong>Eligible:</strong> ${eligibility.eligible ? "Yes" : `No (${eligibility.reason})`}</p>
-              <div class="flex space-x-2 mt-2">
-                <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-700">Edit</button>
-                <button data-id="${m.id}" data-name="${
-                  m.name || "Unknown"
-                }" class="delete-btn bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">Delete</button>
-              </div>
-            `;
-            elements.membersList.appendChild(div);
-          }
-          console.log("searchInput: Displayed", filtered.length, "filtered members");
-        } catch (error) {
-          console.error("searchInput: Error:", error);
-          showError(elements.profitError, "Failed to search members: " + error.message);
-        }
-      });
-
       // Load Transaction Requests
-      function loadRequests() {
+      async function loadRequests() {
         console.log("loadRequests: Starting");
         showLoading(elements.requestsList);
-        const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
-        onSnapshot(q, (snapshot) => {
-          const pending = snapshot.docs.filter((doc) => doc.data().status === "pending");
-          elements.requestsList.innerHTML = pending.length
-            ? pending
-                .map(
-                  (doc) => `
-            <div class="bg-gray-700 p-4 rounded-lg">
-              <p><strong>Member:</strong> ${doc.data().memberName || "N/A"}</p>
-              <p><strong>Type:</strong> ${doc.data().type || "N/A"}</p>
-              <p><strong>Amount:</strong> ₱${formatCurrency(doc.data().amount)}</p>
-              <p><strong>Date:</strong> ${doc.data().timestamp?.toDate().toLocaleString("en-PH") || "N/A"}</p>
+        try {
+          const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
+          const snapshot = await getDocs(q);
+          elements.requestsList.innerHTML = "";
+
+          snapshot.docs.forEach((doc) => {
+            const t = { id: doc.id, ...doc.data() };
+            const div = document.createElement("div");
+            div.className = "bg-gray-700 p-4 rounded-lg";
+            div.innerHTML = `
+              <p><strong>${t.memberName || "Unknown"} (${t.type})</strong></p>
+              <p>Amount: ₱${formatCurrency(t.amount)}</p>
+              <p>Status: <span class="px-2 py-1 rounded ${
+                t.status === "approved"
+                  ? "bg-green-600"
+                  : t.status === "pending"
+                    ? "bg-yellow-600"
+                    : "bg-red-600"
+              }">${t.status}</span></p>
+              <p>Date: ${t.timestamp.toDate().toLocaleString("en-PH")}</p>
               <div class="flex space-x-2 mt-2">
-                <button data-id="${doc.id}" class="approve-btn bg-green-600 px-3 py-1 rounded text-sm hover:bg-green-700">Approve</button>
-                <button data-id="${doc.id}" class="reject-btn bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">Reject</button>
+                <button data-id="${t.id}" data-type="approve" class="action-btn bg-green-600 px-3 py-1 rounded text-sm hover:bg-green-700">Approve</button>
+                <button data-id="${t.id}" data-type="reject" class="action-btn bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">Reject</button>
               </div>
-            </div>
-          `
-                )
-                .join("")
-            : '<p class="text-gray-400">No pending requests.</p>';
-          console.log("loadRequests: Updated with", pending.length, "pending requests");
-        }, (error) => {
+            `;
+            elements.requestsList.appendChild(div);
+          });
+          console.log("loadRequests: Loaded", snapshot.docs.length, "requests");
+        } catch (error) {
           console.error("loadRequests: Error:", error);
           showError(elements.profitError, "Failed to load requests: " + error.message);
-        });
+        }
       }
 
       // Load Transaction History
-      function loadTransactionHistory() {
-        console.log("loadTransactionHistory: Starting");
+      async function loadHistory() {
+        console.log("loadHistory: Starting");
         showLoading(elements.historyList);
-        const profitQ = query(collection(db, "profit_distributions"), orderBy("timestamp", "desc"));
-        const transactionQ = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
-
-        onSnapshot(profitQ, (profitSnap) => {
-          onSnapshot(transactionQ, (txnSnap) => {
-            allTransactions = [
-              ...profitSnap.docs.map((doc) => ({
-                id: doc.id,
-                type: doc.data().type === "profit" ? "Profit Distribution" : "Loss Deduction",
-                filterType: doc.data().type,
-                amount: doc.data().amount,
-                excessAmount: doc.data().excessAmount || 0,
-                source: doc.data().source || "main",
-                inputType: doc.data().inputType || "amount",
-                inputValue: doc.data().inputValue || doc.data().amount,
-                timestamp: doc.data().timestamp?.toDate() || new Date(),
-                details: `To ${doc.data().eligibleMemberCount} of ${doc.data().totalMemberCount} members (Source: ${doc.data().source}, Input: ${doc.data().inputType === "percentage" ? `${doc.data().inputValue}%` : `₱${formatCurrency(doc.data().inputValue)}`})`,
-              })),
-              ...txnSnap.docs.map((doc) => ({
-                id: doc.id,
-                type: doc.data().type === "deposit" ? "Deposit" : "Cash Out",
-                filterType: doc.data().type,
-                amount: doc.data().amount,
-                timestamp: doc.data().timestamp?.toDate() || new Date(),
-                details: `Member: ${doc.data().memberName || "N/A"}, Status: ${doc.data().status}`,
-              })),
-            ];
-            displayTransactionHistory();
-            console.log("loadTransactionHistory: Loaded", allTransactions.length, "transactions");
-          }, (error) => {
-            console.error("loadTransactionHistory: Error in transactions snapshot:", error);
-            showError(elements.profitError, "Failed to load transaction history: " + error.message);
-          });
-        }, (error) => {
-          console.error("loadTransactionHistory: Error in profit snapshot:", error);
-          showError(elements.profitError, "Failed to load transaction history: " + error.message);
-        });
-      }
-
-      // Display Transaction History
-      function displayTransactionHistory() {
-        console.log("displayTransactionHistory: Starting");
         try {
           const filter = elements.historyFilter.value;
           const sort = elements.historySort.value;
-          let filtered = filter === "all" ? allTransactions : allTransactions.filter((t) => t.filterType === filter);
-          filtered.sort((a, b) => (sort === "desc" ? b.timestamp - a.timestamp : a.timestamp - b.timestamp));
+          let q = query(collection(db, "transactions"), orderBy("timestamp", sort));
+          if (filter !== "all") {
+            q = query(collection(db, "transactions"), where("type", "==", filter), orderBy("timestamp", sort));
+          }
+          const snapshot = await getDocs(q);
+          allTransactions = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          elements.historyList.innerHTML = "";
 
-          elements.historyList.innerHTML = filtered.length
-            ? filtered
-                .map(
-                  (t) => `
-            <div class="bg-gray-700 p-4 rounded-lg">
-              <p><strong>Type:</strong> ${t.type}</p>
-              <p><strong>Amount:</strong> ₱${formatCurrency(t.amount)}</p>
-              ${t.excessAmount ? `<p><strong>Excess:</strong> ₱${formatCurrency(t.excessAmount)}</p>` : ""}
-              <p><strong>Date:</strong> ${t.timestamp.toLocaleString("en-PH")}</p>
-              <p><strong>Details:</strong> ${t.details}</p>
-            </div>
-          `
-                )
-                .join("")
-            : '<p class="text-gray-400">No transactions found.</p>';
-          console.log("displayTransactionHistory: Displayed", filtered.length, "transactions");
+          allTransactions.forEach((t) => {
+            const div = document.createElement("div");
+            div.className = "bg-gray-700 p-4 rounded-lg";
+            div.innerHTML = `
+              <p><strong>${t.memberName || "Unknown"} (${t.type})</strong></p>
+              <p>Amount: ₱${formatCurrency(t.amount)}</p>
+              <p>Status: <span class="px-2 py-1 rounded ${
+                t.status === "approved"
+                  ? "bg-green-600"
+                  : t.status === "pending"
+                    ? "bg-yellow-600"
+                    : "bg-red-600"
+              }">${t.status}</span></p>
+              <p>Date: ${t.timestamp.toDate().toLocaleString("en-PH")}</p>
+            `;
+            elements.historyList.appendChild(div);
+          });
+          console.log("loadHistory: Loaded", allTransactions.length, "transactions");
         } catch (error) {
-          console.error("displayTransactionHistory: Error:", error);
-          showError(elements.profitError, "Failed to display transaction history: " + error.message);
+          console.error("loadHistory: Error:", error);
+          showError(elements.profitError, "Failed to load history: " + error.message);
         }
       }
 
-      // Load Daily Report
+      // Load Daily Distribution Report
       async function loadDailyReport() {
         console.log("loadDailyReport: Starting");
         showLoading(elements.dailyReportList);
         try {
           const serverTime = await getServerTime();
           const { start, end } = getPHTDayRange(serverTime);
-          const q = query(collection(db, "member_distributions"), orderBy("timestamp", "desc"));
-          const snapshot = await getDocs(q);
-          const todayDist = snapshot.docs.filter(
-            (doc) => doc.data().timestamp?.toDate() >= start && doc.data().timestamp?.toDate() <= end
+          const q = query(
+            collection(db, "member_distributions"),
+            where("timestamp", ">=", start),
+            where("timestamp", "<=", end),
+            orderBy("timestamp", "desc")
           );
+          const snapshot = await getDocs(q);
+          elements.dailyReportList.innerHTML = "";
 
-          elements.dailyReportList.innerHTML = todayDist.length
-            ? todayDist
-                .map(
-                  (doc) => `
-            <div class="bg-gray-700 p-4 rounded-lg">
-              <p><strong>Member:</strong> ${doc.data().memberName || "N/A"}</p>
-              <p><strong>Type:</strong> ${doc.data().type === "profit" ? "Profit" : "Loss"}</p>
-              <p><strong>Amount:</strong> ${doc.data().type === "profit" ? "+" : "-"}₱${formatCurrency(
-                  doc.data().amount
-                )}</p>
-              <p><strong>Date:</strong> ${doc.data().timestamp?.toDate().toLocaleString("en-PH") || "N/A"}</p>
-            </div>
-          `
-                )
-                .join("")
-            : '<p class="text-gray-400">No distributions today.</p>';
-          console.log("loadDailyReport: Displayed", todayDist.length, "distributions");
+          snapshot.docs.forEach((doc) => {
+            const d = doc.data();
+            const div = document.createElement("div");
+            div.className = "bg-gray-700 p-4 rounded-lg";
+            div.innerHTML = `
+              <p><strong>${d.memberName || "Unknown"} (${d.type})</strong></p>
+              <p>Amount: ₱${formatCurrency(d.amount)}</p>
+              <p>Date: ${d.timestamp.toDate().toLocaleString("en-PH")}</p>
+            `;
+            elements.dailyReportList.appendChild(div);
+          });
+          console.log("loadDailyReport: Loaded", snapshot.docs.length, "distributions");
         } catch (error) {
           console.error("loadDailyReport: Error:", error);
           showError(elements.profitError, "Failed to load daily report: " + error.message);
         }
       }
 
-      // Export Pre-Distribution Report to Excel
-      async function exportReportToExcel() {
-        console.log("exportReportToExcel: Starting");
+      // Pre-Distribution Report
+      async function generatePreDistributionReport() {
+        console.log("generatePreDistributionReport: Starting");
         try {
           const serverTime = await getServerTime();
-          const { mainBalance, exceedBalance } = await loadFundBalance();
-
-          // Member Details
-          const memberData = await Promise.all(
-            allMembers.map(async (m) => {
-              const eligibility = await isMemberEligible(m, serverTime);
-              return {
-                "Member Name": m.name || "N/A",
-                Email: m.email || "N/A",
-                Status: m.status || "N/A",
-                Shares: m.shares || 0,
-                "Balance (₱)": formatCurrency(m.balance),
-                "Eligible for Profit": eligibility.eligible ? "Yes" : "No",
-                "Reason for Ineligibility": eligibility.eligible ? "" : eligibility.reason,
-              };
-            })
-          );
-
-          // Pending Transactions
-          const pendingSnapshot = await getDocs(query(collection(db, "transactions"), orderBy("timestamp", "desc")));
-          const pendingRequests = pendingSnapshot.docs
-            .filter((doc) => doc.data().status === "pending")
-            .map((doc) => ({
-              Member: doc.data().memberName || "N/A",
-              Type: doc.data().type || "N/A",
-              "Amount (₱)": formatCurrency(doc.data().amount),
-              Date: doc.data().timestamp?.toDate().toLocaleString("en-PH") || "N/A",
-            }));
-
-          // Fund Summary
-          const fundSummary = [
-            {
-              "Main Fund Balance (₱)": formatCurrency(mainBalance),
-              "Exceed Fund Balance (₱)": formatCurrency(exceedBalance),
-              "Total Members": allMembers.length,
-              "Total Shares": allMembers.reduce((sum, m) => sum + (m.shares || 0), 0),
-              "Total Member Balance (₱)": formatCurrency(allMembers.reduce((sum, m) => sum + (m.balance || 0), 0)),
-            },
-          ];
-
-          // Create Workbook
-          const wb = XLSX.utils.book_new();
-          
-          // Fund Summary Sheet
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fundSummary), "Fund Summary");
-          
-          // Member Details Sheet
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(memberData), "Members");
-          
-          // Pending Transactions Sheet
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(pendingRequests), "Pending Transactions");
-
-          // Notes Sheet
-          const notes = [
-            { Note: "Generated on: " + serverTime.toLocaleString("en-PH") },
-            { Note: "Eligibility Criteria: Approved status, positive balance, approved ≥24 hours, no distribution today." },
-            { Note: "Exceed Fund: Available for distribution if sufficient balance exists." },
-          ];
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(notes), "Notes");
-
-          // Download Excel File
-          XLSX.writeFile(wb, `Pre_Distribution_Report_${serverTime.toISOString().slice(0, 10)}.xlsx`);
-          console.log("exportReportToExcel: Excel report generated");
+          const report = [];
+          for (const m of allMembers) {
+            const eligibility = await isMemberEligible(m, serverTime);
+            report.push({
+              name: m.name || "N/A",
+              email: m.email || "N/A",
+              shares: m.shares || 0,
+              balance: formatCurrency(m.balance || 0),
+              eligible: eligibility.eligible ? "Yes" : `No (${eligibility.reason})`,
+            });
+          }
+          console.log("generatePreDistributionReport: Generated report for", report.length, "members");
+          const worksheet = XLSX.utils.json_to_sheet(report);
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(workbook, worksheet, "Pre-Distribution Report");
+          XLSX.writeFile(workbook, `Pre_Distribution_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+          console.log("generatePreDistributionReport: Exported report to Excel");
         } catch (error) {
-          console.error("exportReportToExcel: Error:", error);
-          showError(elements.profitError, "Failed to export report to Excel: " + error.message);
+          console.error("generatePreDistributionReport: Error:", error);
+          showError(elements.profitError, "Failed to generate report: " + error.message);
         }
       }
 
-      // Export Entire Database to Excel
-      async function exportDatabaseToExcel() {
-        console.log("exportDatabaseToExcel: Starting");
+      // Export Database to Excel
+      async function exportDatabase() {
+        console.log("exportDatabase: Starting");
         try {
-          const serverTime = await getServerTime();
-
-          // Users Collection
-          const usersSnapshot = await getDocs(collection(db, "users"));
-          const usersData = usersSnapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
-              ID: doc.id,
-              Name: data.name || "N/A",
-              Email: data.email || "N/A",
-              Status: data.status || "N/A",
-              Shares: data.shares || 0,
-              "Balance (₱)": formatCurrency(data.balance),
-              "Approval Date": data.approvalDate?.toDate().toLocaleString("en-PH") || "N/A",
-              "Last Distribution": data.lastDistribution?.toDate().toLocaleString("en-PH") || "N/A",
-            };
-          });
-
-          // Fund Collection
-          const fundSnapshot = await getDocs(collection(db, "fund"));
-          const fundData = fundSnapshot.docs.map((doc) => ({
-            ID: doc.id,
-            "Main Balance (₱)": formatCurrency(doc.data().mainBalance || 0),
-            "Exceed Balance (₱)": formatCurrency(doc.data().exceedBalance || 0),
+          const members = allMembers.map((m) => ({
+            Name: m.name || "N/A",
+            Email: m.email || "N/A",
+            Status: m.status || "N/A",
+            Shares: m.shares || 0,
+            Balance: formatCurrency(m.balance || 0),
+            ApprovalDate: m.approvalDate
+              ? m.approvalDate.toDate().toLocaleString("en-PH")
+              : "N/A",
           }));
 
-          // Transactions Collection
-          const transactionsSnapshot = await getDocs(query(collection(db, "transactions"), orderBy("timestamp", "desc")));
-          const transactionsData = transactionsSnapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
-              ID: doc.id,
-              "Member ID": data.memberId || "N/A",
-              "Member Name": data.memberName || "N/A",
-              Type: data.type || "N/A",
-              "Amount (₱)": formatCurrency(data.amount),
-              Status: data.status || "N/A",
-              Timestamp: data.timestamp?.toDate().toLocaleString("en-PH") || "N/A",
-            };
-          });
+          const transactions = allTransactions.map((t) => ({
+            MemberName: t.memberName || "N/A",
+            Type: t.type || "N/A",
+            Amount: formatCurrency(t.amount || 0),
+            Status: t.status || "N/A",
+            Timestamp: t.timestamp.toDate().toLocaleString("en-PH"),
+          }));
 
-          // Profit Distributions Collection
-          const profitDistSnapshot = await getDocs(query(collection(db, "profit_distributions"), orderBy("timestamp", "desc")));
-          const profitDistData = profitDistSnapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
-              ID: doc.id,
-              Type: data.type || "N/A",
-              Source: data.source || "N/A",
-              "Amount (₱)": formatCurrency(data.amount || 0),
-              "Excess Amount (₱)": formatCurrency(data.excessAmount || 0),
-              "Input Type": data.inputType || "amount",
-              "Input Value": data.inputType === "percentage" ? `${data.inputValue}%` : `₱${formatCurrency(data.inputValue || data.amount)}`,
-              "Admin ID": data.adminId || "N/A",
-              "Eligible Member Count": data.eligibleMemberCount || 0,
-              "Total Member Count": data.totalMemberCount || 0,
-              "Total Shares": data.totalShares || 0,
-              Timestamp: data.timestamp?.toDate().toLocaleString("en-PH") || "N/A",
-            };
-          });
-
-          // Member Distributions Collection
-          const memberDistSnapshot = await getDocs(query(collection(db, "member_distributions"), orderBy("timestamp", "desc")));
-          const memberDistData = memberDistSnapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
-              ID: doc.id,
-              "Member ID": data.memberId || "N/A",
-              "Member Name": data.memberName || "N/A",
-              Type: data.type || "N/A",
-              "Amount (₱)": formatCurrency(data.amount || 0),
-              "Distribution ID": data.distributionId || "N/A",
-              Timestamp: data.timestamp?.toDate().toLocaleString("en-PH") || "N/A",
-            };
-          });
-
-          // Create Workbook
-          const wb = XLSX.utils.book_new();
-          
-          // Append Sheets
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(usersData), "Users");
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fundData), "Fund");
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(transactionsData), "Transactions");
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(profitDistData), "Profit Distributions");
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(memberDistData), "Member Distributions");
-
-          // Download Excel File
-          XLSX.writeFile(wb, `Database_Export_${serverTime.toISOString().slice(0, 10)}.xlsx`);
-          console.log("exportDatabaseToExcel: Excel database exported");
+          const workbook = XLSX.utils.book_new();
+          const memberSheet = XLSX.utils.json_to_sheet(members);
+          const transactionSheet = XLSX.utils.json_to_sheet(transactions);
+          XLSX.utils.book_append_sheet(workbook, memberSheet, "Members");
+          XLSX.utils.book_append_sheet(workbook, transactionSheet, "Transactions");
+          XLSX.writeFile(workbook, `Database_Export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+          console.log("exportDatabase: Exported database to Excel");
         } catch (error) {
-          console.error("exportDatabaseToExcel: Error:", error);
-          showError(elements.profitError, "Failed to export database to Excel: " + error.message);
+          console.error("exportDatabase: Error:", error);
+          showError(elements.profitError, "Failed to export database: " + error.message);
         }
       }
-
-      // Add to Exceed Fund
-      elements.addExceedForm.addEventListener("submit", async (e) => {
-        console.log("addExceedForm: Form submitted");
-        e.preventDefault();
-        const now = Date.now();
-        if (now - lastSubmissionTime < SUBMISSION_COOLDOWN) {
-          showError(elements.exceedError, `Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (now - lastSubmissionTime)) / 1000)} seconds.`);
-          console.log("addExceedForm: Cooldown active, submission blocked");
-          return;
-        }
-        lastSubmissionTime = now;
-        elements.addExceedBtn.disabled = true;
-
-        try {
-          const amount = parseFloat(elements.exceedAmount.value);
-          if (amount <= 0) throw new Error("Amount must be greater than 0.");
-          const fundSnap = await getDocs(collection(db, "fund"));
-          const fundDoc = fundSnap.docs[0];
-          const fundData = fundDoc.data();
-          const newExceedBalance = (fundData.exceedBalance || 0) + amount;
-
-          await updateDoc(doc(db, "fund", fundDoc.id), { exceedBalance: newExceedBalance });
-          await setDoc(doc(collection(db, "profit_distributions")), {
-            type: "profit",
-            source: "external",
-            amount: 0,
-            excessAmount: amount,
-            inputType: "amount",
-            inputValue: amount,
-            timestamp: serverTimestamp(),
-            adminId: auth.currentUser.uid,
-            eligibleMemberCount: 0,
-            totalMemberCount: allMembers.length,
-            totalShares: 0,
-          });
-
-          elements.addExceedForm.reset();
-          await loadFundBalance();
-          alert(`Successfully added ₱${formatCurrency(amount)} to exceed fund. New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
-          console.log("addExceedForm: Successfully added ₱", amount, "to exceed fund");
-        } catch (error) {
-          console.error("addExceedForm: Error:", error);
-          showError(elements.exceedError, "Failed to add to exceed fund: " + error.message);
-        } finally {
-          elements.addExceedBtn.disabled = false;
-          console.log("addExceedForm: Button re-enabled");
-        }
-      });
 
       // Distribute Profit/Loss
       elements.profitForm.addEventListener("submit", async (e) => {
@@ -1154,131 +901,198 @@
           console.log("profitForm: Created distribution ref with ID:", distRef.id);
 
           let totalDistributed = 0;
-          let eligibleMembers = [];
-          let totalShares = 0;
-          let totalAmount = inputValue; // Used for amount-based loss distribution
+          let eligibleMembers = allMembers; // Include all members
+          let totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+          let totalAmount = inputValue;
 
-          if (type === "profit") {
-            eligibleMembers = (
-              await Promise.all(
-                allMembers.map(async (m) => ((await isMemberEligible(m, serverTime)).eligible ? m : null))
-              )
-            ).filter((m) => m && m.shares > 0);
-            totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
-
-            if (!eligibleMembers.length && source === "exceed") {
-              throw new Error("No eligible members for profit distribution from exceed fund. Distribution rejected.");
-            } else if (!eligibleMembers.length) {
-              const newExceedBalance = exceedBalance + inputValue;
-              batch.update(doc(db, "fund", fundDoc.id), { mainBalance, exceedBalance: newExceedBalance });
-              batch.set(distRef, {
-                type,
-                source,
-                amount: 0,
-                excessAmount: inputValue,
-                inputType: "amount",
-                inputValue: inputValue,
-                timestamp: serverTimestamp(),
-                adminId: auth.currentUser.uid,
-                eligibleMemberCount: 0,
-                totalMemberCount: allMembers.length,
-                totalShares: 0,
-              });
-
-              await batch.commit();
-              elements.profitForm.reset();
-              await loadFundBalance();
-              await updateChart();
-              alert(`No eligible members for profit distribution. ₱${formatCurrency(inputValue)} added to exceed fund. New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
-              console.log("profitForm: No eligible members, added ₱", inputValue, "to exceed fund");
-              return;
-            }
-
-            eligibleMembers.forEach((m) => {
-              const memberBalance = (m.shares || 0) * 10;
-              const memberDist = Math.min(memberBalance * 0.1, inputValue - totalDistributed);
-              if (memberDist <= 0) return;
-
-              const newBalance = m.balance + memberDist;
-              totalDistributed += memberDist;
-
-              batch.update(doc(db, "users", m.id), {
-                balance: newBalance,
-                lastDistribution: serverTimestamp(),
-              });
-
-              batch.set(doc(collection(db, "member_distributions")), {
-                memberId: m.id,
-                memberName: m.name,
-                type: "profit",
-                amount: memberDist,
-                timestamp: serverTimestamp(),
-                distributionId: distRef.id,
-              });
-            });
-          } else {
-            // Loss distribution
-            eligibleMembers = allMembers.filter((m) => m.status !== "pending" && m.shares > 0 && m.balance > 0);
-            totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
-
-            if (!eligibleMembers.length) throw new Error("No members with non-pending status, positive shares, and positive balance.");
-
-            if (inputType === "percentage") {
-              // Percentage-based loss
-              const lossPercentage = inputValue / 100; // Convert percentage to decimal
-              eligibleMembers.forEach((m) => {
-                const memberDist = Math.min(m.balance * lossPercentage, m.balance); // Cap at member's balance
-                if (memberDist <= 0) return;
-
-                const newBalance = Math.max(0, m.balance - memberDist);
-                totalDistributed += memberDist;
-
-                batch.update(doc(db, "users", m.id), {
-                  balance: newBalance,
-                  lastDistribution: serverTimestamp(),
-                });
-
-                batch.set(doc(collection(db, "member_distributions")), {
-                  memberId: m.id,
-                  memberName: m.name,
-                  type: "loss",
-                  amount: memberDist,
-                  timestamp: serverTimestamp(),
-                  distributionId: distRef.id,
-                });
-              });
-              totalAmount = totalDistributed; // Total amount is the sum of actual losses
-            } else {
-              // Amount-based loss (proportional to balance)
-              const totalEligibleBalance = eligibleMembers.reduce((sum, m) => sum + (m.balance || 0), 0);
-              if (totalEligibleBalance <= 0) throw new Error("Total eligible balance is zero, cannot distribute loss.");
-
-              eligibleMembers.forEach((m) => {
-                const memberDist = Math.min((inputValue * (m.balance || 0)) / totalEligibleBalance, m.balance);
-                if (memberDist <= 0) return;
-
-                const newBalance = Math.max(0, m.balance - memberDist);
-                totalDistributed += memberDist;
-
-                batch.update(doc(db, "users", m.id), {
-                  balance: newBalance,
-                  lastDistribution: serverTimestamp(),
-                });
-
-                batch.set(doc(collection(db, "member_distributions")), {
-                  memberId: m.id,
-                  memberName: m.name,
-                  type: "loss",
-                  amount: memberDist,
-                  timestamp: serverTimestamp(),
-                  distributionId: distRef.id,
-                });
-              });
-            }
+          if (!eligibleMembers.length) {
+            throw new Error("No members available for distribution.");
           }
 
-          if (inputType === "amount" && totalDistributed > inputValue) throw new Error("Calculated distribution exceeds requested amount.");
-          const excessAmount = inputType === "amount" ? inputValue - totalDistributed : 0;
+          if (type === "profit") {
+            // Profit distribution (proportional to shares)
+            if (totalShares <= 0) {
+              throw new Error("Total shares must be greater than 0 for profit distribution.");
+            }
+
+            let remainingAmount = inputValue;
+            eligibleMembers.forEach((m, index) => {
+              if (inputType === "percentage") {
+                const profitPercentage = inputValue / 100;
+                const memberDist = Number(((m.shares || 0) * profitPercentage).toFixed(2));
+                if (memberDist <= 0) return;
+
+                const newBalance = (m.balance || 0) + memberDist;
+                totalDistributed += memberDist;
+
+                batch.update(doc(db, "users", m.id), {
+                  balance: newBalance,
+                  lastDistribution: serverTimestamp(),
+                });
+
+                batch.set(doc(collection(db, "member_distributions")), {
+                  memberId: m.id,
+                  memberName: m.name,
+                  type: "profit",
+                  amount: memberDist,
+                  timestamp: serverTimestamp(),
+                  distributionId: distRef.id,
+                });
+
+                console.log(`profitForm: Member ${m.name} (ID: ${m.id}) profit: ₱${memberDist}, New Balance: ₱${newBalance}`);
+              } else {
+                // Amount-based profit
+                if (index === eligibleMembers.length - 1) {
+                  const memberDist = Number(remainingAmount.toFixed(2));
+                  if (memberDist <= 0) return;
+
+                  const newBalance = (m.balance || 0) + memberDist;
+                  totalDistributed += memberDist;
+
+                  batch.update(doc(db, "users", m.id), {
+                    balance: newBalance,
+                    lastDistribution: serverTimestamp(),
+                  });
+
+                  batch.set(doc(collection(db, "member_distributions")), {
+                    memberId: m.id,
+                    memberName: m.name,
+                    type: "profit",
+                    amount: memberDist,
+                    timestamp: serverTimestamp(),
+                    distributionId: distRef.id,
+                  });
+
+                  console.log(`profitForm: Member ${m.name} (ID: ${m.id}) profit: ₱${memberDist}, New Balance: ₱${newBalance}`);
+                } else {
+                  const memberDist = Number(
+                    ((inputValue * (m.shares || 0)) / totalShares).toFixed(2)
+                  );
+                  if (memberDist <= 0) return;
+
+                  const newBalance = (m.balance || 0) + memberDist;
+                  totalDistributed += memberDist;
+                  remainingAmount -= memberDist;
+
+                  batch.update(doc(db, "users", m.id), {
+                    balance: newBalance,
+                    lastDistribution: serverTimestamp(),
+                  });
+
+                  batch.set(doc(collection(db, "member_distributions")), {
+                    memberId: m.id,
+                    memberName: m.name,
+                    type: "profit",
+                    amount: memberDist,
+                    timestamp: serverTimestamp(),
+                    distributionId: distRef.id,
+                  });
+
+                  console.log(`profitForm: Member ${m.name} (ID: ${m.id}) profit: ₱${memberDist}, New Balance: ₱${newBalance}`);
+                }
+              }
+            });
+            totalAmount = totalDistributed;
+          } else {
+            // Loss distribution (proportional to balance)
+            const totalEligibleBalance = eligibleMembers.reduce((sum, m) => sum + (m.balance || 0), 0);
+            console.log("profitForm: Total eligible balance:", totalEligibleBalance);
+            if (totalEligibleBalance <= 0) {
+              throw new Error("Total eligible balance is zero, cannot distribute loss.");
+            }
+            if (totalEligibleBalance !== mainBalance) {
+              console.warn("profitForm: Total eligible balance (₱", totalEligibleBalance, ") does not match mainBalance (₱", mainBalance, ")");
+            }
+
+            let remainingAmount = inputValue;
+            if (inputType === "percentage") {
+              const lossPercentage = inputValue / 100;
+              eligibleMembers.forEach((m) => {
+                const memberDist = Number(((m.balance || 0) * lossPercentage).toFixed(2));
+                if (memberDist <= 0) return;
+
+                const newBalance = Math.max(0, (m.balance || 0) - memberDist);
+                totalDistributed += memberDist;
+
+                batch.update(doc(db, "users", m.id), {
+                  balance: newBalance,
+                  lastDistribution: serverTimestamp(),
+                });
+
+                batch.set(doc(collection(db, "member_distributions")), {
+                  memberId: m.id,
+                  memberName: m.name,
+                  type: "loss",
+                  amount: memberDist,
+                  timestamp: serverTimestamp(),
+                  distributionId: distRef.id,
+                });
+
+                console.log(`profitForm: Member ${m.name} (ID: ${m.id}) loss: ₱${memberDist}, New Balance: ₱${newBalance}`);
+              });
+              totalAmount = totalDistributed;
+            } else {
+              eligibleMembers.forEach((m, index) => {
+                if (index === eligibleMembers.length - 1) {
+                  const memberDist = Number(Math.min(remainingAmount, m.balance || 0).toFixed(2));
+                  if (memberDist <= 0) return;
+
+                  const newBalance = Math.max(0, (m.balance || 0) - memberDist);
+                  totalDistributed += memberDist;
+
+                  batch.update(doc(db, "users", m.id), {
+                    balance: newBalance,
+                    lastDistribution: serverTimestamp(),
+                  });
+
+                  batch.set(doc(collection(db, "member_distributions")), {
+                    memberId: m.id,
+                    memberName: m.name,
+                    type: "loss",
+                    amount: memberDist,
+                    timestamp: serverTimestamp(),
+                    distributionId: distRef.id,
+                  });
+
+                  console.log(`profitForm: Member ${m.name} (ID: ${m.id}) loss: ₱${memberDist}, New Balance: ₱${newBalance}`);
+                } else {
+                  const memberDist = Number(
+                    (Math.min((inputValue * (m.balance || 0)) / totalEligibleBalance, m.balance || 0)).toFixed(2)
+                  );
+                  if (memberDist <= 0) return;
+
+                  const newBalance = Math.max(0, (m.balance || 0) - memberDist);
+                  totalDistributed += memberDist;
+                  remainingAmount -= memberDist;
+
+                  batch.update(doc(db, "users", m.id), {
+                    balance: newBalance,
+                    lastDistribution: serverTimestamp(),
+                  });
+
+                  batch.set(doc(collection(db, "member_distributions")), {
+                    memberId: m.id,
+                    memberName: m.name,
+                    type: "loss",
+                    amount: memberDist,
+                    timestamp: serverTimestamp(),
+                    distributionId: distRef.id,
+                  });
+
+                  console.log(`profitForm: Member ${m.name} (ID: ${m.id}) loss: ₱${memberDist}, New Balance: ₱${newBalance}`);
+                }
+              });
+            }
+            console.log(`profitForm: Total distributed: ₱${totalDistributed}, Input value: ₱${inputValue}, Remaining: ₱${remainingAmount}`);
+          }
+
+          if (inputType === "amount" && totalDistributed > inputValue + 0.01) {
+            throw new Error(
+              `Calculated distribution (₱${totalDistributed.toFixed(2)}) exceeds requested amount (₱${inputValue.toFixed(2)}).`
+            );
+          }
+
+          const excessAmount = inputType === "amount" ? Math.max(0, inputValue - totalDistributed) : 0;
           let newMainBalance = mainBalance;
           let newExceedBalance = exceedBalance;
 
@@ -1298,7 +1112,7 @@
             type,
             source,
             amount: totalDistributed,
-            excessAmount: excessAmount > 0 ? excessAmount : 0,
+            excessAmount: excessAmount,
             inputType: inputType,
             inputValue: inputValue,
             timestamp: serverTimestamp(),
@@ -1325,207 +1139,221 @@
         }
       });
 
-      // Pre-Distribution Report
-      elements.preDistReportBtn.addEventListener("click", async () => {
-        console.log("preDistReportBtn: Generating report");
-        try {
-          const serverTime = await getServerTime();
-          const { mainBalance, exceedBalance } = await loadFundBalance();
-          const memberRows = await Promise.all(
-            allMembers.map(async (m) => {
-              const eligibility = await isMemberEligible(m, serverTime);
-              return `| ${m.name || "N/A"} | ${m.email || "N/A"} | ${m.status || "N/A"} | ${m.shares || 0} | ${formatCurrency(m.balance)} | ${eligibility.eligible ? "Yes" : "No"} | ${eligibility.eligible ? "" : eligibility.reason} |`;
-            })
-          );
-          const pendingSnapshot = await getDocs(query(collection(db, "transactions"), orderBy("timestamp", "desc")));
-          const pendingRequests = pendingSnapshot.docs
-            .filter((doc) => doc.data().status === "pending")
-            .map(
-              (doc) => `- ${doc.data().memberName || "N/A"}: ${doc.data().type} ₱${formatCurrency(doc.data().amount)} (${doc.data().timestamp?.toDate().toLocaleString("en-PH") || "N/A"})`
-            )
-            .join("\n") || "No pending requests.";
-
-          const report = `# Pre-Distribution Report\n*Generated on ${serverTime.toLocaleString("en-PH")}*\n\n` +
-            `## Fund Balances\n- **Main Fund Balance**: ₱${formatCurrency(mainBalance)}\n- **Exceed Fund Balance**: ₱${formatCurrency(exceedBalance)}\n\n` +
-            `## Member Summary\n- **Total Members**: ${allMembers.length}\n- **Total Shares**: ${allMembers.reduce((sum, m) => sum + (m.shares || 0), 0)}\n- **Total Member Balance**: ₱${formatCurrency(allMembers.reduce((sum, m) => sum + (m.balance || 0), 0))}\n\n` +
-            `## Member Details\n| Member Name | Email | Status | Shares | Balance (₱) | Eligible for Profit | Reason for Ineligibility |\n|-------------|-------|--------|--------|-------------|---------------------|-------------------------|\n${memberRows.join("\n")}\n\n` +
-            `## Pending Transaction Requests\n${pendingRequests}\n\n` +
-            `## Notes\n- **Eligibility Criteria**: Approved status, positive balance, approved ≥24 hours, no distribution today.\n- **Exceed Fund**: Available for distribution if sufficient balance exists.`;
-          alert(report);
-          console.log("preDistReportBtn: Report generated");
-        } catch (error) {
-          console.error("preDistReportBtn: Error:", error);
-          showError(elements.profitError, "Failed to generate report: " + error.message);
+      // Add to Exceed Fund
+      elements.addExceedForm.addEventListener("submit", async (e) => {
+        console.log("addExceedForm: Form submitted");
+        e.preventDefault();
+        const now = Date.now();
+        if (now - lastSubmissionTime < SUBMISSION_COOLDOWN) {
+          showError(elements.exceedError, `Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (now - lastSubmissionTime)) / 1000)} seconds.`);
+          console.log("addExceedForm: Cooldown active, submission blocked");
+          return;
         }
-      });
+        lastSubmissionTime = now;
+        elements.addExceedBtn.disabled = true;
 
-      // Export Report to Excel Button
-      elements.exportExcelBtn.addEventListener("click", () => {
-        console.log("exportExcelBtn: Clicked");
-        exportReportToExcel();
-      });
+        try {
+          const amount = parseFloat(elements.exceedAmount.value);
+          if (amount <= 0) throw new Error("Amount must be greater than 0.");
 
-      // Export Database to Excel Button
-      elements.exportDbBtn.addEventListener("click", () => {
-        console.log("exportDbBtn: Clicked");
-        exportDatabaseToExcel();
+          const fundSnap = await getDocs(collection(db, "fund"));
+          const fundDoc = fundSnap.docs[0];
+          const fundData = fundDoc.data();
+          const newExceedBalance = (fundData.exceedBalance || 0) + amount;
+
+          await updateDoc(doc(db, "fund", fundDoc.id), {
+            mainBalance: fundData.mainBalance || 0,
+            exceedBalance: newExceedBalance,
+          });
+
+          elements.addExceedForm.reset();
+          await loadFundBalance();
+          alert(`Successfully added ₱${formatCurrency(amount)} to exceed fund. New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
+          console.log("addExceedForm: Added ₱", amount, "to exceed fund");
+        } catch (error) {
+          console.error("addExceedForm: Error:", error);
+          showError(elements.exceedError, error.message);
+        } finally {
+          elements.addExceedBtn.disabled = false;
+          console.log("addExceedForm: Button re-enabled");
+        }
       });
 
       // Edit Member
       elements.membersList.addEventListener("click", async (e) => {
-        console.log("membersList: Click event triggered");
-        try {
-          if (e.target.classList.contains("edit-btn")) {
-            const id = e.target.dataset.id;
-            console.log("membersList: Edit button clicked for member ID:", id);
-            const member = allMembers.find((m) => m.id === id);
-            elements.editMemberId.value = id;
-            elements.editName.value = member.name || "";
-            elements.editEmail.value = member.email || "";
-            elements.editStatus.value = member.status || "pending";
-            elements.editShares.value = member.shares || 0;
-            elements.editBalance.value = member.balance || 0;
-            elements.editApprovalDate.value = member.approvalDate
-              ? member.approvalDate.toDate().toISOString().slice(0, 16)
-              : new Date().toISOString().slice(0, 16);
-            elements.editModal.classList.remove("hidden");
-            console.log("membersList: Edit modal opened for member ID:", id);
-          } else if (e.target.classList.contains("delete-btn")) {
-            console.log("membersList: Delete button clicked for member ID:", e.target.dataset.id);
-            if (confirm(`Are you sure you want to delete ${e.target.dataset.name}?`)) {
-              await deleteDoc(doc(db, "users", e.target.dataset.id));
+        if (e.target.classList.contains("edit-btn")) {
+          console.log("editMember: Edit button clicked");
+          const id = e.target.dataset.id;
+          const member = allMembers.find((m) => m.id === id);
+          if (!member) {
+            console.log("editMember: Member not found, ID:", id);
+            showError(elements.profitError, "Member not found.");
+            return;
+          }
+
+          elements.editMemberId.value = id;
+          elements.editName.value = member.name || "";
+          elements.editEmail.value = member.email || "";
+          elements.editStatus.value = member.status || "pending";
+          elements.editShares.value = member.shares || 0;
+          elements.editBalance.value = member.balance || 0;
+          elements.editApprovalDate.value = member.approvalDate
+            ? member.approvalDate.toDate().toISOString().slice(0, 16)
+            : new Date().toISOString().slice(0, 16);
+          elements.editModal.classList.remove("hidden");
+          console.log("editMember: Modal opened for member ID:", id);
+        }
+
+        if (e.target.classList.contains("delete-btn")) {
+          console.log("deleteMember: Delete button clicked");
+          const id = e.target.dataset.id;
+          const name = e.target.dataset.name;
+          if (confirm(`Are you sure you want to delete ${name}?`)) {
+            try {
+              await deleteDoc(doc(db, "users", id));
               await loadMembers();
-              await loadFundBalance();
-              console.log("membersList: Member deleted, UI refreshed");
+              console.log("deleteMember: Deleted member ID:", id);
+            } catch (error) {
+              console.error("deleteMember: Error:", error);
+              showError(elements.profitError, "Failed to delete member: " + error.message);
             }
           }
-        } catch (error) {
-          console.error("membersList: Error:", error);
-          showError(elements.profitError, "Failed to process member action: " + error.message);
         }
       });
 
       elements.cancelEdit.addEventListener("click", () => {
-        console.log("cancelEdit: Cancel button clicked");
         elements.editModal.classList.add("hidden");
-        elements.editForm.reset();
+        console.log("editMember: Modal closed");
       });
 
       elements.editForm.addEventListener("submit", async (e) => {
         console.log("editForm: Form submitted");
         e.preventDefault();
         try {
-          const id = elements.editMemberId.value;
-          const name = elements.editName.value;
-          const email = elements.editEmail.value;
-          const status = elements.editStatus.value;
-          const shares = parseInt(elements.editShares.value);
-          const balance = parseFloat(elements.editBalance.value);
-          const approvalDate = elements.editApprovalDate.value;
+          const memberId = elements.editMemberId.value;
+          const updatedData = {
+            name: elements.editName.value,
+            email: elements.editEmail.value,
+            status: elements.editStatus.value,
+            shares: parseInt(elements.editShares.value) || 0,
+            balance: parseFloat(elements.editBalance.value) || 0,
+            approvalDate: new Date(elements.editApprovalDate.value),
+          };
 
-          // Input validation
-          if (!name || !email || !status) {
-            throw new Error("All fields are required.");
-          }
-          if (isNaN(shares) || shares < 0) {
-            throw new Error("Shares must be a non-negative number.");
-          }
-          if (isNaN(balance) || balance < 0) {
-            throw new Error("Balance must be a non-negative number.");
-          }
-          if (!approvalDate) {
-            throw new Error("Approval date is required.");
-          }
-
-          console.log("editForm: Submitting update for member ID:", id);
-          console.log("editForm: Form values:", { name, email, status, shares, balance, approvalDate });
-
-          await updateDoc(doc(db, "users", id), {
-            name,
-            email,
-            status,
-            shares,
-            balance,
-            approvalDate: new Date(approvalDate),
-          });
+          await updateDoc(doc(db, "users", memberId), updatedData);
           elements.editModal.classList.add("hidden");
-          elements.editForm.reset();
           await loadMembers();
           await loadFundBalance();
-          alert("Member updated successfully!");
-          console.log("editForm: Member updated, UI refreshed");
+          console.log("editForm: Updated member ID:", memberId);
         } catch (error) {
           console.error("editForm: Error:", error);
-          let message = "Failed to update member: " + error.message;
-          if (error.code === "permission-denied") {
-            message = "You do not have permission to update this member.";
-          } else if (error.code === "not-found") {
-            message = "Member not found in the database.";
-          }
-          showError(elements.profitError, message);
+          showError(elements.profitError, "Failed to update member: " + error.message);
         }
       });
 
-      // Approve/Reject Transactions
+      // Handle Transaction Requests
       elements.requestsList.addEventListener("click", async (e) => {
-        console.log("requestsList: Click event triggered");
-        const id = e.target.dataset.id;
-        if (!id) return;
+        if (e.target.classList.contains("action-btn")) {
+          console.log("transactionAction: Button clicked");
+          const id = e.target.dataset.id;
+          const action = e.target.dataset.type;
+          try {
+            const transRef = doc(db, "transactions", id);
+            const transSnap = await getDoc(transRef);
+            const transData = transSnap.data();
+            const batch = writeBatch(db);
 
-        try {
-          const transactionDoc = await getDoc(doc(db, "transactions", id));
-          const data = transactionDoc.data();
-          const userDoc = await getDoc(doc(db, "users", data.memberId));
-          const user = userDoc.data();
-          const batch = writeBatch(db);
+            if (action === "approve") {
+              const member = allMembers.find((m) => m.id === transData.memberId);
+              if (!member) throw new Error("Member not found.");
 
-          if (e.target.classList.contains("approve-btn")) {
-            console.log("requestsList: Approve button clicked for transaction ID:", id);
-            if (data.type === "deposit") {
-              batch.update(doc(db, "users", data.memberId), {
-                balance: (user.balance || 0) + data.amount,
-                shares: Math.floor(((user.balance || 0) + data.amount) / 10),
-              });
-            } else if (data.type === "cashout" && (user.balance || 0) >= data.amount) {
-              batch.update(doc(db, "users", data.memberId), {
-                balance: Math.max(0, (user.balance || 0) - data.amount),
-                shares: Math.floor(Math.max(0, (user.balance || 0) - data.amount) / 10),
-              });
+              let newBalance = member.balance || 0;
+              if (transData.type === "deposit") {
+                newBalance += transData.amount;
+              } else if (transData.type === "cashout") {
+                if (newBalance < transData.amount) throw new Error("Insufficient balance.");
+                newBalance -= transData.amount;
+              }
+
+              batch.update(doc(db, "users", transData.memberId), { balance: newBalance });
+              batch.update(transRef, { status: "approved", timestamp: serverTimestamp() });
             } else {
-              throw new Error("Insufficient balance for cashout.");
+              batch.update(transRef, { status: "rejected", timestamp: serverTimestamp() });
             }
-            batch.update(doc(db, "transactions", id), { status: "approved" });
-          } else if (e.target.classList.contains("reject-btn")) {
-            console.log("requestsList: Reject button clicked for transaction ID:", id);
-            batch.update(doc(db, "transactions", id), { status: "rejected" });
-          }
 
-          await batch.commit();
-          await loadMembers();
-          await loadFundBalance();
-          console.log("requestsList: Transaction processed, UI refreshed");
-        } catch (error) {
-          console.error("requestsList: Error:", error);
-          showError(elements.profitError, "Failed to process transaction: " + error.message);
+            await batch.commit();
+            await loadRequests();
+            await loadMembers();
+            await loadFundBalance();
+            console.log("transactionAction: Processed", action, "for transaction ID:", id);
+          } catch (error) {
+            console.error("transactionAction: Error:", error);
+            showError(elements.profitError, error.message);
+          }
         }
       });
 
-      // Filter and Sort Transactions
-      elements.historyFilter.addEventListener("change", () => {
-        console.log("historyFilter: Changed to", elements.historyFilter.value);
-        displayTransactionHistory();
-      });
-      elements.historySort.addEventListener("change", () => {
-        console.log("historySort: Changed to", elements.historySort.value);
-        displayTransactionHistory();
+      // Filter and Sort History
+      elements.historyFilter.addEventListener("change", loadHistory);
+      elements.historySort.addEventListener("change", loadHistory);
+
+      // Search Members
+      elements.searchInput.addEventListener("input", () => {
+        console.log("searchInput: Searching");
+        const searchTerm = elements.searchInput.value.toLowerCase();
+        elements.membersList.innerHTML = "";
+        allMembers
+          .filter(
+            (m) =>
+              m.name?.toLowerCase().includes(searchTerm) ||
+              m.email?.toLowerCase().includes(searchTerm)
+          )
+          .forEach((m) => {
+            const div = document.createElement("div");
+            div.className = "bg-gray-800 p-4 rounded-lg shadow";
+            div.innerHTML = `
+              <p><strong>Name:</strong> ${m.name || "N/A"}</p>
+              <p><strong>Email:</strong> ${m.email || "N/A"}</p>
+              <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${
+                m.status === "approved"
+                  ? "bg-green-600"
+                  : m.status === "pending"
+                    ? "bg-yellow-600"
+                    : "bg-red-600"
+              }">${m.status || "N/A"}</span></p>
+              <p><strong>Shares:</strong> ${m.shares || 0}</p>
+              <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
+              <div class="flex space-x-2 mt-2">
+                <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-700">Edit</button>
+                <button data-id="${m.id}" data-name="${
+                  m.name || "Unknown"
+                }" class="delete-btn bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">Delete</button>
+              </div>
+            `;
+            elements.membersList.appendChild(div);
+          });
+        console.log("searchInput: Filtered members with term:", searchTerm);
       });
 
-      // Server Time Button
+      // Logout
+      elements.logoutBtn.addEventListener("click", async () => {
+        console.log("logoutBtn: Logging out");
+        try {
+          await signOut(auth);
+          window.location.href = "login.html";
+          console.log("logoutBtn: Logout successful");
+        } catch (error) {
+          console.error("logoutBtn: Error:", error);
+          showError(elements.profitError, "Failed to logout: " + error.message);
+        }
+      });
+
+      // Server Time
       elements.serverTimeBtn.addEventListener("click", async () => {
-        console.log("serverTimeBtn: Clicked");
+        console.log("serverTimeBtn: Fetching server time");
         try {
           const serverTime = await getServerTime();
-          alert(`Server Time: ${serverTime.toLocaleString("en-PH")}`);
+          alert(`Server Time: ${serverTime.toLocaleString("en-PH", { timeZone: "Asia/Manila" })}`);
           console.log("serverTimeBtn: Displayed server time");
         } catch (error) {
           console.error("serverTimeBtn: Error:", error);
@@ -1533,40 +1361,70 @@
         }
       });
 
-      // Adjust Balance Button
+      // Adjust Balances
       elements.adjustBalanceBtn.addEventListener("click", async () => {
-        console.log("adjustBalanceBtn: Clicked");
-        if (!confirm("Are you sure you want to update all member shares? Each share will be calculated as ₱10 per share based on the latest balance.")) {
-          console.log("adjustBalanceBtn: Update cancelled by user");
-          return;
-        }
+        console.log("adjustBalanceBtn: Button clicked");
         await adjustBalances();
       });
 
-      // Logout
-      elements.logoutBtn.addEventListener("click", () => {
-        console.log("logoutBtn: Clicked");
-        signOut(auth).then(() => {
-          window.location.href = "/login";
-          console.log("logoutBtn: User signed out");
+      // Pre-Distribution Report
+      elements.preDistReportBtn.addEventListener("click", async () => {
+        console.log("preDistReportBtn: Generating report");
+        await generatePreDistributionReport();
+      });
+
+      // Export Report
+      elements.exportExcelBtn.addEventListener("click", async () => {
+        console.log("exportExcelBtn: Exporting report");
+        await loadDailyReport();
+        const report = [];
+        const serverTime = await getServerTime();
+        const { start, end } = getPHTDayRange(serverTime);
+        const q = query(
+          collection(db, "member_distributions"),
+          where("timestamp", ">=", start),
+          where("timestamp", "<=", end)
+        );
+        const snapshot = await getDocs(q);
+        snapshot.docs.forEach((doc) => {
+          const d = doc.data();
+          report.push({
+            MemberName: d.memberName || "N/A",
+            Type: d.type || "N/A",
+            Amount: formatCurrency(d.amount || 0),
+            Timestamp: d.timestamp.toDate().toLocaleString("en-PH"),
+          });
         });
+        const worksheet = XLSX.utils.json_to_sheet(report);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Daily Report");
+        XLSX.writeFile(workbook, `Daily_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        console.log("exportExcelBtn: Exported daily report to Excel");
+      });
+
+      // Export Database
+      elements.exportDbBtn.addEventListener("click", async () => {
+        console.log("exportDbBtn: Exporting database");
+        await exportDatabase();
       });
 
       // Initialize
-      onAuthStateChanged(auth, (user) => {
-        console.log("onAuthStateChanged: Checking auth state");
-        if (!user) {
-          window.location.href = "/login";
-          console.log("onAuthStateChanged: No user, redirecting to login");
-        } else {
-          console.log("onAuthStateChanged: User authenticated, initializing app");
+      onAuthStateChanged(auth, async (user) => {
+        console.log("authState: Checking user authentication");
+        if (user) {
+          console.log("authState: User authenticated, UID:", user.uid);
+          await loadMembers();
+          await loadFundBalance();
+          await loadRequests();
+          await loadHistory();
+          await loadDailyReport();
           initializeChart();
-          loadMembers();
-          loadFundBalance();
-          loadRequests();
-          loadTransactionHistory();
-          loadDailyReport();
-          scheduleAutoUpdate(); // Start the auto-update scheduler
+          await updateChart();
+          scheduleAutoUpdate();
+          console.log("authState: Initialization complete");
+        } else {
+          console.log("authState: No user authenticated, redirecting to login");
+          window.location.href = "login.html";
         }
       });
     </script>
