@@ -1,0 +1,1664 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Baccarat Fund Admin Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  </head>
+  <body class="bg-gray-900 text-white min-h-screen p-4">
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-8">
+      <h1 class="text-2xl font-bold flex items-center">
+        <span class="mr-2">👑</span> Baccarat Fund Admin
+      </h1>
+      <div class="flex space-x-2">
+        <button id="serverTimeBtn" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 text-sm">
+          Server Time
+        </button>
+        <button id="preDistReportBtn" class="bg-yellow-600 px-4 py-2 rounded hover:bg-yellow-700 text-sm">
+          Pre-Distribution Report
+        </button>
+        <button id="adjustBalanceBtn" class="bg-purple-600 px-4 py-2 rounded hover:bg-purple-700 text-sm">
+          Update Shares (₱10/Share)
+        </button>
+        <button id="exportExcelBtn" class="bg-green-600 px-4 py-2 rounded hover:bg-green-700 text-sm">
+          Export Report to Excel
+        </button>
+        <button id="exportDbBtn" class="bg-teal-600 px-4 py-2 rounded hover:bg-teal-700 text-sm">
+          Export Database to Excel
+        </button>
+        <button id="logoutBtn" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700 text-sm">
+          Logout
+        </button>
+      </div>
+    </header>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
+      <div class="bg-gray-800 p-4 rounded-lg shadow">
+        <p class="text-sm text-gray-400">Total Members</p>
+        <p class="text-2xl font-bold" id="totalMembers">0</p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-lg shadow">
+        <p class="text-sm text-gray-400">Total Shares</p>
+        <p class="text-2xl font-bold" id="totalShares">0</p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-lg shadow">
+        <p class="text-sm text-gray-400">Total Balance</p>
+        <p class="text-2xl font-bold">₱<span id="totalBalance">0.00</span></p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-lg shadow">
+        <p class="text-sm text-gray-400">Exceed Fund</p>
+        <p class="text-2xl font-bold">₱<span id="exceedFund">0.00</span></p>
+      </div>
+    </div>
+
+    <!-- Fund Growth Chart -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">📊 Fund Growth</h2>
+      <canvas id="fundChart" height="100"></canvas>
+    </div>
+
+    <!-- Add to Exceed Fund -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">💰 Add to Exceed Fund</h2>
+      <form id="addExceedForm" class="space-y-4">
+        <div>
+          <label class="block text-sm mb-1">Amount (₱)</label>
+          <input
+            type="number"
+            id="exceedAmount"
+            class="w-full p-2 bg-gray-700 rounded text-white"
+            placeholder="Enter amount"
+            min="0"
+            step="0.01"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          id="addExceedBtn"
+          class="w-full bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-600"
+        >
+          Add to Exceed Fund
+        </button>
+      </form>
+      <p id="exceedError" class="text-red-500 text-sm mt-2 hidden"></p>
+    </div>
+
+    <!-- Distribute Profit/Loss -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">💸 Distribute Profit/Loss</h2>
+      <p class="text-sm mb-2">Fund Balance: ₱<span id="fundBalance">0.00</span></p>
+      <p class="text-sm mb-4">Exceed Fund: ₱<span id="exceedFundDisplay">0.00</span></p>
+      <form id="profitForm" class="space-y-4">
+        <div>
+          <label class="block text-sm mb-1">Transaction Type</label>
+          <select id="transactionType" class="w-full p-2 bg-gray-700 rounded text-white">
+            <option value="profit">Profit</option>
+            <option value="loss">Loss</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Source</label>
+          <select id="fundSource" class="w-full p-2 bg-gray-700 rounded text-white">
+            <option value="main">Main Fund</option>
+            <option value="exceed">Exceed Fund</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Input Type</label>
+          <select id="inputType" class="w-full p-2 bg-gray-700 rounded text-white">
+            <option value="amount">Amount (₱)</option>
+            <option value="percentage">Percentage (%)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm mb-1" id="profitAmountLabel">Amount (₱)</label>
+          <input
+            type="number"
+            id="profitAmount"
+            class="w-full p-2 bg-gray-700 rounded text-white"
+            placeholder="Enter amount"
+            min="0"
+            step="0.01"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          id="distributeBtn"
+          class="w-full bg-green-600 px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-600"
+        >
+          Distribute
+        </button>
+      </form>
+      <p id="profitError" class="text-red-500 text-sm mt-2 hidden"></p>
+    </div>
+
+    <!-- Members Section -->
+    <div class="mb-8">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-bold">👥 Members</h2>
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="Search members..."
+          class="p-2 bg-gray-700 rounded text-white w-64"
+        />
+      </div>
+      <div id="membersList" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </div>
+
+    <!-- Top Shareholders -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">🏆 Top 5 Shareholders</h2>
+      <ul id="topShareholders" class="list-disc list-inside text-sm"></ul>
+    </div>
+
+    <!-- Transaction Requests -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">💰 Transaction Requests</h2>
+      <div id="requestsList" class="space-y-4 max-h-80 overflow-y-auto"></div>
+    </div>
+
+    <!-- Daily Distribution Report -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow mb-8">
+      <h2 class="text-lg font-bold mb-4">📈 Daily Distribution Report</h2>
+      <div id="dailyReportList" class="space-y-4 max-h-80 overflow-y-auto"></div>
+    </div>
+
+    <!-- Transaction History -->
+    <div class="bg-gray-800 p-4 rounded-lg shadow">
+      <h2 class="text-lg font-bold mb-4">📜 Transaction History</h2>
+      <div class="flex flex-col sm:flex-row justify-between mb-4 space-y-2 sm:space-y-0 sm:space-x-2">
+        <select id="historyFilter" class="p-2 bg-gray-700 rounded text-white">
+          <option value="all">All</option>
+          <option value="deposit">Deposits</option>
+          <option value="cashout">Cash Outs</option>
+          <option value="profit">Profits</option>
+          <option value="loss">Losses</option>
+        </select>
+        <select id="historySort" class="p-2 bg-gray-700 rounded text-white">
+          <option value="desc">Newest First</option>
+          <option value="asc">Oldest First</option>
+        </select>
+      </div>
+      <div id="historyList" class="space-y-4 max-h-80 overflow-y-auto"></div>
+    </div>
+
+    <!-- Edit Member Modal -->
+    <div id="editModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center">
+      <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md">
+        <h2 class="text-lg font-bold mb-4">Edit Member</h2>
+        <form id="editForm" class="space-y-4">
+          <input type="hidden" id="editMemberId" />
+          <div>
+            <label class="block text-sm">Name</label>
+            <input type="text" id="editName" class="w-full p-2 bg-gray-700 rounded text-white" required />
+          </div>
+          <div>
+            <label class="block text-sm">Email</label>
+            <input type="email" id="editEmail" class="w-full p-2 bg-gray-700 rounded text-white" required />
+          </div>
+          <div>
+            <label class="block text-sm">Status</label>
+            <select id="editStatus" class="w-full p-2 bg-gray-700 rounded text-white">
+              <option value="approved">Approved</option>
+              <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm">Shares</label>
+            <input type="number" id="editShares" class="w-full p-2 bg-gray-700 rounded text-white" min="0" required />
+          </div>
+          <div>
+            <label class="block text-sm">Balance</label>
+            <input
+              type="number"
+              id="editBalance"
+              class="w-full p-2 bg-gray-700 rounded text-white"
+              min="0"
+              step="0.01"
+              required
+            />
+          </div>
+          <div>
+            <label class="block text-sm">Approval Date</label>
+            <input
+              type="datetime-local"
+              id="editApprovalDate"
+              class="w-full p-2 bg-gray-700 rounded text-white"
+              required
+            />
+          </div>
+          <div class="flex justify-end space-x-2">
+            <button type="button" id="cancelEdit" class="bg-gray-600 px-4 py-2 rounded">Cancel</button>
+            <button type="submit" class="bg-blue-600 px-4 py-2 rounded">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Cash Out Modal -->
+    <div id="cashOutModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center">
+      <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md">
+        <h2 class="text-lg font-bold mb-4">Cash Out for Member</h2>
+        <form id="cashOutForm" class="space-y-4">
+          <input type="hidden" id="cashOutMemberId" />
+          <div>
+            <label class="block text-sm">Member Name</label>
+            <input
+              type="text"
+              id="cashOutMemberName"
+              class="w-full p-2 bg-gray-700 rounded text-white"
+              readonly
+            />
+          </div>
+          <div>
+            <label class="block text-sm">Current Balance</label>
+            <input
+              type="text"
+              id="cashOutCurrentBalance"
+              class="w-full p-2 bg-gray-700 rounded text-white"
+              readonly
+            />
+          </div>
+          <div>
+            <label class="block text-sm">Cash Out Amount (₱)</label>
+            <input
+              type="number"
+              id="cashOutAmount"
+              class="w-full p-2 bg-gray-700 rounded text-white"
+              placeholder="Enter amount"
+              min="0"
+              step="0.01"
+              required
+            />
+          </div>
+          <div class="flex justify-end space-x-2">
+            <button type="button" id="cancelCashOut" class="bg-gray-600 px-4 py-2 rounded">Cancel</button>
+            <button type="submit" class="bg-green-600 px-4 py-2 rounded hover:bg-green-700">Submit Cash Out</button>
+          </div>
+        </form>
+        <p id="cashOutError" class="text-red-500 text-sm mt-2 hidden"></p>
+      </div>
+    </div>
+
+    <script type="module">
+      // Firebase Imports
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+      import {
+        getFirestore,
+        collection,
+        getDocs,
+        getDoc,
+        doc,
+        updateDoc,
+        deleteDoc,
+        query,
+        orderBy,
+        where,
+        onSnapshot,
+        writeBatch,
+        setDoc,
+        serverTimestamp,
+      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+      import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+      // Firebase Config
+      const firebaseConfig = {
+        apiKey: "AIzaSyCN0dBQXoaWh_13lF0ON25otUpeH3OGINQ",
+        authDomain: "bfc-tracker.firebaseapp.com",
+        projectId: "bfc-tracker",
+        storageBucket: "bfc-tracker.firebasestorage.app",
+        messagingSenderId: "127052459580",
+        appId: "1:127052459580:web:c3d5caa9302238c11cdd39",
+        measurementId: "G-PNYRCFJHYM",
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      const auth = getAuth(app);
+
+      // DOM Elements
+      const elements = {
+        totalMembers: document.getElementById("totalMembers"),
+        totalShares: document.getElementById("totalShares"),
+        totalBalance: document.getElementById("totalBalance"),
+        fundBalance: document.getElementById("fundBalance"),
+        exceedFund: document.getElementById("exceedFund"),
+        exceedFundDisplay: document.getElementById("exceedFundDisplay"),
+        membersList: document.getElementById("membersList"),
+        topShareholders: document.getElementById("topShareholders"),
+        requestsList: document.getElementById("requestsList"),
+        historyList: document.getElementById("historyList"),
+        dailyReportList: document.getElementById("dailyReportList"),
+        searchInput: document.getElementById("searchInput"),
+        historyFilter: document.getElementById("historyFilter"),
+        historySort: document.getElementById("historySort"),
+        profitForm: document.getElementById("profitForm"),
+        profitAmount: document.getElementById("profitAmount"),
+        profitAmountLabel: document.getElementById("profitAmountLabel"),
+        distributeBtn: document.getElementById("distributeBtn"),
+        profitError: document.getElementById("profitError"),
+        transactionType: document.getElementById("transactionType"),
+        fundSource: document.getElementById("fundSource"),
+        inputType: document.getElementById("inputType"),
+        addExceedForm: document.getElementById("addExceedForm"),
+        addExceedBtn: document.getElementById("addExceedBtn"),
+        exceedAmount: document.getElementById("exceedAmount"),
+        exceedError: document.getElementById("exceedError"),
+        editModal: document.getElementById("editModal"),
+        editForm: document.getElementById("editForm"),
+        editMemberId: document.getElementById("editMemberId"),
+        editName: document.getElementById("editName"),
+        editEmail: document.getElementById("editEmail"),
+        editStatus: document.getElementById("editStatus"),
+        editShares: document.getElementById("editShares"),
+        editBalance: document.getElementById("editBalance"),
+        editApprovalDate: document.getElementById("editApprovalDate"),
+        cancelEdit: document.getElementById("cancelEdit"),
+        logoutBtn: document.getElementById("logoutBtn"),
+        serverTimeBtn: document.getElementById("serverTimeBtn"),
+        adjustBalanceBtn: document.getElementById("adjustBalanceBtn"),
+        preDistReportBtn: document.getElementById("preDistReportBtn"),
+        exportExcelBtn: document.getElementById("exportExcelBtn"),
+        exportDbBtn: document.getElementById("exportDbBtn"),
+        cashOutModal: document.getElementById("cashOutModal"),
+        cashOutForm: document.getElementById("cashOutForm"),
+        cashOutMemberId: document.getElementById("cashOutMemberId"),
+        cashOutMemberName: document.getElementById("cashOutMemberName"),
+        cashOutCurrentBalance: document.getElementById("cashOutCurrentBalance"),
+        cashOutAmount: document.getElementById("cashOutAmount"),
+        cashOutError: document.getElementById("cashOutError"),
+        cancelCashOut: document.getElementById("cancelCashOut"),
+      };
+
+      // Update profit amount label based on input type
+      elements.inputType.addEventListener("change", () => {
+        elements.profitAmountLabel.textContent = elements.inputType.value === "amount" ? "Amount (₱)" : "Percentage (%)";
+        elements.profitAmount.placeholder = elements.inputType.value === "amount" ? "Enter amount" : "Enter percentage (0-100)";
+      });
+
+      let allMembers = [];
+      let allTransactions = [];
+      let fundChartInstance = null;
+      const SUBMISSION_COOLDOWN = 5000;
+      const HOURS_THRESHOLD = 24;
+      let lastSubmissionTime = 0;
+      let lastAutoUpdateDate = null;
+
+      // Utility Functions
+      const formatCurrency = (value) =>
+        parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      const showError = (element, message) => {
+        element.textContent = message;
+        element.classList.remove("hidden");
+        setTimeout(() => element.classList.add("hidden"), 5000);
+      };
+
+      const showLoading = (element, message = "Loading...") => {
+        element.innerHTML = `<p class="text-gray-400">${message}</p>`;
+      };
+
+      const formatTimeRemaining = (milliseconds) => {
+        const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+        const minutes = Math.round((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+        return `${hours}h ${minutes}m`;
+      };
+
+      // Get Server Time
+      async function getServerTime() {
+        try {
+          const tempRef = doc(collection(db, "temp"));
+          await setDoc(tempRef, { timestamp: serverTimestamp() });
+          const docSnap = await getDoc(tempRef);
+          const serverTime = docSnap.exists() ? docSnap.data().timestamp.toDate() : new Date();
+          await deleteDoc(tempRef);
+          return serverTime;
+        } catch (error) {
+          console.error("Error fetching server time:", error);
+          throw error;
+        }
+      }
+
+      // Get Current Time in PHT (Asia/Manila)
+      function getPHTTime() {
+        const options = { timeZone: "Asia/Manila", hour12: false };
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat("en-US", {
+          ...options,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const parts = formatter.formatToParts(now);
+        const dateObj = {
+          year: parseInt(parts.find((p) => p.type === "year").value),
+          month: parseInt(parts.find((p) => p.type === "month").value) - 1,
+          day: parseInt(parts.find((p) => p.type === "day").value),
+          hour: parseInt(parts.find((p) => p.type === "hour").value),
+          minute: parseInt(parts.find((p) => p.type === "minute").value),
+          second: parseInt(parts.find((p) => p.type === "second").value),
+        };
+        return new Date(dateObj.year, dateObj.month, dateObj.day, dateObj.hour, dateObj.minute, dateObj.second);
+      }
+
+      // Get PHT Day Range
+      function getPHTDayRange(date) {
+        const start = new Date(date);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(start);
+        end.setHours(23, 59, 59, 999);
+        return { start, end };
+      }
+
+      // Check Member Eligibility (for display only)
+      async function isMemberEligible(member, serverTime) {
+        if (!member) return { eligible: false, reason: "Member data missing" };
+        if (member.status !== "approved") return { eligible: false, reason: "Not Approved" };
+        if ((member.balance || 0) <= 0) return { eligible: false, reason: "Zero/Negative Balance" };
+
+        const approvalDate = member.approvalDate?.toDate
+          ? member.approvalDate.toDate()
+          : member.approvalDate
+            ? new Date(member.approvalDate)
+            : null;
+        if (!approvalDate || isNaN(approvalDate)) return { eligible: false, reason: "No Approval Date" };
+
+        const hoursSinceApproval = (serverTime - approvalDate) / (1000 * 60 * 60);
+        if (hoursSinceApproval < HOURS_THRESHOLD) {
+          const hoursRemaining = HOURS_THRESHOLD - hoursSinceApproval;
+          return {
+            eligible: false,
+            reason: `New Member (${hoursSinceApproval.toFixed(2)} hrs, ${formatTimeRemaining(
+              hoursRemaining * 60 * 60 * 1000
+            )} remaining)`,
+          };
+        }
+
+        const lastDistribution = member.lastDistribution?.toDate
+          ? member.lastDistribution.toDate()
+          : member.lastDistribution
+            ? new Date(member.lastDistribution)
+            : null;
+        if (lastDistribution && lastDistribution >= getPHTDayRange(serverTime).start) {
+          const nextDayStart = new Date(getPHTDayRange(serverTime).end.getTime() + 1);
+          const timeRemaining = nextDayStart - serverTime;
+          return {
+            eligible: false,
+            reason: `Already Received Today (${formatTimeRemaining(timeRemaining)} until next eligibility)`,
+          };
+        }
+
+        return { eligible: true, reason: "Eligible" };
+      }
+
+      // Adjust Balances (1 share = 10 pesos)
+      async function adjustBalances() {
+        console.log("adjustBalances: Starting share update process");
+        try {
+          const snapshot = await getDocs(collection(db, "users"));
+          allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          console.log("adjustBalances: Fetched", allMembers.length, "members");
+
+          if (allMembers.length === 0) {
+            console.log("adjustBalances: No members found");
+            showError(elements.profitError, "No members found to update shares.");
+            return;
+          }
+
+          const batch = writeBatch(db);
+          let updatedCount = 0;
+
+          for (const member of allMembers) {
+            const balance = member.balance || 0;
+            const newShares = Math.floor(balance / 10);
+            console.log(`adjustBalances: Processing member ${member.id}, Balance: ₱${balance}, New Shares: ${newShares}`);
+            batch.update(doc(db, "users", member.id), { shares: newShares });
+            updatedCount++;
+          }
+
+          console.log("adjustBalances: Committing batch for", updatedCount, "members");
+          await batch.commit();
+          console.log("adjustBalances: Batch committed successfully");
+
+          await loadMembers();
+          await loadFundBalance();
+          console.log("adjustBalances: UI refreshed with updated members and fund balance");
+        } catch (error) {
+          console.error("adjustBalances: Error updating shares:", error);
+          showError(elements.profitError, "Failed to update shares: " + error.message);
+        }
+      }
+
+      // Auto-Update Shares Every Sunday at 00:00 PHT
+      function scheduleAutoUpdate() {
+        console.log("scheduleAutoUpdate: Initializing auto-update scheduler");
+        setInterval(async () => {
+          try {
+            const now = getPHTTime();
+            console.log("scheduleAutoUpdate: Checking time in PHT:", now.toLocaleString("en-PH", { timeZone: "Asia/Manila" }));
+            const isSunday = now.getDay() === 0;
+            const isMidnight = now.getHours() === 0 && now.getMinutes() === 0;
+
+            const currentDateStr = now.toISOString().slice(0, 10);
+
+            if (isSunday && isMidnight && lastAutoUpdateDate !== currentDateStr) {
+              console.log("scheduleAutoUpdate: Triggering auto-update for Sunday at 00:00 PHT");
+              lastAutoUpdateDate = currentDateStr;
+              await adjustBalances();
+              console.log("scheduleAutoUpdate: Auto-update completed");
+            } else {
+              console.log(
+                "scheduleAutoUpdate: Skipping update - Not Sunday at 00:00 PHT or already updated today",
+                { isSunday, isMidnight, lastAutoUpdateDate }
+              );
+            }
+          } catch (error) {
+            console.error("scheduleAutoUpdate: Error in scheduler:", error);
+            showError(elements.profitError, "Auto-update failed: " + error.message);
+          }
+        }, 60000);
+      }
+
+      // Load Fund and Exceed Fund Balances
+      async function loadFundBalance() {
+        console.log("loadFundBalance: Starting");
+        try {
+          const fundSnapshot = await getDocs(collection(db, "fund"));
+          let mainBalance = 0;
+          let exceedBalance = 0;
+
+          const snapshot = await getDocs(collection(db, "users"));
+          allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          mainBalance = allMembers.reduce((sum, m) => sum + (m.balance || 0), 0);
+          console.log("loadFundBalance: Calculated mainBalance:", mainBalance);
+
+          const profitSnapshot = await getDocs(collection(db, "profit_distributions"));
+          profitSnapshot.docs.forEach((doc) => {
+            const data = doc.data();
+            if (data.excessAmount) {
+              exceedBalance += data.type === "profit" ? data.excessAmount : -data.excessAmount;
+            }
+          });
+          console.log("loadFundBalance: Calculated exceedBalance:", exceedBalance);
+
+          if (fundSnapshot.empty) {
+            await setDoc(doc(db, "fund", "main"), { mainBalance, exceedBalance });
+            console.log("loadFundBalance: Created new fund document");
+          } else {
+            await updateDoc(doc(db, "fund", fundSnapshot.docs[0].id), { mainBalance, exceedBalance });
+            console.log("loadFundBalance: Updated existing fund document");
+          }
+
+          elements.fundBalance.textContent = formatCurrency(mainBalance);
+          elements.exceedFund.textContent = formatCurrency(exceedBalance);
+          elements.exceedFundDisplay.textContent = formatCurrency(exceedBalance);
+          console.log("loadFundBalance: Updated UI with fund balances");
+          return { mainBalance, exceedBalance };
+        } catch (error) {
+          console.error("loadFundBalance: Error:", error);
+          showError(elements.profitError, "Failed to load fund balance: " + error.message);
+          return { mainBalance: 0, exceedBalance: 0 };
+        }
+      }
+
+      // Initialize Chart
+      function initializeChart() {
+        console.log("initializeChart: Initializing");
+        if (fundChartInstance) fundChartInstance.destroy();
+        const ctx = document.getElementById("fundChart").getContext("2d");
+        fundChartInstance = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "Fund Balance",
+                data: [],
+                backgroundColor: "rgba(59, 130, 246, 0.2)",
+                borderColor: "rgba(59, 130, 246, 1)",
+                borderWidth: 2,
+                fill: true,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { labels: { color: "white" } } },
+            scales: {
+              x: { ticks: { color: "white" } },
+              y: { ticks: { color: "white", callback: (value) => `₱${formatCurrency(value)}` }, beginAtZero: true },
+            },
+          },
+        });
+        console.log("initializeChart: Chart initialized");
+      }
+
+      // Update Chart
+      async function updateChart() {
+        console.log("updateChart: Starting");
+        try {
+          const q = query(collection(db, "profit_distributions"), orderBy("timestamp", "asc"));
+          const snapshot = await getDocs(q);
+          const labels = [];
+          const data = [];
+          const { mainBalance } = await loadFundBalance();
+
+          snapshot.docs.forEach((doc) => {
+            const d = doc.data();
+            const date = d.timestamp?.toDate?.() ? d.timestamp.toDate() : new Date(d.timestamp || Date.now());
+            const formattedDate = date.toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+            if (!labels.includes(formattedDate)) {
+              labels.push(formattedDate);
+              data.push(mainBalance);
+            }
+          });
+
+          if (labels.length === 0) {
+            const now = new Date();
+            labels.push(now.toLocaleDateString("en-PH", { month: "short", day: "numeric" }));
+            data.push(mainBalance);
+          }
+
+          fundChartInstance.data.labels = labels;
+          fundChartInstance.data.datasets[0].data = data;
+          fundChartInstance.update();
+          console.log("updateChart: Chart updated with", labels.length, "data points");
+        } catch (error) {
+          console.error("updateChart: Error:", error);
+          showError(elements.profitError, "Failed to update chart: " + error.message);
+        }
+      }
+
+      // Load Members
+      async function loadMembers() {
+        console.log("loadMembers: Starting");
+        showLoading(elements.membersList);
+        showLoading(elements.topShareholders);
+        try {
+          const snapshot = await getDocs(collection(db, "users"));
+          allMembers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          console.log("loadMembers: Fetched", allMembers.length, "members");
+
+          let memberCount = 0,
+              shareTotal = 0,
+              balanceTotal = 0;
+          elements.membersList.innerHTML = "";
+          const serverTime = await getServerTime();
+
+          for (const m of allMembers) {
+            memberCount++;
+            shareTotal += m.shares || 0;
+            balanceTotal += m.balance || 0;
+
+            const eligibility = await isMemberEligible(m, serverTime);
+            const div = document.createElement("div");
+            div.className = "bg-gray-800 p-4 rounded-lg shadow";
+            div.innerHTML = `
+              <p><strong>Name:</strong> ${m.name || "N/A"}</p>
+              <p><strong>Email:</strong> ${m.email || "N/A"}</p>
+              <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${
+                m.status === "approved"
+                  ? "bg-green-600"
+                  : m.status === "pending"
+                    ? "bg-yellow-600"
+                    : "bg-red-600"
+              }">${m.status || "N/A"}</span></p>
+              <p><strong>Shares:</strong> ${m.shares || 0}</p>
+              <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
+              <p><strong>Eligible:</strong> ${eligibility.eligible ? "Yes" : `No (${eligibility.reason})`}</p>
+              <div class="flex space-x-2 mt-2">
+                <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-700">Edit</button>
+                <button data-id="${m.id}" data-name="${
+                  m.name || "Unknown"
+                }" class="delete-btn bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">Delete</button>
+                <button data-id="${m.id}" data-name="${m.name || "Unknown"}" data-balance="${
+                  m.balance || 0
+                }" class="cashout-btn bg-orange-600 px-3 py-1 rounded text-sm hover:bg-orange-700 ${
+                  (m.balance || 0) <= 0 ? "opacity-50 cursor-not-allowed" : ""
+                }" ${(m.balance || 0) <= 0 ? "disabled" : ""}>Cash Out</button>
+              </div>
+            `;
+            elements.membersList.appendChild(div);
+          }
+
+          elements.totalMembers.textContent = memberCount;
+          elements.totalShares.textContent = shareTotal;
+          elements.totalBalance.textContent = formatCurrency(balanceTotal);
+          console.log("loadMembers: Updated totals - Members:", memberCount, "Shares:", shareTotal, "Balance:", balanceTotal);
+
+          const topMembers = [...allMembers]
+            .sort((a, b) => (b.shares || 0) - (a.shares || 0))
+            .slice(0, 5);
+          elements.topShareholders.innerHTML = topMembers
+            .map(
+              (m) =>
+                `<li>${m.name || "N/A"}: ${m.shares || 0} shares (₱${formatCurrency(m.balance || 0)})</li>`
+            )
+            .join("");
+          console.log("loadMembers: Updated top shareholders");
+        } catch (error) {
+          console.error("loadMembers: Error:", error);
+          showError(elements.profitError, "Failed to load members: " + error.message);
+        }
+      }
+
+      // Load Transaction Requests
+      async function loadRequests() {
+        console.log("loadRequests: Starting");
+        showLoading(elements.requestsList);
+        try {
+          const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
+          const snapshot = await getDocs(q);
+          elements.requestsList.innerHTML = "";
+
+          snapshot.docs.forEach((doc) => {
+            const t = { id: doc.id, ...doc.data() };
+            const div = document.createElement("div");
+            div.className = "bg-gray-700 p-4 rounded-lg";
+            div.innerHTML = `
+              <p><strong>${t.memberName || "Unknown"} (${t.type})</strong></p>
+              <p>Amount: ₱${formatCurrency(t.amount)}</p>
+              <p>Status: <span class="px-2 py-1 rounded ${
+                t.status === "approved"
+                  ? "bg-green-600"
+                  : t.status === "pending"
+                    ? "bg-yellow-600"
+                    : "bg-red-600"
+              }">${t.status}</span></p>
+              <p>Date: ${t.timestamp?.toDate?.() ? t.timestamp.toDate().toLocaleString("en-PH") : "N/A"}</p>
+              <div class="flex space-x-2 mt-2">
+                <button data-id="${t.id}" data-type="approve" class="action-btn bg-green-600 px-3 py-1 rounded text-sm hover:bg-green-700">Approve</button>
+                <button data-id="${t.id}" data-type="reject" class="action-btn bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">Reject</button>
+              </div>
+            `;
+            elements.requestsList.appendChild(div);
+          });
+          console.log("loadRequests: Loaded", snapshot.docs.length, "requests");
+        } catch (error) {
+          console.error("loadRequests: Error:", error);
+          showError(elements.profitError, "Failed to load requests: " + error.message);
+        }
+      }
+
+      // Load Transaction History
+      async function loadHistory() {
+        console.log("loadHistory: Starting");
+        showLoading(elements.historyList);
+        try {
+          const filter = elements.historyFilter.value;
+          const sort = elements.historySort.value;
+          let q = query(collection(db, "transactions"), orderBy("timestamp", sort));
+          if (filter !== "all") {
+            q = query(collection(db, "transactions"), where("type", "==", filter), orderBy("timestamp", sort));
+          }
+          const snapshot = await getDocs(q);
+          allTransactions = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          elements.historyList.innerHTML = "";
+
+          allTransactions.forEach((t) => {
+            const div = document.createElement("div");
+            div.className = "bg-gray-700 p-4 rounded-lg";
+            div.innerHTML = `
+              <p><strong>${t.memberName || "Unknown"} (${t.type})</strong></p>
+              <p>Amount: ₱${formatCurrency(t.amount)}</p>
+              <p>Status: <span class="px-2 py-1 rounded ${
+                t.status === "approved"
+                  ? "bg-green-600"
+                  : t.status === "pending"
+                    ? "bg-yellow-600"
+                    : "bg-red-600"
+              }">${t.status}</span></p>
+              <p>Date: ${t.timestamp?.toDate?.() ? t.timestamp.toDate().toLocaleString("en-PH") : "N/A"}</p>
+            `;
+            elements.historyList.appendChild(div);
+          });
+          console.log("loadHistory: Loaded", allTransactions.length, "transactions");
+        } catch (error) {
+          console.error("loadHistory: Error:", error);
+          showError(elements.profitError, "Failed to load history: " + error.message);
+        }
+      }
+
+      // Load Daily Distribution Report
+      async function loadDailyReport() {
+        console.log("loadDailyReport: Starting");
+        showLoading(elements.dailyReportList, "Loading daily distributions...");
+        try {
+          const serverTime = await getServerTime();
+          const { start, end } = getPHTDayRange(serverTime);
+          const q = query(
+            collection(db, "member_distributions"),
+            where("timestamp", ">=", start),
+            where("timestamp", "<=", end),
+            orderBy("timestamp", "desc")
+          );
+          const snapshot = await getDocs(q);
+          elements.dailyReportList.innerHTML = "";
+
+          if (snapshot.empty) {
+            elements.dailyReportList.innerHTML = `<p class="text-gray-400">No distributions for today.</p>`;
+            console.log("loadDailyReport: No distributions found for today");
+            return;
+          }
+
+          // Fetch all members to get their balances for percentage calculation
+          const memberSnapshot = await getDocs(collection(db, "users"));
+          const memberMap = new Map(
+            memberSnapshot.docs.map((doc) => [doc.id, { ...doc.data(), id: doc.id }])
+          );
+
+          snapshot.docs.forEach((doc) => {
+            const d = doc.data();
+            const member = memberMap.get(d.memberId);
+            let percentageLoss = "N/A";
+
+            // Calculate percentage loss if type is loss and member data exists
+            if (d.type === "loss" && member) {
+              const balanceBeforeLoss = (member.balance || 0) + (d.amount || 0); // Current balance + loss amount
+              percentageLoss =
+                balanceBeforeLoss > 0
+                  ? ((d.amount / balanceBeforeLoss) * 100).toFixed(2) + "%"
+                  : "N/A";
+            }
+
+            const div = document.createElement("div");
+            div.className = "bg-gray-700 p-4 rounded-lg";
+            div.innerHTML = `
+              <p><strong>${d.memberName || "Unknown"} (${d.type || "N/A"})</strong></p>
+              <p>Amount: ₱${formatCurrency(d.amount || 0)}</p>
+              ${d.type === "loss" ? `<p>Percentage Loss: ${percentageLoss}</p>` : ""}
+              <p>Distribution ID: ${d.distributionId || "N/A"}</p>
+              <p>Date: ${d.timestamp?.toDate?.() ? d.timestamp.toDate().toLocaleString("en-PH") : "N/A"}</p>
+            `;
+            elements.dailyReportList.appendChild(div);
+          });
+          console.log("loadDailyReport: Loaded", snapshot.docs.length, "distributions");
+        } catch (error) {
+          console.error("loadDailyReport: Error:", error);
+          showError(elements.profitError, "Failed to load daily report: " + error.message);
+        }
+      }
+
+      // Pre-Distribution Report
+      async function generatePreDistributionReport() {
+        console.log("generatePreDistributionReport: Starting");
+        try {
+          const serverTime = await getServerTime();
+          const report = [];
+          for (const m of allMembers) {
+            const eligibility = await isMemberEligible(m, serverTime);
+            report.push({
+              Name: m.name || "N/A",
+              Email: m.email || "N/A",
+              Shares: m.shares || 0,
+              Balance: `₱${formatCurrency(m.balance || 0)}`,
+              Status: m.status || "N/A",
+              ApprovalDate: m.approvalDate?.toDate?.()
+                ? m.approvalDate.toDate().toLocaleString("en-PH")
+                : m.approvalDate
+                  ? new Date(m.approvalDate).toLocaleString("en-PH")
+                  : "N/A",
+              LastDistribution: m.lastDistribution?.toDate?.()
+                ? m.lastDistribution.toDate().toLocaleString("en-PH")
+                : m.lastDistribution
+                  ? new Date(m.lastDistribution).toLocaleString("en-PH")
+                  : "N/A",
+              Eligible: eligibility.eligible ? "Yes" : `No (${eligibility.reason})`,
+            });
+          }
+          console.log("generatePreDistributionReport: Generated report for", report.length, "members");
+
+          const worksheet = XLSX.utils.json_to_sheet(report);
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(workbook, worksheet, "Pre-Distribution Report");
+          XLSX.writeFile(workbook, `Pre_Distribution_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+          console.log("generatePreDistributionReport: Exported report to Excel");
+        } catch (error) {
+          console.error("generatePreDistributionReport: Error:", error);
+          showError(elements.profitError, "Failed to generate pre-distribution report: " + error.message);
+        }
+      }
+
+      // Export Database to Excel
+      async function exportDatabase() {
+        console.log("exportDatabase: Starting");
+        try {
+          const members = allMembers.map((m) => ({
+            Name: m.name || "N/A",
+            Email: m.email || "N/A",
+            Status: m.status || "N/A",
+            Shares: m.shares || 0,
+            Balance: `₱${formatCurrency(m.balance || 0)}`,
+            ApprovalDate: m.approvalDate?.toDate?.()
+              ? m.approvalDate.toDate().toLocaleString("en-PH")
+              : m.approvalDate
+                ? new Date(m.approvalDate).toLocaleString("en-PH")
+                : "N/A",
+            LastDistribution: m.lastDistribution?.toDate?.()
+              ? m.lastDistribution.toDate().toLocaleString("en-PH")
+              : m.lastDistribution
+                ? new Date(m.lastDistribution).toLocaleString("en-PH")
+                : "N/A",
+          }));
+
+          const transactions = allTransactions.map((t) => ({
+            MemberName: t.memberName || "N/A",
+            Type: t.type || "N/A",
+            Amount: `₱${formatCurrency(t.amount || 0)}`,
+            Status: t.status || "N/A",
+            Timestamp: t.timestamp?.toDate?.() ? t.timestamp.toDate().toLocaleString("en-PH") : "N/A",
+            DistributionId: t.distributionId || "N/A",
+          }));
+
+          const workbook = XLSX.utils.book_new();
+          const memberSheet = XLSX.utils.json_to_sheet(members);
+          const transactionSheet = XLSX.utils.json_to_sheet(transactions);
+          XLSX.utils.book_append_sheet(workbook, memberSheet, "Members");
+          XLSX.utils.book_append_sheet(workbook, transactionSheet, "Transactions");
+          XLSX.writeFile(workbook, `Database_Export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+          console.log("exportDatabase: Exported database to Excel");
+        } catch (error) {
+          console.error("exportDatabase: Error:", error);
+          showError(elements.profitError, "Failed to export database: " + error.message);
+        }
+      }
+
+      // Export Daily Report to Excel
+      elements.exportExcelBtn.addEventListener("click", async () => {
+        console.log("exportExcelBtn: Exporting daily report");
+        try {
+          const serverTime = await getServerTime();
+          const { start, end } = getPHTDayRange(serverTime);
+          const q = query(
+            collection(db, "member_distributions"),
+            where("timestamp", ">=", start),
+            where("timestamp", "<=", end)
+          );
+          const snapshot = await getDocs(q);
+          const report = [];
+
+          // Fetch all members to get their balances for percentage calculation
+          const memberSnapshot = await getDocs(collection(db, "users"));
+          const memberMap = new Map(
+            memberSnapshot.docs.map((doc) => [doc.id, { ...doc.data(), id: doc.id }])
+          );
+
+          snapshot.docs.forEach((doc) => {
+            const d = doc.data();
+            const member = memberMap.get(d.memberId);
+            let percentageLoss = "N/A";
+
+            if (d.type === "loss" && member) {
+              const balanceBeforeLoss = (member.balance || 0) + (d.amount || 0);
+              percentageLoss =
+                balanceBeforeLoss > 0
+                  ? ((d.amount / balanceBeforeLoss) * 100).toFixed(2) + "%"
+                  : "N/A";
+            }
+
+            report.push({
+              MemberName: d.memberName || "N/A",
+              Type: d.type || "N/A",
+              Amount: `₱${formatCurrency(d.amount || 0)}`,
+              PercentageLoss: d.type === "loss" ? percentageLoss : "N/A",
+              DistributionId: d.distributionId || "N/A",
+              Timestamp: d.timestamp?.toDate?.() ? d.timestamp.toDate().toLocaleString("en-PH") : "N/A",
+            });
+          });
+
+          if (report.length === 0) {
+            showError(elements.profitError, "No distributions available for today.");
+            console.log("exportExcelBtn: No distributions to export");
+            return;
+          }
+
+          const worksheet = XLSX.utils.json_to_sheet(report);
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(workbook, worksheet, "Daily Report");
+          XLSX.writeFile(workbook, `Daily_Distribution_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+          console.log("exportExcelBtn: Exported daily report to Excel with", report.length, "records");
+        } catch (error) {
+          console.error("exportExcelBtn: Error:", error);
+          showError(elements.profitError, "Failed to export daily report: " + error.message);
+        }
+      });
+
+      // Distribute Profit/Loss
+      elements.profitForm.addEventListener("submit", async (e) => {
+        console.log("profitForm: Form submitted");
+        e.preventDefault();
+        const now = Date.now();
+        if (now - lastSubmissionTime < SUBMISSION_COOLDOWN) {
+          showError(elements.profitError, `Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (now - lastSubmissionTime)) / 1000)} seconds.`);
+          console.log("profitForm: Cooldown active, submission blocked");
+          return;
+        }
+        lastSubmissionTime = now;
+        elements.distributeBtn.disabled = true;
+
+        try {
+          const type = elements.transactionType.value;
+          const source = elements.fundSource.value;
+          const inputType = elements.inputType.value;
+          const inputValue = parseFloat(elements.profitAmount.value);
+          if (inputValue <= 0) throw new Error("Input value must be greater than 0.");
+          if (inputType === "percentage" && inputValue > 100) throw new Error("Percentage cannot exceed 100%.");
+
+          const fundSnap = await getDocs(collection(db, "fund"));
+          if (fundSnap.empty) throw new Error("Fund document not found.");
+          const fundDoc = fundSnap.docs[0];
+          const fundData = fundDoc.data();
+          const mainBalance = fundData.mainBalance || 0;
+          const exceedBalance = fundData.exceedBalance || 0;
+          const serverTime = await getServerTime();
+          const batch = writeBatch(db);
+
+          const distRef = doc(collection(db, "profit_distributions"));
+          console.log("profitForm: Created distribution ref with ID:", distRef.id);
+
+          let totalDistributed = 0;
+          let eligibleMembers = allMembers; // Include all members
+          let totalShares = eligibleMembers.reduce((sum, m) => sum + (m.shares || 0), 0);
+          let totalEligibleBalance = eligibleMembers.reduce((sum, m) => sum + (m.balance || 0), 0);
+          let totalAmount = inputValue;
+
+          if (!eligibleMembers.length) {
+            throw new Error("No members available for distribution.");
+          }
+
+          if (type === "profit") {
+            // Profit distribution (proportional to shares)
+            if (totalShares <= 0) {
+              throw new Error("Total shares must be greater than 0 for profit distribution.");
+            }
+
+            let remainingAmount = inputValue;
+            eligibleMembers.forEach((m, index) => {
+              if (inputType === "percentage") {
+                const profitPercentage = inputValue / 100;
+                const memberDist = Number(((m.shares || 0) * profitPercentage).toFixed(2));
+                if (memberDist <= 0) return;
+
+                const newBalance = (m.balance || 0) + memberDist;
+                totalDistributed += memberDist;
+
+                batch.update(doc(db, "users", m.id), {
+                  balance: newBalance,
+                  lastDistribution: serverTimestamp(),
+                });
+
+                batch.set(doc(collection(db, "member_distributions")), {
+                  memberId: m.id,
+                  memberName: m.name || "Unknown",
+                  type: "profit",
+                  amount: memberDist,
+                  timestamp: serverTimestamp(),
+                  distributionId: distRef.id,
+                });
+
+                console.log(`profitForm: Member ${m.name || "Unknown"} (ID: ${m.id}) profit: ₱${memberDist}, New Balance: ₱${newBalance}`);
+              } else {
+                // Amount-based profit
+                if (index === eligibleMembers.length - 1) {
+                  const memberDist = Number(remainingAmount.toFixed(2));
+                  if (memberDist <= 0) return;
+
+                  const newBalance = (m.balance || 0) + memberDist;
+                  totalDistributed += memberDist;
+
+                  batch.update(doc(db, "users", m.id), {
+                    balance: newBalance,
+                    lastDistribution: serverTimestamp(),
+                  });
+
+                  batch.set(doc(collection(db, "member_distributions")), {
+                    memberId: m.id,
+                    memberName: m.name || "Unknown",
+                    type: "profit",
+                    amount: memberDist,
+                    timestamp: serverTimestamp(),
+                    distributionId: distRef.id,
+                  });
+
+                  console.log(`profitForm: Member ${m.name || "Unknown"} (ID: ${m.id}) profit: ₱${memberDist}, New Balance: ₱${newBalance}`);
+                } else {
+                  const memberDist = Number(
+                    ((inputValue * (m.shares || 0)) / totalShares).toFixed(2)
+                  );
+                  if (memberDist <= 0) return;
+
+                  const newBalance = (m.balance || 0) + memberDist;
+                  totalDistributed += memberDist;
+                  remainingAmount -= memberDist;
+
+                  batch.update(doc(db, "users", m.id), {
+                    balance: newBalance,
+                    lastDistribution: serverTimestamp(),
+                  });
+
+                  batch.set(doc(collection(db, "member_distributions")), {
+                    memberId: m.id,
+                    memberName: m.name || "Unknown",
+                    type: "profit",
+                    amount: memberDist,
+                    timestamp: serverTimestamp(),
+                    distributionId: distRef.id,
+                  });
+
+                  console.log(`profitForm: Member ${m.name || "Unknown"} (ID: ${m.id}) profit: ₱${memberDist}, New Balance: ₱${newBalance}`);
+                }
+              }
+            });
+            totalAmount = totalDistributed;
+          } else {
+            // Loss distribution (proportional to balance)
+            if (totalEligibleBalance <= 0) {
+              throw new Error("Total eligible balance is zero, cannot distribute loss.");
+            }
+            if (totalEligibleBalance !== mainBalance) {
+              console.warn("profitForm: Total eligible balance (₱", totalEligibleBalance, ") does not match mainBalance (₱", mainBalance, ")");
+            }
+
+            let remainingAmount = inputValue;
+            if (inputType === "percentage") {
+              const lossPercentage = inputValue / 100;
+              eligibleMembers.forEach((m) => {
+                const memberDist = Number(((m.balance || 0) * lossPercentage).toFixed(2));
+                if (memberDist <= 0) return;
+
+                const newBalance = Math.max(0, (m.balance || 0) - memberDist);
+                totalDistributed += memberDist;
+
+                batch.update(doc(db, "users", m.id), {
+                  balance: newBalance,
+                  lastDistribution: serverTimestamp(),
+                });
+
+                batch.set(doc(collection(db, "member_distributions")), {
+                  memberId: m.id,
+                  memberName: m.name || "Unknown",
+                  type: "loss",
+                  amount: memberDist,
+                  timestamp: serverTimestamp(),
+                  distributionId: distRef.id,
+                });
+
+                console.log(`profitForm: Member ${m.name || "Unknown"} (ID: ${m.id}) loss: ₱${memberDist}, New Balance: ₱${newBalance}`);
+              });
+              totalAmount = totalDistributed;
+            } else {
+              // Amount-based loss distribution
+              let runningTotal = 0;
+              eligibleMembers.forEach((m, index) => {
+                if (index === eligibleMembers.length - 1) {
+                  const memberDist = Number(Math.min(remainingAmount, m.balance || 0).toFixed(2));
+                  if (memberDist <= 0) return;
+
+                  const newBalance = Math.max(0, (m.balance || 0) - memberDist);
+                  totalDistributed += memberDist;
+
+                  batch.update(doc(db, "users", m.id), {
+                    balance: newBalance,
+                    lastDistribution: serverTimestamp(),
+                  });
+
+                  batch.set(doc(collection(db, "member_distributions")), {
+                    memberId: m.id,
+                    memberName: m.name || "Unknown",
+                    type: "loss",
+                    amount: memberDist,
+                    timestamp: serverTimestamp(),
+                    distributionId: distRef.id,
+                  });
+
+                  console.log(`profitForm: Member ${m.name || "Unknown"} (ID: ${m.id}) loss: ₱${memberDist}, New Balance: ₱${newBalance}`);
+                } else {
+                  const memberDist = Number(
+                    Math.min(
+                      ((inputValue * (m.balance || 0)) / totalEligibleBalance), (m.balance || 0)
+                    ).toFixed(2)
+                  );
+                  if (memberDist <= 0) return;
+
+                  runningTotal += memberDist;
+                  if (runningTotal > inputValue) {
+                    // Adjust to prevent exceeding inputValue
+                    const adjustedDist = memberDist - (runningTotal - inputValue);
+                    if (adjustedDist <= 0) return;
+                    totalDistributed += adjustedDist;
+                    remainingAmount -= adjustedDist;
+
+                    batch.update(doc(db, "users", m.id), {
+                      balance: Math.max(0, (m.balance || 0) - adjustedDist),
+                      lastDistribution: serverTimestamp(),
+                    });
+
+                    batch.set(doc(collection(db, "member_distributions")), {
+                      memberId: m.id,
+                      memberName: m.name || "Unknown",
+                      type: "loss",
+                      amount: adjustedDist,
+                      timestamp: serverTimestamp(),
+                      distributionId: distRef.id,
+                    });
+
+                    console.log(`profitForm: Member ${m.name || "Unknown"} (ID: ${m.id}) adjusted loss: ₱${adjustedDist}, New Balance: ₱${(m.balance || 0) - adjustedDist}`);
+                  } else {
+                    totalDistributed += memberDist;
+                    remainingAmount -= memberDist;
+
+                    const newBalance = Math.max(0, (m.balance || 0) - memberDist);
+                    batch.update(doc(db, "users", m.id), {
+                      balance: newBalance,
+                      lastDistribution: serverTimestamp(),
+                    });
+
+                    batch.set(doc(collection(db, "member_distributions")), {
+                      memberId: m.id,
+                      memberName: m.name || "Unknown",
+                      type: "loss",
+                      amount: memberDist,
+                      timestamp: serverTimestamp(),
+                      distributionId: distRef.id,
+                    });
+
+                    console.log(`profitForm: Member ${m.name || "Unknown"} (ID: ${m.id}) loss: ₱${memberDist}, New Balance: ₱${newBalance}`);
+                  }
+                }
+              });
+            }
+            console.log(`profitForm: Total distributed: ₱${totalDistributed}, Input value: ₱${inputValue}, Remaining: ₱${remainingAmount}`);
+          }
+
+          if (inputType === "amount" && totalDistributed > inputValue + 0.01) {
+            throw new Error(
+              `Calculated distribution (₱${totalDistributed.toFixed(2)}) exceeds requested amount (₱${inputValue.toFixed(2)}).`
+            );
+          }
+
+          const excessAmount = inputType === "amount" ? Math.max(0, inputValue - totalDistributed) : 0;
+          let newMainBalance = mainBalance;
+          let newExceedBalance = exceedBalance;
+
+          if (source === "main") {
+            newMainBalance = mainBalance + (type === "profit" ? -totalDistributed : totalDistributed);
+            newExceedBalance = exceedBalance + (type === "profit" ? excessAmount : -excessAmount);
+          } else {
+            newExceedBalance = exceedBalance + (type === "profit" ? -totalDistributed : totalDistributed);
+          }
+
+          if (newMainBalance < 0) throw new Error("Insufficient main fund balance.");
+          if (newExceedBalance < 0) throw new Error("Insufficient exceed fund balance.");
+
+          batch.update(doc(db, "fund", fundDoc.id), { mainBalance: newMainBalance, exceedBalance: newExceedBalance });
+
+          batch.set(distRef, {
+            type,
+            source,
+            amount: totalDistributed,
+            excessAmount: excessAmount,
+            inputType: inputType,
+            inputValue: inputValue,
+            timestamp: serverTimestamp(),
+            adminId: auth.currentUser.uid,
+            eligibleMemberCount: eligibleMembers.length,
+            totalMemberCount: allMembers.length,
+            totalShares,
+            totalEligibleBalance,
+          });
+
+          await batch.commit();
+          elements.profitForm.reset();
+          await loadMembers();
+          await loadFundBalance();
+          await loadDailyReport();
+          await updateChart();
+          alert(`Successfully ${type === "profit" ? "distributed profit" : "deducted loss"} of ₱${formatCurrency(totalDistributed)} from ${source} fund! ${excessAmount > 0 ? `Excess ₱${formatCurrency(excessAmount)} ${source === "main" ? "added to exceed fund" : "deducted from exceed fund"}. ` : ""}New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
+          console.log("profitForm: Successfully processed", type, "of ₱", totalDistributed, "with input type:", inputType);
+        } catch (error) {
+          console.error("profitForm: Error:", error);
+          showError(elements.profitError, error.message);
+        } finally {
+          elements.distributeBtn.disabled = false;
+          console.log("profitForm: Button re-enabled");
+        }
+      });
+
+      // Add to Exceed Fund
+      elements.addExceedForm.addEventListener("submit", async (e) => {
+        console.log("addExceedForm: Form submitted");
+        e.preventDefault();
+        const now = Date.now();
+        if (now - lastSubmissionTime < SUBMISSION_COOLDOWN) {
+          showError(elements.exceedError, `Please wait ${Math.ceil((SUBMISSION_COOLDOWN - (now - lastSubmissionTime)) / 1000)} seconds.`);
+          console.log("addExceedForm: Cooldown active, submission blocked");
+          return;
+        }
+        lastSubmissionTime = now;
+        elements.addExceedBtn.disabled = true;
+
+        try {
+          const amount = parseFloat(elements.exceedAmount.value);
+          if (amount <= 0) throw new Error("Amount must be greater than 0.");
+
+          const fundSnap = await getDocs(collection(db, "fund"));
+          const fundDoc = fundSnap.docs[0];
+          const fundData = fundDoc.data();
+          const newExceedBalance = (fundData.exceedBalance || 0) + amount;
+
+          await updateDoc(doc(db, "fund", fundDoc.id), {
+            mainBalance: fundData.mainBalance || 0,
+            exceedBalance: newExceedBalance,
+          });
+
+          elements.addExceedForm.reset();
+          await loadFundBalance();
+          alert(`Successfully added ₱${formatCurrency(amount)} to exceed fund. New exceed fund balance: ₱${formatCurrency(newExceedBalance)}.`);
+          console.log("addExceedForm: Added ₱", amount, "to exceed fund");
+        } catch (error) {
+          console.error("addExceedForm: Error:", error);
+          showError(elements.exceedError, error.message);
+        } finally {
+          elements.addExceedBtn.disabled = false;
+          console.log("addExceedForm: Button re-enabled");
+        }
+      });
+
+      // Handle Members Actions (Edit, Delete, Cash Out)
+      elements.membersList.addEventListener("click", async (e) => {
+        if (e.target.classList.contains("edit-btn")) {
+          console.log("editMember: Edit button clicked");
+          const id = e.target.dataset.id;
+          const member = allMembers.find((m) => m.id === id);
+          if (!member) {
+            console.log("editMember: Member not found, ID:", id);
+            showError(elements.profitError, "Member not found.");
+            return;
+          }
+
+          elements.editMemberId.value = id;
+          elements.editName.value = member.name || "";
+          elements.editEmail.value = member.email || "";
+          elements.editStatus.value = member.status || "pending";
+          elements.editShares.value = member.shares || 0;
+          elements.editBalance.value = member.balance || 0;
+          elements.editApprovalDate.value = member.approvalDate
+            ? member.approvalDate.toDate?.().toISOString().slice(0, 16) || new Date(member.approvalDate).toISOString().slice(0, 16)
+            : new Date().toISOString().slice(0, 16);
+          elements.editModal.classList.remove("hidden");
+          console.log("editMember: Modal opened for member ID:", id);
+        }
+
+        if (e.target.classList.contains("delete-btn")) {
+          console.log("deleteMember: Delete button clicked");
+          const id = e.target.dataset.id;
+          const name = e.target.dataset.name;
+          if (confirm(`Are you sure you want to delete ${name}?`)) {
+            try {
+              await deleteDoc(doc(db, "users", id));
+              await loadMembers();
+              console.log("deleteMember: Deleted member ID:", id);
+            } catch (error) {
+              console.error("deleteMember: Error:", error);
+              showError(elements.profitError, "Failed to delete member: " + error.message);
+            }
+          }
+        }
+
+        if (e.target.classList.contains("cashout-btn") && !e.target.disabled) {
+          console.log("cashOut: Cash Out button clicked");
+          const id = e.target.dataset.id;
+          const name = e.target.dataset.name;
+          const balance = parseFloat(e.target.dataset.balance);
+          if (balance <= 0) {
+            showError(elements.profitError, "Cannot cash out: Insufficient balance.");
+            console.log("cashOut: Insufficient balance for member ID:", id);
+            return;
+          }
+
+          elements.cashOutMemberId.value = id;
+          elements.cashOutMemberName.value = name;
+          elements.cashOutCurrentBalance.value = `₱${formatCurrency(balance)}`;
+          elements.cashOutAmount.value = "";
+          elements.cashOutModal.classList.remove("hidden");
+          console.log("cashOut: Modal opened for member ID:", id);
+        }
+      });
+
+      elements.cancelEdit.addEventListener("click", () => {
+        elements.editModal.classList.add("hidden");
+        console.log("editMember: Modal closed");
+      });
+
+      elements.editForm.addEventListener("submit", async (e) => {
+        console.log("editForm: Form submitted");
+        e.preventDefault();
+        try {
+          const memberId = elements.editMemberId.value;
+          const updatedData = {
+            name: elements.editName.value,
+            email: elements.editEmail.value,
+            status: elements.editStatus.value,
+            shares: parseInt(elements.editShares.value) || 0,
+            balance: parseFloat(elements.editBalance.value) || 0,
+            approvalDate: new Date(elements.editApprovalDate.value),
+          };
+
+          await updateDoc(doc(db, "users", memberId), updatedData);
+          elements.editModal.classList.add("hidden");
+          await loadMembers();
+          await loadFundBalance();
+          console.log("editForm: Updated member ID:", memberId);
+        } catch (error) {
+          console.error("editForm: Error:", error);
+          showError(elements.profitError, "Failed to update member: " + error.message);
+        }
+      });
+
+      elements.cancelCashOut.addEventListener("click", () => {
+        elements.cashOutModal.classList.add("hidden");
+        elements.cashOutError.classList.add("hidden");
+        console.log("cashOut: Modal closed");
+      });
+
+      elements.cashOutForm.addEventListener("submit", async (e) => {
+        console.log("cashOutForm: Form submitted");
+        e.preventDefault();
+        try {
+          const memberId = elements.cashOutMemberId.value;
+          const amount = parseFloat(elements.cashOutAmount.value);
+          const member = allMembers.find((m) => m.id === memberId);
+          if (!member) throw new Error("Member not found.");
+          if (amount <= 0) throw new Error("Cash out amount must be greater than 0.");
+          if (amount > (member.balance || 0)) throw new Error("Cash out amount exceeds member balance.");
+
+          const transRef = doc(collection(db, "transactions"));
+          await setDoc(transRef, {
+            memberId: memberId,
+            memberName: member.name || "Unknown",
+            type: "cashout",
+            amount: amount,
+            status: "pending",
+            timestamp: serverTimestamp(),
+            adminId: auth.currentUser.uid,
+          });
+
+          elements.cashOutModal.classList.add("hidden");
+          elements.cashOutForm.reset();
+          await loadRequests();
+          alert(`Cash out request of ₱${formatCurrency(amount)} for ${member.name || "Unknown"} submitted for approval.`);
+          console.log("cashOutForm: Submitted cash out request for member ID:", memberId, "Amount: ₱", amount);
+        } catch (error) {
+          console.error("cashOutForm: Error:", error);
+          showError(elements.cashOutError, error.message);
+        }
+      });
+
+      // Handle Transaction Requests
+      elements.requestsList.addEventListener("click", async (e) => {
+        if (e.target.classList.contains("action-btn")) {
+          console.log("transactionAction: Button clicked");
+          const id = e.target.dataset.id;
+          const action = e.target.dataset.type;
+          try {
+            const transRef = doc(db, "transactions", id);
+            const transSnap = await getDoc(transRef);
+            const transData = transSnap.data();
+            const batch = writeBatch(db);
+
+            if (action === "approve") {
+              const member = allMembers.find((m) => m.id === transData.memberId);
+              if (!member) throw new Error("Member not found.");
+
+              let newBalance = member.balance || 0;
+              if (transData.type === "deposit") {
+                newBalance += transData.amount;
+              } else if (transData.type === "cashout") {
+                if (newBalance < transData.amount) throw new Error("Insufficient balance.");
+                newBalance -= transData.amount;
+              }
+
+              batch.update(doc(db, "users", transData.memberId), { balance: newBalance });
+              batch.update(transRef, { status: "approved", timestamp: serverTimestamp() });
+            } else {
+              batch.update(transRef, { status: "rejected", timestamp: serverTimestamp() });
+            }
+
+            await batch.commit();
+            await loadRequests();
+            await loadMembers();
+            await loadFundBalance();
+            console.log("transactionAction: Processed", action, "for transaction ID:", id);
+          } catch (error) {
+            console.error("transactionAction: Error:", error);
+            showError(elements.profitError, error.message);
+          }
+        }
+      });
+
+      // Filter and Sort History
+      elements.historyFilter.addEventListener("change", loadHistory);
+      elements.historySort.addEventListener("change", loadHistory);
+
+      // Search Members
+      elements.searchInput.addEventListener("input", () => {
+        console.log("searchInput: Searching");
+        const searchTerm = elements.searchInput.value.toLowerCase();
+        elements.membersList.innerHTML = "";
+        allMembers
+          .filter(
+            (m) =>
+              m.name?.toLowerCase().includes(searchTerm) ||
+              m.email?.toLowerCase().includes(searchTerm)
+          )
+          .forEach((m) => {
+            const div = document.createElement("div");
+            div.className = "bg-gray-800 p-4 rounded-lg shadow";
+            div.innerHTML = `
+              <p><strong>Name:</strong> ${m.name || "N/A"}</p>
+              <p><strong>Email:</strong> ${m.email || "N/A"}</p>
+              <p><strong>Status:</strong> <span class="px-2 py-1 rounded ${
+                m.status === "approved"
+                  ? "bg-green-600"
+                  : m.status === "pending"
+                    ? "bg-yellow-600"
+                    : "bg-red-600"
+              }">${m.status || "N/A"}</span></p>
+              <p><strong>Shares:</strong> ${m.shares || 0}</p>
+              <p><strong>Balance:</strong> ₱${formatCurrency(m.balance)}</p>
+              <div class="flex space-x-2 mt-2">
+                <button data-id="${m.id}" class="edit-btn bg-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-700">Edit</button>
+                <button data-id="${m.id}" data-name="${
+                  m.name || "Unknown"
+                }" class="delete-btn bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">Delete</button>
+                <button data-id="${m.id}" data-name="${m.name || "Unknown"}" data-balance="${
+                  m.balance || 0
+                }" class="cashout-btn bg-orange-600 px-3 py-1 rounded text-sm hover:bg-orange-700 ${
+                  (m.balance || 0) <= 0 ? "opacity-50 cursor-not-allowed" : ""
+                }" ${(m.balance || 0) <= 0 ? "disabled" : ""}>Cash Out</button>
+              </div>
+            `;
+            elements.membersList.appendChild(div);
+          });
+        console.log("searchInput: Filtered members with term:", searchTerm);
+      });
+
+      // Logout
+      elements.logoutBtn.addEventListener("click", async () => {
+        console.log("logoutBtn: Logging out");
+        try {
+          await signOut(auth);
+          window.location.href = "login.html";
+          console.log("logoutBtn: Logout successful");
+        } catch (error) {
+          console.error("logoutBtn: Error:", error);
+          showError(elements.profitError, "Failed to logout: " + error.message);
+        }
+      });
+
+      // Server Time
+      elements.serverTimeBtn.addEventListener("click", async () => {
+        console.log("serverTimeBtn: Fetching server time");
+        try {
+          const serverTime = await getServerTime();
+          alert(`Server Time: ${serverTime.toLocaleString("en-PH", { timeZone: "Asia/Manila" })}`);
+          console.log("serverTimeBtn: Displayed server time");
+        } catch (error) {
+          console.error("serverTimeBtn: Error:", error);
+          showError(elements.profitError, "Failed to fetch server time: " + error.message);
+        }
+      });
+
+      // Adjust Balances
+      elements.adjustBalanceBtn.addEventListener("click", async () => {
+        console.log("adjustBalanceBtn: Button clicked");
+        await adjustBalances();
+      });
+
+      // Pre-Distribution Report
+      elements.preDistReportBtn.addEventListener("click", async () => {
+        console.log("preDistReportBtn: Generating report");
+        await generatePreDistributionReport();
+      });
+
+      // Export Database
+      elements.exportDbBtn.addEventListener("click", async () => {
+        console.log("exportDbBtn: Exporting database");
+        await exportDatabase();
+      });
+
+      // Initialize
+      onAuthStateChanged(auth, async (user) => {
+        console.log("authState: Checking user authentication");
+        if (user) {
+          console.log("authState: User authenticated, UID:", user.uid);
+          await loadMembers();
+          await loadFundBalance();
+          await loadRequests();
+          await loadHistory();
+          await loadDailyReport();
+          initializeChart();
+          await updateChart();
+          scheduleAutoUpdate();
+          console.log("authState: Initialization complete");
+        } else {
+          console.log("authState: No user authenticated, redirecting to login");
+          window.location.href = "login.html";
+        }
+      });
+    </script>
+  </body>
+</html>
